@@ -1,0 +1,22 @@
+# Source (only dist is published)
+src/
+*.ts
+!*.d.ts
+
+# Tests
+*.test.ts
+*.spec.ts
+__tests__/
+jest.config.*
+coverage/
+
+# Development
+node_modules/
+.eslintrc*
+.prettierrc*
+tsconfig.json
+rollup.config.js
+
+# IDE
+.idea/
+.vscode/

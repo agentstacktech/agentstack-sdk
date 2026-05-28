@@ -1,0 +1,33 @@
+{
+  "name": "agentstack-sdk",
+  "private": true,
+  "workspaces": [
+    "packages/core",
+    "packages/react",
+    "packages/hooks"
+  ],
+  "scripts": {
+    "build": "npm run build -w @agentstack/sdk && npm run build -w @agentstack/react && npm run build -w @agentstack/hooks",
+    "test": "npm run test -w @agentstack/sdk",
+    "check:economy-parity": "npm run check:economy-parity -w @agentstack/sdk",
+    "check:finance-parity": "npm run check:finance-parity -w @agentstack/sdk",
+    "check:commerce-marketplace-parity": "npm run check:commerce-marketplace-parity -w @agentstack/sdk",
+    "check:commerce-shop-parity": "npm run check:commerce-shop-parity -w @agentstack/sdk",
+    "lint": "npm run lint -w @agentstack/sdk",
+    "clean": "npm run clean -w @agentstack/sdk",
+    "check:docs-urls": "npm run check:docs-urls -w @agentstack/sdk",
+    "check:package-exports": "npm run check:package-exports -w @agentstack/sdk",
+    "check:docs-api-symbols": "npm run check:docs-api-symbols -w @agentstack/sdk"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
+  },
+  "overrides": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "tslib": "^2.8.0"
+  }
+}

@@ -1,0 +1,13 @@
+# AgentStack SDK — curated docs for LLMs
+
+AGENTS.md
+docs/AI_APPLICATION_FACTORY.md
+docs/AI_INTEGRATOR_GUIDE.md
+docs/SDK_MODULE_CATALOG.md
+docs/AI_ERROR_ACTION_MATRIX.md
+AI_INDEX.md
+
+# Monorepo (AgentStack platform)
+https://github.com/agentstacktech/AgentStack/blob/main/docs/AGENT_PROTOCOL_QUICKSTART.md
+https://github.com/agentstacktech/AgentStack/blob/main/docs/SDK_AI_SURFACE.md
+https://github.com/agentstacktech/AgentStack/blob/main/docs/sdk/CAPABILITY_TASKS_INTEGRATOR.md

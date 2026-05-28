@@ -1,0 +1,9 @@
+{
+  "success": true,
+  "connection_id": "c1",
+  "logic_id": "l1",
+  "hook_url": "https://example/hook",
+  "owner_kind": "project",
+  "project_id": 42,
+  "logic_rule_ids": ["l1"]
+}
