@@ -190,7 +190,7 @@
   "bugs": {
     "url": "https://github.com/agentstacktech/agentstack-sdk/issues"
   },
-  "homepage": "https://github.com/agentstacktech/agentstack-sdk#readme",
+  "homepage": "https://agentstack.tech",
   "devDependencies": {
     "@jsquash/avif": "^1.3.0",
     "@jsquash/jpeg": "^1.6.0",

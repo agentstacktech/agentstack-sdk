@@ -15,11 +15,10 @@ npm install @agentstack/sdk
 ### Базовое использование
 
 ```typescript
-import { AgentStackSDK } from '@agentstack/sdk';
+import { AgentStackSDK, resolveAgentStackApiBase } from '@agentstack/sdk';
 
-// Инициализация SDK
 const sdk = new AgentStackSDK({
-  apiBase: 'https://api.agentstack.com',
+  apiBase: resolveAgentStackApiBase(),
   apiKey: 'your-api-key',
   projectId: 1,
   timeout: 10000,
@@ -826,7 +825,7 @@ const events = await sdk.neural.getEvents({
 
 ```typescript
 const sdk = new AgentStackSDK({
-  apiBase: 'https://api.agentstack.com', // Базовый URL API
+  apiBase: 'https://agentstack.tech/api', // Базовый URL API
   apiKey: 'your-api-key',                // API ключ
   projectId: 1,                          // ID проекта
   timeout: 10000,                        // Таймаут запросов (мс)
@@ -839,7 +838,7 @@ const sdk = new AgentStackSDK({
 
 ```typescript
 const sdk = new AgentStackSDK({
-  apiBase: 'https://api.agentstack.com',
+  apiBase: 'https://agentstack.tech/api',
   apiKey: 'your-api-key',
   projectId: 1,
   timeout: 15000,
@@ -942,7 +941,7 @@ try {
 ```typescript
 // Автоматический retry для сетевых ошибок
 const sdk = new AgentStackSDK({
-  apiBase: 'https://api.agentstack.com',
+  apiBase: 'https://agentstack.tech/api',
   retryAttempts: 3,
   retryDelay: 1000,
   retry: {
@@ -1013,7 +1012,7 @@ describe('AgentStack SDK', () => {
 
   beforeEach(() => {
     sdk = new AgentStackSDK({
-      apiBase: 'http://localhost:8000',
+      apiBase: 'http://localhost:8000/api',
       apiKey: 'test-key',
       projectId: 1,
     });
@@ -1044,7 +1043,7 @@ describe('AgentStack SDK', () => {
 describe('Integration Tests', () => {
   test('should complete user flow', async () => {
     const sdk = new AgentStackSDK({
-      apiBase: 'https://api.agentstack.com',
+      apiBase: 'https://agentstack.tech/api',
       apiKey: 'real-api-key',
       projectId: 1,
     });

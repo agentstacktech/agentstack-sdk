@@ -18,7 +18,7 @@ import { SDKProvider, useAuth, useProfile, useSettings } from '@agentstack/react
 
 // Конфигурация SDK
 const sdkConfig = {
-  apiBase: 'https://api.agentstack.com',
+  apiBase: 'https://agentstack.tech/api',
   apiKey: 'your-api-key',
   projectId: 1,
 };
@@ -399,7 +399,7 @@ import { SDKProvider } from '@agentstack/react';
 
 function App() {
   const sdkConfig = {
-    apiBase: 'https://api.agentstack.com',
+    apiBase: 'https://agentstack.tech/api',
     apiKey: 'your-api-key',
     projectId: 1,
     timeout: 10000,
@@ -472,7 +472,7 @@ import { SDKProvider } from '@agentstack/react';
 
 function App() {
   const customConfig = {
-    apiBase: 'https://api.agentstack.com',
+    apiBase: 'https://agentstack.tech/api',
     apiKey: 'your-api-key',
     projectId: 1,
     timeout: 15000,

@@ -42,6 +42,16 @@ Monorepo frontend sets `sdkAudience: 'platform_operator'` in `shared/sdk-client.
 
 ---
 
+## API base URL
+
+| Surface | Production |
+| ------- | ---------- |
+| REST | `https://agentstack.tech/api` |
+| OpenAPI | `https://agentstack.tech/swagger` |
+| MCP | `https://agentstack.tech/mcp` |
+
+Do **not** use legacy hosts (`api.agentstack.com`, `api.agentstack.tech`, `docs.agentstack.com`). Node/scripts: `AGENTSTACK_API_BASE=https://agentstack.tech/api` or omit and call `resolveAgentStackApiBase()`.
+
 ## Configuration
 
 ```typescript

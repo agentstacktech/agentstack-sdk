@@ -255,7 +255,7 @@ const health = await sdk.api.healthCheck();
 
 ```typescript
 const sdk = new AgentStackSDK({
-  apiBase: 'https://api.agentstack.com',
+  apiBase: 'https://agentstack.tech/api',
   apiKey: 'your_api_key',
   
   // Neural Architecture конфигурация
@@ -299,7 +299,7 @@ import { AgentStackSDK } from '@agentstack/sdk';
 
 // Инициализация
 const sdk = new AgentStackSDK({
-  apiBase: 'https://api.agentstack.com',
+  apiBase: 'https://agentstack.tech/api',
   apiKey: 'your_api_key'
 });
 
@@ -313,10 +313,10 @@ const help = await sdk.docs.getHelp('auth');
 
 ## 📚 Дополнительные ресурсы
 
-- [Примеры использования](./examples/)
-- [API Reference](./api-reference/)
-- [Migration Guide](./migration-guide/)
-- [Best Practices](./best-practices/)
+- [Примеры](../examples/typescript/)
+- [Quick start](./quick-start.md)
+- [AI integrator guide](./AI_INTEGRATOR_GUIDE.md)
+- [OpenAPI](https://agentstack.tech/swagger)
 
 ---
 

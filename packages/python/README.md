@@ -17,7 +17,7 @@ from agentstack_sdk import AgentStackSDK, SDKConfig
 async def main():
     # Создание конфигурации SDK
     config = SDKConfig(
-        api_base="https://agentstack.tech",
+        api_base="https://agentstack.tech/api",
         api_key="your_api_key",
         neural={
             'cache': {'enabled': True, 'ttl': 300},
@@ -175,7 +175,7 @@ await sdk.scheduler.run_task(task["id"])
 
 ```python
 config = SDKConfig(
-    api_base="http://localhost:8000",      # Базовый URL API
+    api_base="http://localhost:8000/api",  # Local Core
     api_key="your_api_key",                # API ключ
     timeout=30,                            # Таймаут запросов (сек)
     retry_attempts=3,                      # Количество попыток
@@ -256,7 +256,7 @@ except Exception as e:
 
 ## 📚 Дополнительные ресурсы
 
-- [Документация API](https://docs.agentstack.com)
+- [OpenAPI / Swagger](https://agentstack.tech/swagger)
 - [Примеры использования](examples/)
 - [GitHub Repository](https://github.com/agentstacktech/agentstack-sdk)
 - [Поддержка](https://github.com/agentstacktech/agentstack-sdk/issues)

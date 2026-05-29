@@ -2,12 +2,11 @@
  * Basic usage example for AgentStack SDK
  */
 
-import { AgentStackSDK } from '@agentstack/sdk';
+import { AgentStackSDK, resolveAgentStackApiBase } from '@agentstack/sdk';
 
 async function basicExample() {
-  // Initialize SDK
   const sdk = new AgentStackSDK({
-    baseUrl: 'https://api.agentstack.com',
+    apiBase: resolveAgentStackApiBase(),
     apiKey: 'your-api-key',
     projectId: 123,
     timeout: 30000,

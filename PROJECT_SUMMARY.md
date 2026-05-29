@@ -112,7 +112,7 @@ pip install agentstack-sdk
 ```typescript
 // TypeScript/JavaScript
 const sdk = new AgentStackSDK({
-  apiBase: 'https://api.agentstack.com',
+  apiBase: 'https://agentstack.tech/api',
   apiKey: 'your_api_key'
 });
 
@@ -124,7 +124,7 @@ await sdk.neural.cache.set('key', 'value');
 ```python
 # Python
 sdk = AgentStackSDK(SDKConfig(
-    api_base="https://api.agentstack.com",
+    api_base="https://agentstack.tech/api",
     api_key="your_api_key"
 ))
 

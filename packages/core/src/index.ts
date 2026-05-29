@@ -17,12 +17,6 @@ export {
 } from './config/agentstackEndpoints';
 
 export {
-  validateAppManifest,
-  assertModuleEnabled,
-  assertIntegratorModule,
-} from './ai-preflight';
-
-export {
   isIntegratorAudience,
   assertPlatformOperatorSurface,
   assertIntegratorMayCallAdminApi,
@@ -30,6 +24,19 @@ export {
   PLATFORM_OPERATOR_MODULE_IDS,
 } from './config/integratorScope';
 export type { SDKAudience } from './config/integratorScope';
+
+export {
+  normalizeProjectId,
+  readProjectIdFromBrowserStorage,
+  resolveEffectiveProjectId,
+} from './config/projectContext';
+
+export {
+  validateAppManifest,
+  assertModuleEnabled,
+  assertIntegratorModule,
+  assertProjectIdConfigured,
+} from './ai-preflight';
 
 // Unified Application Manifest (UAM v1) — parity with Python `ai_builder.manifest.schema`
 export {

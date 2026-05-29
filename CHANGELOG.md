@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Project context:** `sdk.getProjectId()`, `requireProjectId()`, `updateProjectId()`, login → HTTPClient sync, [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md)
 - **Integrator scope:** `SDKConfig.sdkAudience` (`integrator` default, `platform_operator` for AgentStack ops); guards on `sdk.admin`, `sdk.platform.adminData`, `/api/admin/*` HTTP; admin modules omitted from `getModuleCatalog()` for integrators; [docs/INTEGRATOR_SCOPE.md](docs/INTEGRATOR_SCOPE.md); `assertIntegratorModule()` in AI preflight
 - `resolveAgentStackApiBase()` and production URL constants (`agentstack.tech`)
 - `AGENTS.md`, AI Application Factory / integrator guides, `llms.txt`
@@ -21,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Docs/examples: production API `https://agentstack.tech/api` everywhere; removed misleading Docker deployment section; legacy hosts and broken doc TOC links fixed; `check-docs-urls` guards legacy hosts, bare `localhost:8000`, and missing `/api` on production origin
 - Default integrator API base is production (`https://agentstack.tech/api`)
 - GitHub repository metadata → `agentstacktech/agentstack-sdk`
 - README project API examples use `sdk.platform.api` (not misleading `sdk.projects.get`)

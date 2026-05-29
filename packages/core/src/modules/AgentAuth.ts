@@ -18,6 +18,7 @@ import {
   AGENTSTACK_PRODUCTION_API_BASE,
   AGENTSTACK_PRODUCTION_ORIGIN,
 } from '../config/agentstackEndpoints';
+import { normalizeProjectId } from '../config/projectContext';
 import type {
   UserSettings,
   NotificationSettings,
@@ -408,6 +409,11 @@ export class AgentAuth extends SimpleEventEmitter {
               projectId: session.project_id
             }
           });
+
+          const sessionProjectId = normalizeProjectId(session.project_id);
+          if (sessionProjectId) {
+            this.client.updateConfig({ projectId: sessionProjectId });
+          }
 
           this.emit('auth:login', authTokens);
           return authTokens;

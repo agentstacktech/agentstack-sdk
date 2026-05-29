@@ -17,7 +17,7 @@ from . import id_mapper
 
 __version__ = "1.0.0"
 __author__ = "AgentStack Team"
-__email__ = "support@agentstack.com"
+__email__ = "dev@agentstack.tech"
 
 __all__ = [
     "AgentStackSDK",

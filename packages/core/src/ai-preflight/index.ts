@@ -32,4 +32,9 @@ export function assertIntegratorModule(sdk: AgentStackSDK, moduleId: string): vo
   assertPlatformOperatorSurface(sdk.getConfig(), `module:${moduleId}`);
 }
 
+/** Ensure tenant scope is configured before project-scoped API calls. */
+export function assertProjectIdConfigured(sdk: AgentStackSDK): number {
+  return sdk.requireProjectId();
+}
+
 export { appManifestSchema };

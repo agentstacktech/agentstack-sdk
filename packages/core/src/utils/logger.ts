@@ -5,7 +5,7 @@
  * Automatically disables logging in production (NODE_ENV === 'production')
  * 
  * Usage:
- *   import { logger } from '@agentstack/unified-sdk/core';
+ *   import { logger } from '@agentstack/sdk';
  *   logger.debug('API call', { method: 'GET', url: '/api/users' });
  *   logger.info('User logged in', { userId: 123 });
  *   logger.warn('Rate limit approaching', { remaining: 10 });

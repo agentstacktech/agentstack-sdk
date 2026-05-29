@@ -19,6 +19,11 @@ import { getStorageItem, setStorageItem, removeStorageItem } from '../utils/stor
 import { AGENTSTACK_DEV_API_BASE } from '../config/agentstackEndpoints';
 import { assertIntegratorMayCallAdminApi } from '../config/integratorScope';
 import {
+  normalizeProjectId,
+  readProjectIdFromBrowserStorage,
+  resolveEffectiveProjectId,
+} from '../config/projectContext';
+import {
   SDKConfig,
   RequestConfig,
   APIResponse,
@@ -334,6 +339,18 @@ export class HTTPClient extends SimpleEventEmitter {
     // Это критично для восстановления сессии после перезагрузки страницы
     if (typeof window !== 'undefined') {
       this.refreshTokensFromStorage();
+      this.syncProjectIdFromConfigOrStorage();
+    } else {
+      const pid = normalizeProjectId(this.config.projectId);
+      if (pid) this.config.projectId = pid;
+    }
+  }
+
+  /** Align `config.projectId` with constructor value or persisted session. */
+  private syncProjectIdFromConfigOrStorage(): void {
+    const effective = resolveEffectiveProjectId(this.config.projectId);
+    if (effective) {
+      this.config.projectId = effective;
     }
   }
   
@@ -877,6 +894,10 @@ export class HTTPClient extends SimpleEventEmitter {
       }
       if (apiKey) {
         this.setApiKey(apiKey);
+      }
+      const storedPid = readProjectIdFromBrowserStorage();
+      if (storedPid) {
+        this.config.projectId = storedPid;
       }
     }
   }

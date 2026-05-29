@@ -12,7 +12,7 @@ async def main():
     
     # Создание конфигурации SDK
     config = SDKConfig(
-        api_base="https://agentstack.tech",
+        api_base="https://agentstack.tech/api",
         api_key="your_api_key",           # Замените на ваш API ключ
         timeout=30,
         enable_caching=True,

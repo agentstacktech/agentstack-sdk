@@ -21,7 +21,7 @@ function App() {
     <AgentStackErrorBoundary>
       <AgentStackProvider
         config={{
-          baseUrl: 'https://api.agentstack.com',
+          apiBase: 'https://agentstack.tech/api',
           apiKey: 'your-api-key',
           projectId: 123,
           enableCaching: true,

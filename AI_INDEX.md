@@ -378,7 +378,7 @@ class AgentStackSDK:
 interface SDKConfig {
   apiBase: string;               // API base URL (default https://agentstack.tech/api)
   apiKey?: string;               // API key (optional)
-  projectId?: string | number;   // Default project ID
+  projectId?: string | number;   // Active scope → X-Project-ID (see docs/PROJECT_CONTEXT.md)
   timeout?: number;              // Request timeout (ms)
   retryAttempts?: number;        // Retry attempts (default: 3)
   retryDelay?: number;           // Retry delay (ms)

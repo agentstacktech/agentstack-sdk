@@ -33,8 +33,8 @@ setup(
     long_description=read_readme(),
     long_description_content_type="text/markdown",
     author="AgentStack Team",
-    author_email="support@agentstack.com",
-    url="https://github.com/agentstack/agentstack-sdk",
+    author_email="dev@agentstack.tech",
+    url="https://github.com/agentstacktech/agentstack-sdk",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     classifiers=[
@@ -86,11 +86,11 @@ setup(
         "aiohttp"
     ],
     project_urls={
-        "Homepage": "https://github.com/agentstack/agentstack-sdk",
-        "Documentation": "https://docs.agentstack.com",
-        "Repository": "https://github.com/agentstack/agentstack-sdk.git",
-        "Bug Reports": "https://github.com/agentstack/agentstack-sdk/issues",
-        "Source": "https://github.com/agentstack/agentstack-sdk",
+        "Homepage": "https://agentstack.tech",
+        "Documentation": "https://agentstack.tech/swagger",
+        "Repository": "https://github.com/agentstacktech/agentstack-sdk.git",
+        "Bug Reports": "https://github.com/agentstacktech/agentstack-sdk/issues",
+        "Source": "https://github.com/agentstacktech/agentstack-sdk",
     },
     entry_points={
         "console_scripts": [

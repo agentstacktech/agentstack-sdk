@@ -3,11 +3,10 @@
  * Демонстрация всех модулей SDK
  */
 
-import { AgentStackSDK } from '@agentstack/sdk';
+import { AgentStackSDK, resolveAgentStackApiBase } from '@agentstack/sdk';
 
-// Инициализация SDK
 const sdk = new AgentStackSDK({
-  apiBase: 'https://api.agentstack.com',
+  apiBase: resolveAgentStackApiBase(),
   apiKey: 'your_api_key',
   
   // Neural Architecture конфигурация

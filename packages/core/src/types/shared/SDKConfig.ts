@@ -44,7 +44,12 @@ export interface SDKConfig {
   /** API key for authentication */
   apiKey?: string;
   
-  /** Project ID for multi-tenant operations */
+  /**
+   * Active project scope for tenant APIs. Becomes `X-Project-ID` on most requests
+   * (see `HTTPClient`). Set at construct time, via `sdk.updateProjectId()`, or
+   * synced from login session / browser storage. Login uses ecosystem `1` on
+   * `/auth/login` only — session `project_id` is applied after success.
+   */
   projectId?: number | string;
   
   /** Request timeout in milliseconds */

@@ -3,12 +3,11 @@
  * Demonstrates interceptors, error handling, and event listening
  */
 
-import { AgentStackSDK, AgentStackError } from '@agentstack/sdk';
+import { AgentStackSDK, AgentStackError, resolveAgentStackApiBase } from '@agentstack/sdk';
 
 async function advancedExample() {
-  // Initialize SDK with advanced configuration
   const sdk = new AgentStackSDK({
-    baseUrl: 'https://api.agentstack.com',
+    apiBase: resolveAgentStackApiBase(),
     apiKey: 'your-api-key',
     projectId: 123,
     timeout: 30000,
@@ -147,7 +146,7 @@ async function advancedExample() {
   // Demo mode example
   async function demoModeExample() {
     const demoSdk = new AgentStackSDK({
-      baseUrl: 'https://api.agentstack.com',
+      apiBase: resolveAgentStackApiBase(),
       apiKey: 'demo-api-key',
       projectId: 123,
       demoMode: 'ro' // Read-only demo mode

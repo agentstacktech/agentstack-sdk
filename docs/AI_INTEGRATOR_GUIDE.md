@@ -31,6 +31,8 @@ const matrix = sdk.getCapabilityMatrix();
 
 See [SDK_MODULE_CATALOG.md](SDK_MODULE_CATALOG.md).
 
+**Project scope:** almost all tenant APIs need an active `project_id`. Set `SDKConfig.projectId`, call `sdk.updateProjectId()` after the user picks a project, or rely on post-login sync. Details: [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
+
 **Integrator scope:** default `sdkAudience` is `integrator` — `admin` / `adminData` are **not** in the catalog and `sdk.admin` throws. Use project APIs only. Full policy: [INTEGRATOR_SCOPE.md](INTEGRATOR_SCOPE.md).
 
 ```typescript

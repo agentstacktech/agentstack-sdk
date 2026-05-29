@@ -63,5 +63,6 @@ npm run lint
 ## Questions?
 
 - [GitHub Issues](https://github.com/agentstacktech/agentstack-sdk/issues)
-- [Documentation](https://github.com/agentstacktech/agentstack-sdk#readme)
+- [Platform docs (Swagger)](https://agentstack.tech/swagger)
+- [SDK AGENTS.md](./AGENTS.md)
 - [Mirror runbook](../docs/sdk/SDK_MIRROR_PUBLISH_RUNBOOK.md) (monorepo maintainers)

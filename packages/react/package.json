@@ -32,6 +32,10 @@
     "url": "https://github.com/agentstacktech/agentstack-sdk.git",
     "directory": "packages/react"
   },
+  "bugs": {
+    "url": "https://github.com/agentstacktech/agentstack-sdk/issues"
+  },
+  "homepage": "https://agentstack.tech",
   "peerDependencies": {
     "@tanstack/react-query": "^5.0.0",
     "react": ">=18.3.0",

@@ -4,7 +4,7 @@ Runnable with `npx tsx` from `agentstack-unified-sdk` after `npm run build` in `
 
 ## Environments
 
-| Env | `AGENTSTACK_API_BASE` |
+| Env | `AGENTSTACK_API_BASE`, `AGENTSTACK_PROJECT_ID` (optional; see `docs/PROJECT_CONTEXT.md`) |
 |-----|------------------------|
 | Production (default) | *(unset)* → `https://agentstack.tech/api` |
 | Local Core | `http://localhost:8000/api` |

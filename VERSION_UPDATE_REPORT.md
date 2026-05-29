@@ -65,7 +65,7 @@ pip install agentstack-sdk==1.0.0
 import { AgentStackSDK } from '@agentstack/sdk';
 
 const sdk = new AgentStackSDK({
-  apiBase: 'https://api.agentstack.com',
+  apiBase: 'https://agentstack.tech/api',
   apiKey: 'your_api_key'
 });
 ```
@@ -75,7 +75,7 @@ const sdk = new AgentStackSDK({
 from agentstack_sdk import AgentStackSDK, SDKConfig
 
 config = SDKConfig(
-    api_base="https://api.agentstack.com",
+    api_base="https://agentstack.tech/api",
     api_key="your_api_key"
 )
 sdk = AgentStackSDK(config)

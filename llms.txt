@@ -2,13 +2,21 @@
 
 AGENTS.md
 docs/INTEGRATOR_SCOPE.md
+docs/PROJECT_CONTEXT.md
+docs/quick-start.md
 docs/AI_APPLICATION_FACTORY.md
 docs/AI_INTEGRATOR_GUIDE.md
 docs/SDK_MODULE_CATALOG.md
 docs/AI_ERROR_ACTION_MATRIX.md
 AI_INDEX.md
 
+# Production endpoints
+https://agentstack.tech/api
+https://agentstack.tech/swagger
+https://agentstack.tech/mcp
+
 # Monorepo (AgentStack platform)
-https://github.com/agentstacktech/AgentStack/blob/main/docs/AGENT_PROTOCOL_QUICKSTART.md
-https://github.com/agentstacktech/AgentStack/blob/main/docs/SDK_AI_SURFACE.md
-https://github.com/agentstacktech/AgentStack/blob/main/docs/sdk/CAPABILITY_TASKS_INTEGRATOR.md
+https://github.com/agentstacktech/AgentStack/blob/master/docs/AGENT_PROTOCOL_QUICKSTART.md
+https://github.com/agentstacktech/AgentStack/blob/master/docs/SDK_AI_SURFACE.md
+https://github.com/agentstacktech/AgentStack/blob/master/docs/sdk/CAPABILITY_TASKS_INTEGRATOR.md
+https://github.com/agentstacktech/agentstack-sdk

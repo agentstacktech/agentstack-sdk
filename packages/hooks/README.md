@@ -282,7 +282,7 @@ All hooks use React Query internally:
 
 ## 🔗 Links
 
-- [AgentStack Documentation](https://docs.agentstack.com)
+- [AgentStack platform](https://agentstack.tech) · [Swagger](https://agentstack.tech/swagger)
 - [React Query Docs](https://tanstack.com/query)
 - [TypeScript Handbook](https://www.typescriptlang.org/docs)
 

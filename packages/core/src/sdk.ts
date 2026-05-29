@@ -139,6 +139,7 @@ import {
 import type { MakeMessengerOpts, Messenger } from './modules/Messenger';
 import { buildMessengerClientConfigFromHttpClientConfig } from './messenger/buildMessengerClientConfig';
 import { assertPlatformOperatorSurface } from './config/integratorScope';
+import { normalizeProjectId, resolveEffectiveProjectId } from './config/projectContext';
 
 export class AgentStackSDK extends SimpleEventEmitter {
   public httpClient: HTTPClient;
@@ -687,12 +688,39 @@ export class AgentStackSDK extends SimpleEventEmitter {
   }
 
   /**
-   * Update project ID in SDK configuration
+   * Active project id for `X-Project-ID` and scoped modules (economy, agents, storage, …).
+   */
+  getProjectId(): number | undefined {
+    return resolveEffectiveProjectId(
+      this.httpClient.getConfig().projectId ?? this.config.projectId,
+    );
+  }
+
+  /**
+   * Same as {@link getProjectId} but throws when missing (integrator guard).
+   */
+  requireProjectId(): number {
+    const id = this.getProjectId();
+    if (!id) {
+      throw new AgentStackError(
+        'projectId is required. Set SDKConfig.projectId, call sdk.updateProjectId(id) after login, ' +
+          'or pass project_id in sdk.platform.auth.login(). See docs/PROJECT_CONTEXT.md.',
+      );
+    }
+    return id;
+  }
+
+  /**
+   * Update project ID in SDK configuration (workspace switcher, post-login selection).
    */
   updateProjectId(projectId: number): void {
-    this.config.projectId = projectId;
-    this.httpClient.updateConfig({ projectId });
-    this.emit('project:changed', { projectId });
+    const pid = normalizeProjectId(projectId);
+    if (!pid) {
+      throw new AgentStackError('updateProjectId: invalid project id');
+    }
+    this.config.projectId = pid;
+    this.httpClient.updateConfig({ projectId: pid });
+    this.emit('project:changed', { projectId: pid });
   }
 
   // ============================================================================

@@ -24,10 +24,16 @@ await sdk.platform.auth.login({
 
 // 3) First REST call
 const projects = await sdk.platform.api.getProjects();
+
+// Project scope (X-Project-ID) — set projectId in config, after login, or updateProjectId:
+sdk.updateProjectId(42);
 ```
 
-**Production API:** `https://agentstack.tech` (default via `resolveAgentStackApiBase()`).  
-**Local Core:** `AGENTSTACK_API_BASE=http://localhost:8000/api`
+**Project context:** [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md) · `sdk.getProjectId()` · `assertProjectIdConfigured(sdk)`
+
+**Production API base:** `https://agentstack.tech/api` (default via `resolveAgentStackApiBase()`).  
+**Local Core:** `AGENTSTACK_API_BASE=http://localhost:8000/api`  
+**Vite apps:** `VITE_API_BASE_URL=https://agentstack.tech/api`
 
 ---
 

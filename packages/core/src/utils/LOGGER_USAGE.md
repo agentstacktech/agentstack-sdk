@@ -9,7 +9,7 @@
 ### Простая замена console.log
 
 ```typescript
-import { logger } from '@agentstack/unified-sdk/core';
+import { logger } from '@agentstack/sdk';
 
 // Вместо console.log
 logger.log('User logged in', { userId: 123 });
@@ -37,7 +37,7 @@ logger.debug('HTTP request details', { method: 'GET', url: '/api/users' });
 ## Уровни логирования
 
 ```typescript
-import { logger, LogLevel } from '@agentstack/unified-sdk/core';
+import { logger, LogLevel } from '@agentstack/sdk';
 
 // DEBUG (0) - детальная отладочная информация
 logger.debug('HTTP request', { method: 'GET', url: '/api/users' });
@@ -61,7 +61,7 @@ logger.disable();
 ### Программная конфигурация
 
 ```typescript
-import { logger, LogLevel } from '@agentstack/unified-sdk/core';
+import { logger, LogLevel } from '@agentstack/sdk';
 
 // Установить уровень логирования
 logger.setLevel(LogLevel.DEBUG);
@@ -114,7 +114,7 @@ window.AgentStackLogger.getEnvironment()
 
 ```typescript
 // В начале файла
-import { logger } from '@agentstack/unified-sdk/core';
+import { logger } from '@agentstack/sdk';
 ```
 
 ### Шаг 2: Замена
@@ -152,7 +152,7 @@ logger.debug('Debug info', data);
 ### В компонентах React
 
 ```typescript
-import { logger } from '@agentstack/unified-sdk/core';
+import { logger } from '@agentstack/sdk';
 
 function MyComponent() {
   useEffect(() => {
@@ -174,7 +174,7 @@ function MyComponent() {
 ### В SDK модулях
 
 ```typescript
-import { logger } from '@agentstack/unified-sdk/core';
+import { logger } from '@agentstack/sdk';
 
 export class MyModule {
   async fetchData() {
@@ -194,7 +194,7 @@ export class MyModule {
 ### В HTTP клиенте
 
 ```typescript
-import { logger } from '@agentstack/unified-sdk/core';
+import { logger } from '@agentstack/sdk';
 
 async function makeRequest(url: string) {
   logger.debug('Making request', { url });

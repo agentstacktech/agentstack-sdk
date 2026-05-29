@@ -23,9 +23,18 @@
     "@tanstack/react-query": "^5.0.0"
   },
   "dependencies": {
-    "@agentstack/react": "file:../react",
-    "@agentstack/sdk": "file:../core"
+    "@agentstack/react": "^0.4.13",
+    "@agentstack/sdk": "^0.4.13"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agentstacktech/agentstack-sdk.git",
+    "directory": "packages/hooks"
+  },
+  "bugs": {
+    "url": "https://github.com/agentstacktech/agentstack-sdk/issues"
+  },
+  "homepage": "https://agentstack.tech",
   "devDependencies": {
     "@tanstack/react-query": "^5.99.0",
     "@types/react": "^18.3.26",

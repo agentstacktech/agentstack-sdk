@@ -189,7 +189,7 @@ const help = await sdk.docs.getHelp('auth');
 from agentstack import AgentStackSDK
 
 sdk = AgentStackSDK(
-    api_base='https://agentstack.tech',
+    api_base='https://agentstack.tech/api',
     api_key='your_api_key'
 )
 
@@ -208,7 +208,7 @@ import { AgentStackProvider, useAdminUsers } from '@agentstack/react';
 function App() {
   return (
     <AgentStackProvider
-      apiBase="https://agentstack.tech"
+      apiBase="https://agentstack.tech/api"
       apiKey="your_api_key"
     >
       <AdminDashboard />
@@ -492,7 +492,7 @@ const sdk = new AgentStackSDK({
 ### Python
 ```python
 sdk = AgentStackSDK(
-    api_base='https://agentstack.tech',
+    api_base='https://agentstack.tech/api',
     api_key='your_api_key',
     
     # Neural Architecture
@@ -677,32 +677,32 @@ console.log('Neural Events Throughput:', neuralMetrics.events.throughput);
 console.log('Pattern Analysis Accuracy:', neuralMetrics.patterns.accuracy);
 ```
 
-## 🚀 Production Deployment
+## Production API base
 
-### Environment Configuration
+Production REST base is **`https://agentstack.tech/api`**. Prefer the helper (Node, scripts, examples):
+
+```typescript
+import { AgentStackSDK, resolveAgentStackApiBase } from '@agentstack/sdk';
+
+const sdk = new AgentStackSDK({
+  apiBase: resolveAgentStackApiBase(),
+  apiKey: process.env.AGENTSTACK_API_KEY,
+});
+```
+
+| Environment | Configuration |
+|-------------|----------------|
+| Production (default) | Omit `AGENTSTACK_API_BASE` → `https://agentstack.tech/api` |
+| Local Core | `AGENTSTACK_API_BASE=http://localhost:8000/api` |
+| Vite SPA | `VITE_API_BASE_URL=https://agentstack.tech/api` (no `/api` suffix in some setups — HTTPClient normalizes) |
+
 ```bash
-# .env
-AGENTSTACK_API_BASE=https://api.agentstack.com
-AGENTSTACK_API_KEY=your_production_api_key
-AGENTSTACK_NEURAL_CACHE_ENABLED=true
-AGENTSTACK_NEURAL_EVENTS_ENABLED=true
+# Node / CI
+AGENTSTACK_API_BASE=https://agentstack.tech/api
+AGENTSTACK_API_KEY=your_api_key
 ```
 
-### Docker Deployment
-```dockerfile
-FROM node:18-alpine
-
-WORKDIR /app
-
-COPY package*.json ./
-RUN npm ci --only=production
-
-COPY . .
-
-EXPOSE 3000
-
-CMD ["npm", "start"]
-```
+The SDK is a **client library** — deploy your app as you normally would (static host, serverless, container). No separate “SDK Docker image” is required.
 
 ## 🤝 Contributing
 
@@ -716,15 +716,12 @@ CMD ["npm", "start"]
 
 ## 📞 Поддержка
 
-- **Документация**: [docs.agentstack.com](https://docs.agentstack.com)
-- **GitHub**: [github.com/agentstack/sdk](https://github.com/agentstack/sdk)
-- **Discord**: [discord.gg/agentstack](https://discord.gg/agentstack)
-- **Email**: [support@agentstack.com](mailto:support@agentstack.com)
+- **Платформа**: [agentstack.tech](https://agentstack.tech)
+- **OpenAPI / Swagger**: [agentstack.tech/swagger](https://agentstack.tech/swagger)
+- **MCP**: [agentstack.tech/mcp](https://agentstack.tech/mcp)
+- **GitHub (SDK)**: [github.com/agentstacktech/agentstack-sdk](https://github.com/agentstacktech/agentstack-sdk)
+- **Issues**: [github.com/agentstacktech/agentstack-sdk/issues](https://github.com/agentstacktech/agentstack-sdk/issues)
 
 ---
 
-**Версия**: 2.0.0  
-**Последнее обновление**: 2025-01-15  
-**Neural Architecture**: Integrated  
-**Admin SDK**: Available  
-**Статус**: Production Ready
+**npm:** `@agentstack/sdk` · **AI entry:** [AGENTS.md](AGENTS.md) · **Integrator scope:** [docs/INTEGRATOR_SCOPE.md](docs/INTEGRATOR_SCOPE.md)
