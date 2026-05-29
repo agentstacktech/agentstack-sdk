@@ -38,7 +38,7 @@
     "react-dom": ">=18.3.0"
   },
   "dependencies": {
-    "@agentstack/sdk": "file:../core",
+    "@agentstack/sdk": "^0.4.13",
     "zod": "^3.24.1"
   },
   "devDependencies": {

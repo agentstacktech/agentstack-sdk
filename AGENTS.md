@@ -37,7 +37,7 @@ const projects = await sdk.platform.api.getProjects();
 |------|-----|------|
 | Discover | `sdk.getModuleCatalog()` | Pick module id, `accessPaths`, `aiHints`, `examples` |
 | Gate | `sdk.getCapabilityMatrix()` | Skip disabled `domain` modules |
-| Validate | `validateAppManifest()`, `parseTaskManifest()` | Before writes |
+| Validate | `validateAppManifest()`, `assertIntegratorModule()`, `parseTaskManifest()` | Before writes |
 | Execute | `sdk.platform.*`, `sdk.protocol.*` | REST + commands + snapshots |
 | Deploy site | `sdk.hosting.quickStart()` | Static HTML hosting |
 
@@ -52,7 +52,7 @@ Full recipes: [docs/AI_APPLICATION_FACTORY.md](docs/AI_APPLICATION_FACTORY.md)
 - **Rules engine** → `sdk.platform.command` or `protocol.executeRulesCommand`
 - **Cached read model** → `sdk.platform.protocol.readThroughSnapshot`
 - **MCP automation** → `https://agentstack.tech/mcp` (`agentstack.execute`) — mirror of platform actions
-- **Tenant apps** → never `sdk.admin` (platform operator only)
+- **Tenant apps** → never `sdk.admin` / `sdk.platform.adminData` ([docs/INTEGRATOR_SCOPE.md](docs/INTEGRATOR_SCOPE.md))
 
 ---
 
@@ -75,7 +75,7 @@ Full recipes: [docs/AI_APPLICATION_FACTORY.md](docs/AI_APPLICATION_FACTORY.md)
 - Do not use `fetch('/api/...')` when `sdk.platform` or `sdk.protocol` exists.
 - Do not treat `sdk.protocol.searchSnapshots` as server full-text search (cache scan only).
 - Do not call `sdk.projects.get(uuid)` — `projects` is **8DNA** `DNATableWrapper`; use `sdk.platform.api.getProject(id)`.
-- Do not use `sdk.admin` in tenant integrations.
+- Do not use `sdk.admin` or `sdk.platform.adminData` in tenant integrations (`sdkAudience` defaults to `integrator`).
 - Check `getCapabilityMatrix()` before calling optional domains (`payments`, `gameData`, …).
 
 ---
@@ -85,5 +85,6 @@ Full recipes: [docs/AI_APPLICATION_FACTORY.md](docs/AI_APPLICATION_FACTORY.md)
 - Swagger: https://agentstack.tech/swagger  
 - MCP: https://agentstack.tech/mcp  
 - Module catalog: [docs/SDK_MODULE_CATALOG.md](docs/SDK_MODULE_CATALOG.md)  
+- Integrator scope (no admin): [docs/INTEGRATOR_SCOPE.md](docs/INTEGRATOR_SCOPE.md)  
 - Integrator guide: [docs/AI_INTEGRATOR_GUIDE.md](docs/AI_INTEGRATOR_GUIDE.md)  
 - Errors: [docs/AI_ERROR_ACTION_MATRIX.md](docs/AI_ERROR_ACTION_MATRIX.md)

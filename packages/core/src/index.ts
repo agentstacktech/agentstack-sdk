@@ -16,7 +16,20 @@ export {
   isAgentStackProductionHost,
 } from './config/agentstackEndpoints';
 
-export { validateAppManifest, assertModuleEnabled } from './ai-preflight';
+export {
+  validateAppManifest,
+  assertModuleEnabled,
+  assertIntegratorModule,
+} from './ai-preflight';
+
+export {
+  isIntegratorAudience,
+  assertPlatformOperatorSurface,
+  assertIntegratorMayCallAdminApi,
+  filterCapabilityEntriesForAudience,
+  PLATFORM_OPERATOR_MODULE_IDS,
+} from './config/integratorScope';
+export type { SDKAudience } from './config/integratorScope';
 
 // Unified Application Manifest (UAM v1) — parity with Python `ai_builder.manifest.schema`
 export {

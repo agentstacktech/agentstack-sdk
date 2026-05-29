@@ -773,58 +773,9 @@ const history = await sdk.scheduler.getTaskHistory(task.id, {
 const stats = await sdk.scheduler.getTaskStats();
 ```
 
-## 👨‍💼 Администрирование (AgentAdmin)
+## Platform operator (not for npm integrators)
 
-### Управление пользователями
-
-```typescript
-// Получение пользователей
-const users = await sdk.admin.getUsers({
-  role: 'admin',
-  status: 'active',
-  limit: 50,
-});
-
-// Создание пользователя
-const user = await sdk.admin.createUser({
-  email: 'admin@example.com',
-  password: 'securepassword',
-  role: 'admin',
-  project_id: 1,
-});
-
-// Обновление пользователя
-await sdk.admin.updateUser(user.id, {
-  role: 'moderator',
-  is_active: true,
-});
-
-// Удаление пользователя
-await sdk.admin.deleteUser(user.id);
-```
-
-### Системная информация
-
-```typescript
-// Статистика системы
-const stats = await sdk.admin.getSystemStats();
-
-// Логи системы
-const logs = await sdk.admin.getSystemLogs({
-  level: 'error',
-  start_date: '2025-01-01',
-  end_date: '2025-01-31',
-});
-
-// Настройки системы
-const settings = await sdk.admin.getSystemSettings();
-
-// Обновление настроек
-await sdk.admin.updateSystemSettings({
-  maintenance_mode: false,
-  registration_enabled: true,
-});
-```
+`sdk.admin` and `sdk.platform.adminData` require `sdkAudience: 'platform_operator'` (AgentStack monorepo ops only). Tenant apps: [docs/INTEGRATOR_SCOPE.md](../../docs/INTEGRATOR_SCOPE.md) — use `sdk.platform.api`, `sdk.platform.rbac`, `sdk.platform.economy`.
 
 ## 🧠 Neural архитектура
 

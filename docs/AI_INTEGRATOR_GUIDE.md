@@ -31,6 +31,14 @@ const matrix = sdk.getCapabilityMatrix();
 
 See [SDK_MODULE_CATALOG.md](SDK_MODULE_CATALOG.md).
 
+**Integrator scope:** default `sdkAudience` is `integrator` — `admin` / `adminData` are **not** in the catalog and `sdk.admin` throws. Use project APIs only. Full policy: [INTEGRATOR_SCOPE.md](INTEGRATOR_SCOPE.md).
+
+```typescript
+import { assertIntegratorModule } from '@agentstack/sdk';
+assertIntegratorModule(sdk, 'payments'); // ok
+// assertIntegratorModule(sdk, 'admin'); // throws for integrators
+```
+
 ---
 
 ## 3. AgentProtocol patterns

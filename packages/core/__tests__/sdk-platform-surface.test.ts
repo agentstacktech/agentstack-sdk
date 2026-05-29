@@ -60,6 +60,13 @@ describe('sdk.platform', () => {
     expect(socialMod?.accessPaths).toContain('sdk.platform.protocol.socialPublicIndex');
   });
 
+  it('integrator catalog excludes platform-operator admin modules', () => {
+    const sdk = new AgentStackSDK(baseConfig);
+    const ids = sdk.getModuleCatalog().modules.map((m) => m.id);
+    expect(ids).not.toContain('admin');
+    expect(ids).not.toContain('adminData');
+  });
+
   it('getModuleCatalog respects module gates like getCapabilityMatrix', () => {
     const sdk = new AgentStackSDK({
       ...baseConfig,

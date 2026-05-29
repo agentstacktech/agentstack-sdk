@@ -1,15 +1,16 @@
 /**
- * AgentStack-SDK React Examples
- * Административная панель с использованием модульной архитектуры
+ * Platform-operator sample only — NOT for tenant npm integrators.
+ * Requires sdkAudience: 'platform_operator' (AgentStack ecosystem ops).
+ * @see docs/INTEGRATOR_SCOPE.md
  */
 
 import React, { useState, useEffect } from 'react';
 import { AgentStackSDK } from '@agentstack/sdk';
 
-// Инициализация SDK
 const sdk = new AgentStackSDK({
-  apiBase: process.env.REACT_APP_AGENTSTACK_API_BASE || 'https://api.agentstack.com',
+  apiBase: process.env.REACT_APP_AGENTSTACK_API_BASE || 'https://agentstack.tech/api',
   apiKey: process.env.REACT_APP_AGENTSTACK_API_KEY || 'your_api_key',
+  sdkAudience: 'platform_operator',
   
   neural: {
     cache: { enabled: true, ttl: 300 },

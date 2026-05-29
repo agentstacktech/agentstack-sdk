@@ -17,6 +17,7 @@ import { RequestBatcher } from '../utils/request-batcher';
 import { ProteinCache } from '../storage/protein-cache';
 import { getStorageItem, setStorageItem, removeStorageItem } from '../utils/storage-utils';
 import { AGENTSTACK_DEV_API_BASE } from '../config/agentstackEndpoints';
+import { assertIntegratorMayCallAdminApi } from '../config/integratorScope';
 import {
   SDKConfig,
   RequestConfig,
@@ -436,9 +437,11 @@ export class HTTPClient extends SimpleEventEmitter {
     const requestConfig = this.buildRequestConfig(config);
     const cacheKey = this.getCacheKey(requestConfig);
 
-    // ✅ Philosophy: No-cache for admin/builder settings and highly user-specific GETs
     const url = requestConfig.url || '';
     const pathOnly = url.split('?')[0] || '';
+    assertIntegratorMayCallAdminApi(this.config, pathOnly);
+
+    // ✅ Philosophy: No-cache for admin/builder settings and highly user-specific GETs
     const isSessionsPath =
       pathOnly === '/sessions' || pathOnly.startsWith('/sessions/');
     const isUserStorageGet =

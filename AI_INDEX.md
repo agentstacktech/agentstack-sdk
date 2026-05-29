@@ -32,7 +32,7 @@
 4. **Hooks Package (@agentstack/hooks)** - Shared React hooks
 5. **Neural Integration** - Cache, events, pattern analysis (client-side)
 6. **i18n Module** - Zero-config translations (AgentI18n)
-7. **Admin Module** - Admin operations (user management, stats)
+7. **Admin Module** - Ecosystem operator only (`sdk.admin`, `sdkAudience: platform_operator`); integrators: [docs/INTEGRATOR_SCOPE.md](docs/INTEGRATOR_SCOPE.md)
 8. **Entity snapshot repository** — `packages/core/src/cache/` (`AgentStackSDK.entitySnapshotRepository`, path helpers, optional persistence helpers)
 9. **Protein command channel** — `modules/ProteinCommandChannel.ts` → `sdk.proteinCommandChannel` (`/commands/execute`, DNA CRUD bus; same `HTTPClient` as REST)
 10. **AgentProtocol** + **AI surface** — `packages/core/src/protocol/` → **`sdk.protocol`** (REST + 8DNA `dna*` + command bus + snapshots + …); стабильный срез для ИИ: **`sdk.platform`** — [docs/SDK_AI_SURFACE.md](../docs/SDK_AI_SURFACE.md) (`repo.platform.sdk.ai_surface.gen1`). Spec: [`docs/AGENT_PROTOCOL.md`](../docs/AGENT_PROTOCOL.md); **единый контур + офлайн-first:** [`docs/sdk/SDK_UNIFIED_CONNECTION_OFFLINE_FIRST_DECOMPOSITION.md`](../docs/sdk/SDK_UNIFIED_CONNECTION_OFFLINE_FIRST_DECOMPOSITION.md); capabilities: [`docs/AGENT_PROTOCOL_CAPABILITIES.md`](../docs/AGENT_PROTOCOL_CAPABILITIES.md); backlog: [`docs/AGENT_PROTOCOL_ENGINEERING_BACKLOG.md`](../docs/AGENT_PROTOCOL_ENGINEERING_BACKLOG.md); quickstart: [`docs/AGENT_PROTOCOL_QUICKSTART.md`](../docs/AGENT_PROTOCOL_QUICKSTART.md); map tag `repo.platform.sdk.agent_protocol.gen1`.

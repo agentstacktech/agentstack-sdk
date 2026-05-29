@@ -31,7 +31,7 @@ async def main():
     try:
         # Использование модулей SDK
         await sdk.auth.login("user@example.com", "password")
-        users = await sdk.admin.get_users()
+        projects = await sdk.platform.api.get_projects()
         payment = await sdk.payments.create_payment({
             "amount": 1000, 
             "currency": "RUB"
@@ -61,7 +61,7 @@ asyncio.run(main())
 ### Доступные модули:
 
 - **`AgentAuth`** - Аутентификация и авторизация
-- **`AgentAdmin`** - Административные функции
+- **`AgentAdmin`** - Ecosystem operator only (not for tenant integrators; see `docs/INTEGRATOR_SCOPE.md`)
 - **`AgentNeural`** - Neural Architecture интеграция
 - **`AgentDocs`** - Документация и справка
 - **`AgentPayments`** - Платежная система
@@ -86,23 +86,6 @@ api_key = await sdk.auth.create_api_key(
     project_id=1,
     scopes=["read", "write"]
 )
-```
-
-#### 👑 AgentAdmin
-```python
-# Получение пользователей
-users = await sdk.admin.get_users(limit=10)
-
-# Создание пользователя
-new_user = await sdk.admin.create_user(
-    username="newuser",
-    email="newuser@example.com",
-    password="password",
-    role="member"
-)
-
-# Получение статистики системы
-stats = await sdk.admin.get_system_stats()
 ```
 
 #### 🧠 AgentNeural

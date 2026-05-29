@@ -11,6 +11,7 @@ import {
   type SDKCapabilityEntry,
   type SDKCapabilityMatrix,
 } from './platform-surface';
+import type { SDKAudience } from './config/integratorScope';
 import { TASK_CATALOG_METADATA } from './capability-tasks/taskCatalogMetadata';
 
 /** Repo-root relative doc paths (monorepo) or stable URLs. */
@@ -163,11 +164,8 @@ const MODULE_DOC_REFS: Partial<Record<string, SDKDocRef[]>> = {
     'docs/sdk/AGENTNET_ECONOMY_INTEGRATOR_COOKBOOK.md',
     'agentstack-unified-sdk/packages/core/src/economy/AI_INDEX.md',
   ],
-  admin: [
-    'agentstack-unified-sdk/packages/core/src/modules/AgentAdmin.ts',
-    'docs/operations/AGENTNET_ADMIN_RUNBOOK.md',
-    'agentstack-frontend/src/modules/admin/pages/economy/AI_INDEX.md',
-  ],
+  admin: ['docs/INTEGRATOR_SCOPE.md'],
+  adminData: ['docs/INTEGRATOR_SCOPE.md', 'docs/SDK_AI_SURFACE.md'],
   docs: ['agentstack-unified-sdk/packages/core/README.md'],
   gameData: ['agentstack-unified-sdk/packages/core/README.md'],
   pageComposition: ['agentstack-unified-sdk/packages/core/README.md'],
@@ -275,12 +273,14 @@ function surfaceFromEntry(entry: SDKCapabilityEntry): SDKModuleSurface {
 export function buildModuleCatalog(
   semantic: string,
   generation: string,
-  domainGates?: Partial<Record<string, boolean>>
+  domainGates?: Partial<Record<string, boolean>>,
+  audience?: SDKAudience,
 ): SDKModuleCatalog {
   const matrix: SDKCapabilityMatrix = buildCapabilityMatrix(
     semantic,
     generation,
-    domainGates
+    domainGates,
+    audience,
   );
   const modules: SDKModuleSurface[] = [
     ...matrix.platform.map(surfaceFromEntry),

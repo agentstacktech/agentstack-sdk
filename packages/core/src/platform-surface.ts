@@ -4,6 +4,10 @@
  */
 
 import { TASK_CATALOG_METADATA } from './capability-tasks/taskCatalogMetadata';
+import {
+  filterCapabilityEntriesForAudience,
+  type SDKAudience,
+} from './config/integratorScope';
 
 import type { HTTPClient } from './client/http-client';
 import type { AgentAuth } from './modules/AgentAuth';
@@ -71,7 +75,10 @@ export interface AgentStackPlatformSurface {
   authStateStore: AuthStateStore;
   /** Main REST surface (projects, users, …) */
   api: AgentAPI;
-  /** Admin data BFF (`/api/admin/data/*`) — people, DNA list, health */
+  /**
+   * Admin data BFF (`/api/admin/data/*`) — **platform operator only**.
+   * Not available when `SDKConfig.sdkAudience` is `integrator` (default).
+   */
   adminData: AgentAdminData;
   dna: AgentDNA;
   projects: PlatformDNATableWrapper;
@@ -412,6 +419,12 @@ const PLATFORM_CAPABILITY_SEED: Omit<SDKCapabilityEntry, 'enabled'>[] = [
     group: 'commerce',
     description: 'AgentEconomyFacade — tenant `/api/agentnet/{project_id}/*` (no admin routes)',
   },
+  {
+    id: 'adminData',
+    layer: 'platform',
+    group: 'admin',
+    description: 'AgentAdminData — platform operator only (`/api/admin/data/*`)',
+  },
 ];
 
 const DOMAIN_CAPABILITY_SEED: Omit<SDKCapabilityEntry, 'enabled'>[] = [
@@ -478,6 +491,12 @@ const DOMAIN_CAPABILITY_SEED: Omit<SDKCapabilityEntry, 'enabled'>[] = [
   { id: 'gameData', layer: 'domain', group: 'protein', description: 'GameDataSystem' },
   { id: 'storage', layer: 'domain', group: 'media', description: 'AgentStorage' },
   { id: 'agentsFleet', layer: 'domain', group: 'agents', description: 'AgentsFleet' },
+  {
+    id: 'admin',
+    layer: 'domain',
+    group: 'admin',
+    description: 'AgentAdmin — platform operator only (`/api/admin/*`, AgentNet ops)',
+  },
 ];
 
 function domainEnabled(
@@ -501,13 +520,22 @@ function domainEnabled(
 export function buildCapabilityMatrix(
   semantic: string,
   generation: string,
-  domainGates?: Partial<Record<string, boolean>>
+  domainGates?: Partial<Record<string, boolean>>,
+  audience?: SDKAudience,
 ): SDKCapabilityMatrix {
+  const platformSeed = filterCapabilityEntriesForAudience(
+    PLATFORM_CAPABILITY_SEED,
+    audience,
+  );
+  const domainSeed = filterCapabilityEntriesForAudience(
+    DOMAIN_CAPABILITY_SEED,
+    audience,
+  );
   return {
     semantic,
     generation,
-    platform: PLATFORM_CAPABILITY_SEED.map((e) => ({ ...e, enabled: true })),
-    domain: DOMAIN_CAPABILITY_SEED.map((e) => ({
+    platform: platformSeed.map((e) => ({ ...e, enabled: true })),
+    domain: domainSeed.map((e) => ({
       ...e,
       enabled: domainEnabled(e.id, domainGates),
     })),

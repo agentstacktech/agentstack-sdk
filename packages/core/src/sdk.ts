@@ -138,6 +138,7 @@ import {
 } from './modules/Messenger';
 import type { MakeMessengerOpts, Messenger } from './modules/Messenger';
 import { buildMessengerClientConfigFromHttpClientConfig } from './messenger/buildMessengerClientConfig';
+import { assertPlatformOperatorSurface } from './config/integratorScope';
 
 export class AgentStackSDK extends SimpleEventEmitter {
   public httpClient: HTTPClient;
@@ -146,13 +147,29 @@ export class AgentStackSDK extends SimpleEventEmitter {
   // Модули SDK с префиксом Agent
   public auth: AgentAuth;
   public api: AgentAPI;
+  /** @internal Lazy instance; use getter — blocked for `sdkAudience: 'integrator'`. */
+  private readonly _admin: AgentAdmin;
+  /** @internal Lazy instance; use getter — blocked for `sdkAudience: 'integrator'`. */
+  private readonly _adminData: AgentAdminData;
+
   /**
    * AgentStack platform-operator REST (`/api/admin/*` slices).
    * **Not** on `sdk.platform` — ecosystem owner / dev shell only (typically project_id=1).
+   * Throws when `SDKConfig.sdkAudience` is `integrator` (npm default).
    */
-  public admin: AgentAdmin;
-  /** Platform admin data BFF (`/api/admin/data/*`). Also on `sdk.platform.adminData`. */
-  public adminData: AgentAdminData;
+  get admin(): AgentAdmin {
+    assertPlatformOperatorSurface(this.config, 'sdk.admin');
+    return this._admin;
+  }
+
+  /**
+   * Platform admin data BFF (`/api/admin/data/*`). Also on `sdk.platform.adminData`.
+   * Throws when `SDKConfig.sdkAudience` is `integrator` (npm default).
+   */
+  get adminData(): AgentAdminData {
+    assertPlatformOperatorSurface(this.config, 'sdk.adminData');
+    return this._adminData;
+  }
   public neural: AgentNeural;
   public docs: AgentDocs;
   public payments: AgentPayments;
@@ -347,8 +364,8 @@ export class AgentStackSDK extends SimpleEventEmitter {
     // Инициализация модулей SDK
     this.auth = new AgentAuth(this.httpClient, this.authStateStore);
     this.api = new AgentAPI(this.httpClient);
-    this.admin = new AgentAdmin(this.httpClient);
-    this.adminData = new AgentAdminData(this.httpClient);
+    this._admin = new AgentAdmin(this.httpClient);
+    this._adminData = new AgentAdminData(this.httpClient);
     this.neural = new AgentNeural(this.httpClient);
     this.docs = new AgentDocs(this.httpClient);
     this.payments = new AgentPayments(this.httpClient);
@@ -426,12 +443,16 @@ export class AgentStackSDK extends SimpleEventEmitter {
       });
     this.createMessengerEmbed = createMessengerEmbed;
 
+    const self = this;
     this.platform = {
       http: this.httpClient,
       auth: this.auth,
       authStateStore: this.authStateStore,
       api: this.api,
-      adminData: this.adminData,
+      get adminData(): AgentAdminData {
+        assertPlatformOperatorSurface(self.config, 'sdk.platform.adminData');
+        return self._adminData;
+      },
       dna: this.dna,
       projects: this.projects,
       users: this.users,
@@ -647,7 +668,8 @@ export class AgentStackSDK extends SimpleEventEmitter {
     return buildCapabilityMatrix(
       SDK_VERSION.semantic,
       SDK_VERSION.generation,
-      this.config.modules as Partial<Record<string, boolean>> | undefined
+      this.config.modules as Partial<Record<string, boolean>> | undefined,
+      this.config.sdkAudience,
     );
   }
 
@@ -659,7 +681,8 @@ export class AgentStackSDK extends SimpleEventEmitter {
     return buildModuleCatalog(
       SDK_VERSION.semantic,
       SDK_VERSION.generation,
-      this.config.modules as Partial<Record<string, boolean>> | undefined
+      this.config.modules as Partial<Record<string, boolean>> | undefined,
+      this.config.sdkAudience,
     );
   }
 

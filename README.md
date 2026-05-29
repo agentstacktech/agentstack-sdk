@@ -23,7 +23,8 @@ const projects = await sdk.platform.api.getProjects();
 const catalog = sdk.getModuleCatalog(); // AI: discover modules, hints, examples
 ```
 
-**AI entry:** [AGENTS.md](AGENTS.md) · [docs/AI_APPLICATION_FACTORY.md](docs/AI_APPLICATION_FACTORY.md)
+**AI entry:** [AGENTS.md](AGENTS.md) · [docs/AI_APPLICATION_FACTORY.md](docs/AI_APPLICATION_FACTORY.md)  
+**Integrator scope (no ecosystem admin):** [docs/INTEGRATOR_SCOPE.md](docs/INTEGRATOR_SCOPE.md)
 
 **Links:** [Changelog](CHANGELOG.md) | [Contributing](CONTRIBUTING.md)
 
@@ -40,7 +41,7 @@ const catalog = sdk.getModuleCatalog(); // AI: discover modules, hints, examples
 - **Масштабируемость**: Легкое добавление новых сервисов
 - **Мультиязычность**: Поддержка TypeScript, Python, и других языков
 - **Neural Integration**: Полная интеграция с Neural Architecture
-- **Admin SDK**: Специализированный SDK для администрирования
+- **Project-scoped APIs**: RBAC, DNA, economy — без экосистемной `/api/admin/*` (см. [INTEGRATOR_SCOPE](docs/INTEGRATOR_SCOPE.md))
 
 ## 🏗️ Архитектура
 
@@ -170,9 +171,9 @@ const sdk = new AgentStackSDK({
   apiKey: process.env.AGENTSTACK_API_KEY,
 });
 
-// Использование модулей SDK
-await sdk.auth.login({ email: 'user@example.com', password: 'password' });
-const users = await sdk.admin.getUsers();
+// Использование модулей SDK (tenant / integrator)
+await sdk.platform.auth.login({ email: 'user@example.com', password: 'password' });
+const projects = await sdk.platform.api.getProjects();
 const payment = await sdk.payments.createPayment({ amount: 1000, currency: 'RUB' });
 
 // Использование Neural Cache
@@ -192,13 +193,8 @@ sdk = AgentStackSDK(
     api_key='your_api_key'
 )
 
-# Использование Admin SDK
-users = await sdk.admin.get_users()
-new_user = await sdk.admin.create_user({
-    'username': 'new_user',
-    'email': 'new@example.com',
-    'role': 'member'
-})
+# Tenant APIs (no ecosystem admin — see docs/INTEGRATOR_SCOPE.md)
+projects = await sdk.platform.api.get_projects()
 
 # Использование Neural Cache
 await sdk.neural.cache.set('key', 'value')
@@ -290,36 +286,9 @@ const transactions = await sdk.payments.getTransactions({
 });
 ```
 
-### AgentAdmin - Административные функции
+### Platform operator only (not in npm integrator docs)
 
-```typescript
-// Получение всех пользователей
-const users = await sdk.admin.getUsers({
-  page: 1,
-  limit: 20,
-  search: 'john'
-});
-
-// Создание пользователя
-const user = await sdk.admin.createUser({
-  username: 'new_user',
-  email: 'new@example.com',
-  first_name: 'New',
-  last_name: 'User',
-  password: 'secure_password',
-  role: 'member',
-  phone: '+1234567890',
-  locale: 'en'
-});
-
-// Получение статистики системы
-const stats = await sdk.admin.getSystemStats();
-console.log(`Total users: ${stats.total_users}`);
-
-// Получение метрик дашборда
-const metrics = await sdk.admin.getDashboardMetrics();
-console.log(`Revenue: ${metrics.total_revenue.value}`);
-```
+Ecosystem admin (`sdk.admin`, `/api/admin/*`) is **not** available to tenant apps. Default `SDKConfig.sdkAudience` is `integrator`. AgentStack monorepo ops shells use `sdkAudience: 'platform_operator'`. Details: [docs/INTEGRATOR_SCOPE.md](docs/INTEGRATOR_SCOPE.md).
 
 ### AgentDocs - Документация и справка
 
@@ -338,41 +307,6 @@ const examples = await sdk.docs.getCodeExamples({
 
 // Получение FAQ
 const faq = await sdk.docs.getFAQ('payments');
-```
-
-#### Bulk Operations
-```typescript
-// Массовое обновление пользователей
-await sdk.admin.bulkUpdateUsers(['user1', 'user2', 'user3'], {
-  is_active: false,
-  role: 'member'
-});
-
-// Массовое удаление пользователей
-await sdk.admin.bulkDeleteUsers(['user1', 'user2', 'user3']);
-```
-
-#### System Statistics
-```typescript
-// Получение статистики системы
-const stats = await sdk.admin.getSystemStats();
-// {
-//   total_users: 1250,
-//   active_users: 980,
-//   total_projects: 45,
-//   active_projects: 32,
-//   total_revenue: 125000,
-//   success_rate: 98.7
-// }
-
-// Dashboard метрики
-const metrics = await sdk.admin.getDashboardMetrics();
-// {
-//   total_revenue: { value: 125000, change_percentage: 12.5 },
-//   total_transactions: { value: 2450, change_percentage: 8.3 },
-//   success_rate: { value: 98.7, change_percentage: 1.2 },
-//   active_customers: { value: 1250, change_percentage: 15.8 }
-// }
 ```
 
 ### Neural Architecture Integration
@@ -601,32 +535,24 @@ sdk = AgentStackSDK(
 ```typescript
 import { AgentStackSDK } from '@agentstack/sdk';
 
-describe('Admin SDK', () => {
+describe('Integrator SDK', () => {
   let sdk: AgentStackSDK;
 
   beforeEach(() => {
     sdk = new AgentStackSDK({
       apiBase: resolveAgentStackApiBase(),
-      apiKey: 'test_key'
+      apiKey: 'test_key',
     });
   });
 
-  it('should create user', async () => {
-    const user = await sdk.admin.createUser({
-      username: 'test_user',
-      email: 'test@example.com',
-      role: 'member'
-    });
-
-    expect(user.id).toBeDefined();
-    expect(user.username).toBe('test_user');
+  it('should list projects via platform.api', async () => {
+    const projects = await sdk.platform.api.getProjects();
+    expect(Array.isArray(projects)).toBe(true);
   });
 
-  it('should get users', async () => {
-    const users = await sdk.admin.getUsers();
-    
-    expect(Array.isArray(users.users)).toBe(true);
-    expect(users.pagination).toBeDefined();
+  it('should not expose admin in module catalog', () => {
+    const ids = sdk.getModuleCatalog().modules.map((m) => m.id);
+    expect(ids).not.toContain('admin');
   });
 });
 ```
@@ -652,46 +578,15 @@ describe('SDK Integration', () => {
 
 ## 📚 Примеры использования
 
-### Admin Dashboard
+### Project dashboard (integrator)
 ```typescript
-// Полный пример админ дашборда
-class AdminDashboard {
-  private sdk: AgentStackSDK;
+class ProjectDashboard {
+  constructor(private sdk: AgentStackSDK) {}
 
-  constructor(apiKey: string) {
-    this.sdk = new AgentStackSDK({
-      apiBase: resolveAgentStackApiBase(),
-      apiKey
-    });
-  }
-
-  async getDashboardData() {
-    const [stats, metrics, users] = await Promise.all([
-      this.sdk.admin.getSystemStats(),
-      this.sdk.admin.getDashboardMetrics(),
-      this.sdk.admin.getUsers({ limit: 10 })
-    ]);
-
-    return {
-      stats,
-      metrics,
-      recentUsers: users.users
-    };
-  }
-
-  async manageUser(userId: string, action: 'suspend' | 'activate' | 'delete') {
-    switch (action) {
-      case 'suspend':
-        return await this.sdk.admin.suspendUser(userId);
-      case 'activate':
-        return await this.sdk.admin.activateUser(userId);
-      case 'delete':
-        return await this.sdk.admin.deleteUser(userId);
-    }
-  }
-
-  async bulkUserManagement(userIds: string[], updates: any) {
-    return await this.sdk.admin.bulkUpdateUsers(userIds, updates);
+  async getDashboardData(projectId: number) {
+    const project = await this.sdk.platform.api.getProject(projectId);
+    const catalog = this.sdk.getModuleCatalog();
+    return { project, catalog };
   }
 }
 ```
@@ -714,7 +609,7 @@ class UserService {
     }
 
     // Получаем данные
-    const profile = await this.sdk.admin.getUser(userId);
+    const profile = await this.sdk.platform.api.getUser(userId);
     
     // Кэшируем с предсказанием TTL
     await this.sdk.neural.cache.set(`user:${userId}:profile`, profile, 300);
@@ -724,7 +619,7 @@ class UserService {
 
   async updateUserProfile(userId: string, updates: any) {
     // Обновляем данные
-    const updated = await this.sdk.admin.updateUser(userId, updates);
+    const updated = await this.sdk.platform.api.updateUser(userId, updates);
     
     // Инвалидируем кэш
     await this.sdk.neural.cache.invalidate(`user:${userId}:*`);
@@ -738,9 +633,6 @@ class UserService {
 
 ### API Key Management
 ```typescript
-// Ротация API ключей
-const newKey = await sdk.admin.rotateApiKey('old_key_id');
-
 // Создание API ключа с ограничениями
 const apiKey = await sdk.auth.createApiKey({
   name: 'Admin Dashboard Key',

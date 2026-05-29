@@ -43,25 +43,9 @@ await sdk.auth.terminateAllSessions('Security logout');
 - Получение метрик дашборда
 - Административное управление сессиями
 
-**Пример использования:**
-```typescript
-// Получение пользователей
-const users = await sdk.admin.getUsers({
-  page: 1,
-  limit: 20,
-  search: 'john'
-});
+**Platform operator only** — not available to npm tenant integrators (`sdkAudience: 'integrator'`). See [INTEGRATOR_SCOPE.md](INTEGRATOR_SCOPE.md). Tenant apps use `sdk.platform.api` / `sdk.platform.rbac` for project-scoped user operations.
 
-// Создание пользователя
-const user = await sdk.admin.createUser({
-  username: 'new_user',
-  email: 'new@example.com',
-  role: 'member'
-});
-
-// Получение статистики
-const stats = await sdk.admin.getSystemStats();
-```
+**Operator example (monorepo / `sdkAudience: 'platform_operator'`):** see `examples/typescript/operator-admin-usage.ts`.
 
 ### 🧠 AgentNeural - Neural Architecture
 Модуль для работы с Neural Architecture, включая кэширование, события и анализ паттернов.
@@ -319,9 +303,9 @@ const sdk = new AgentStackSDK({
   apiKey: 'your_api_key'
 });
 
-// Использование модулей
-await sdk.auth.login({ email, password });
-const users = await sdk.admin.getUsers();
+// Использование модулей (integrator)
+await sdk.platform.auth.login({ email, password });
+const projects = await sdk.platform.api.getProjects();
 const payment = await sdk.payments.createPayment({ amount: 1000 });
 await sdk.neural.cache.set('key', 'value');
 const help = await sdk.docs.getHelp('auth');

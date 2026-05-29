@@ -47,17 +47,14 @@ async def main():
         except Exception as e:
             print(f"Profile error: {e}")
         
-        # --- AgentAdmin Module ---
-        print("\n--- AgentAdmin Module ---")
+        # --- Platform API (integrator; no ecosystem admin) ---
+        print("\n--- Platform API ---")
         try:
-            users = await sdk.admin.get_users(limit=5)
-            print(f"Users count: {len(users.get('users', []))}")
-            
-            system_stats = await sdk.admin.get_system_stats()
-            print(f"System stats: {system_stats}")
+            projects = await sdk.platform.api.get_projects()
+            print(f"Projects count: {len(projects) if isinstance(projects, list) else 'n/a'}")
         except Exception as e:
-            print(f"Admin error: {e}")
-        
+            print(f"API error: {e}")
+
         # --- AgentPayments Module ---
         print("\n--- AgentPayments Module ---")
         try:

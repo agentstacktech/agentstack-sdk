@@ -135,6 +135,12 @@ export interface SDKConfig {
    * Does not yet skip constructor work; use `false` to signal opt-out to agents/tools.
    */
   modules?: SDKModuleGates;
+
+  /**
+   * Who this SDK instance serves. Default `integrator` (tenant apps, npm, third-party agents).
+   * Use `platform_operator` only in AgentStack monorepo admin / ops shells.
+   */
+  sdkAudience?: 'integrator' | 'platform_operator';
 }
 
 export interface RequestConfig {

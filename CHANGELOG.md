@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Integrator scope:** `SDKConfig.sdkAudience` (`integrator` default, `platform_operator` for AgentStack ops); guards on `sdk.admin`, `sdk.platform.adminData`, `/api/admin/*` HTTP; admin modules omitted from `getModuleCatalog()` for integrators; [docs/INTEGRATOR_SCOPE.md](docs/INTEGRATOR_SCOPE.md); `assertIntegratorModule()` in AI preflight
 - `resolveAgentStackApiBase()` and production URL constants (`agentstack.tech`)
 - `AGENTS.md`, AI Application Factory / integrator guides, `llms.txt`
 - `getModuleCatalog()` documentation (`docs/SDK_MODULE_CATALOG.md`)

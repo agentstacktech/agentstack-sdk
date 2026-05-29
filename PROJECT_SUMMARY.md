@@ -117,7 +117,7 @@ const sdk = new AgentStackSDK({
 });
 
 await sdk.auth.login({ email, password });
-const users = await sdk.admin.getUsers();
+const projects = await sdk.platform.api.getProjects();
 await sdk.neural.cache.set('key', 'value');
 ```
 
@@ -129,7 +129,7 @@ sdk = AgentStackSDK(SDKConfig(
 ))
 
 await sdk.auth.login("user@example.com", "password")
-users = await sdk.admin.get_users()
+projects = await sdk.platform.api.get_projects()
 await sdk.neural.cache.set("key", "value")
 ```
 

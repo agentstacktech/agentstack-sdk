@@ -6,6 +6,7 @@
  */
 
 import type { HTTPClient } from '../client/http-client';
+import { assertPlatformOperatorSurface } from '../config/integratorScope';
 import type { APIResponse } from '../types';
 import type { AgentCommand } from '../modules/AgentCommand';
 import type { AgentProtein } from '../modules/AgentProtein';
@@ -233,6 +234,10 @@ export class AgentProtocol {
     body: { action: string; params?: Record<string, unknown> },
     opts?: Parameters<HTTPClient['post']>[2]
   ): Promise<APIResponse<Record<string, unknown>>> {
+    assertPlatformOperatorSurface(
+      this.deps.http.getConfig(),
+      'sdk.platform.protocol.socialAdminExecute',
+    );
     return this.deps.http.post('/api/admin/social/execute', body, opts);
   }
 
@@ -243,6 +248,10 @@ export class AgentProtocol {
     body: { action: string; params?: Record<string, unknown> },
     opts?: Parameters<HTTPClient['post']>[2]
   ): Promise<APIResponse<Record<string, unknown>>> {
+    assertPlatformOperatorSurface(
+      this.deps.http.getConfig(),
+      'sdk.platform.protocol.agentsAdminExecute',
+    );
     return this.deps.http.post('/api/admin/agents/execute', body, opts);
   }
 

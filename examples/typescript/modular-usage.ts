@@ -81,53 +81,19 @@ async function authExamples() {
 }
 
 // ============================================================================
-// AgentAdmin - Административные функции
+// Integrator APIs (project-scoped) — see docs/INTEGRATOR_SCOPE.md
+// Ecosystem admin: examples/typescript/operator-admin-usage.ts
 // ============================================================================
 
-async function adminExamples() {
-  console.log('=== AgentAdmin Examples ===');
-  
-  // Получение всех пользователей
-  const users = await sdk.admin.getUsers({
-    page: 1,
-    limit: 20,
-    search: 'john'
-  });
-  console.log('Users found:', users.users.length);
-  
-  // Создание пользователя
-  const newUser = await sdk.admin.createUser({
-    username: 'new_user',
-    email: 'new@example.com',
-    first_name: 'New',
-    last_name: 'User',
-    password: 'secure_password',
-    role: 'member'
-  });
-  console.log('User created:', newUser.id);
-  
-  // Получение статистики системы
-  const stats = await sdk.admin.getSystemStats();
-  console.log('System stats:', {
-    totalUsers: stats.total_users,
-    activeUsers: stats.active_users,
-    successRate: stats.success_rate
-  });
-  
-  // Получение метрик дашборда
-  const metrics = await sdk.admin.getDashboardMetrics();
-  console.log('Dashboard metrics:', {
-    revenue: metrics.total_revenue.value,
-    transactions: metrics.total_transactions.value,
-    successRate: metrics.success_rate.value
-  });
-  
-  // Массовые операции
-  await sdk.admin.bulkUpdateUsers(['user1', 'user2'], {
-    is_active: false,
-    role: 'member'
-  });
-  console.log('Bulk update completed');
+async function platformApiExamples() {
+  console.log('=== Platform API (integrator) ===');
+
+  const projects = await sdk.platform.api.getProjects();
+  console.log('Projects:', projects?.length ?? 0);
+
+  const catalog = sdk.getModuleCatalog();
+  const ids = catalog.modules.map((m) => m.id);
+  console.log('Catalog includes admin?', ids.includes('admin'));
 }
 
 // ============================================================================
@@ -455,7 +421,7 @@ async function runAllExamples() {
     console.log('========================');
     
     await authExamples();
-    await adminExamples();
+    await platformApiExamples();
     await neuralExamples();
     await docsExamples();
     await paymentsExamples();
@@ -486,7 +452,7 @@ if (require.main === module) {
 
 export {
   authExamples,
-  adminExamples,
+  platformApiExamples,
   neuralExamples,
   docsExamples,
   paymentsExamples,
