@@ -1,0 +1,4 @@
+# Example — copy into consumer repo root as .gitmodules after `submodule-add-sdk`
+[submodule "vendor/agentstack-sdk"]
+	path = vendor/agentstack-sdk
+	url = https://github.com/agentstacktech/agentstack-sdk.git

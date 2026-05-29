@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Git submodule consumer:** `scripts/submodule-add-sdk.mjs`, `link-sdk-deps.mjs`, `doctor-sdk-submodule.mjs`, `sdk.lock.json` — [docs/SUBMODULE_CONSUMER.md](docs/SUBMODULE_CONSUMER.md), [docs/sdk/SDK_SUBMODULE_INTEGRATION.md](../docs/sdk/SDK_SUBMODULE_INTEGRATION.md)
 - **Project context:** `sdk.getProjectId()`, `requireProjectId()`, `updateProjectId()`, login → HTTPClient sync, [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md)
 - **Integrator scope:** `SDKConfig.sdkAudience` (`integrator` default, `platform_operator` for AgentStack ops); guards on `sdk.admin`, `sdk.platform.adminData`, `/api/admin/*` HTTP; admin modules omitted from `getModuleCatalog()` for integrators; [docs/INTEGRATOR_SCOPE.md](docs/INTEGRATOR_SCOPE.md); `assertIntegratorModule()` in AI preflight
 - `resolveAgentStackApiBase()` and production URL constants (`agentstack.tech`)

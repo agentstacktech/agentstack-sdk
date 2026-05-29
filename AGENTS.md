@@ -29,7 +29,8 @@ const projects = await sdk.platform.api.getProjects();
 sdk.updateProjectId(42);
 ```
 
-**Project context:** [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md) · `sdk.getProjectId()` · `assertProjectIdConfigured(sdk)`
+**Project context:** [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md) · `sdk.getProjectId()` · `assertProjectIdConfigured(sdk)`  
+**How to install SDK (npm / submodule / monorepo):** [docs/SDK_INTEGRATION_FLOWS.md](docs/SDK_INTEGRATION_FLOWS.md)
 
 **Production API base:** `https://agentstack.tech/api` (default via `resolveAgentStackApiBase()`).  
 **Local Core:** `AGENTSTACK_API_BASE=http://localhost:8000/api`  
@@ -92,5 +93,6 @@ Full recipes: [docs/AI_APPLICATION_FACTORY.md](docs/AI_APPLICATION_FACTORY.md)
 - MCP: https://agentstack.tech/mcp  
 - Module catalog: [docs/SDK_MODULE_CATALOG.md](docs/SDK_MODULE_CATALOG.md)  
 - Integrator scope (no admin): [docs/INTEGRATOR_SCOPE.md](docs/INTEGRATOR_SCOPE.md)  
+- Submodule vendor: [docs/SUBMODULE_CONSUMER.md](docs/SUBMODULE_CONSUMER.md)  
 - Integrator guide: [docs/AI_INTEGRATOR_GUIDE.md](docs/AI_INTEGRATOR_GUIDE.md)  
 - Errors: [docs/AI_ERROR_ACTION_MATRIX.md](docs/AI_ERROR_ACTION_MATRIX.md)

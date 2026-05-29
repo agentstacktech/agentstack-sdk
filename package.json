@@ -17,7 +17,12 @@
     "clean": "npm run clean -w @agentstack/sdk",
     "check:docs-urls": "npm run check:docs-urls -w @agentstack/sdk",
     "check:package-exports": "npm run check:package-exports -w @agentstack/sdk",
-    "check:docs-api-symbols": "npm run check:docs-api-symbols -w @agentstack/sdk"
+    "check:docs-api-symbols": "npm run check:docs-api-symbols -w @agentstack/sdk",
+    "test:sdk-submodule": "node tests/sdk-submodule-lock.test.mjs",
+    "submodule:add": "node scripts/submodule-add-sdk.mjs",
+    "submodule:link": "node scripts/link-sdk-deps.mjs",
+    "submodule:doctor": "node scripts/doctor-sdk-submodule.mjs",
+    "submodule:bootstrap": "node scripts/bootstrap-submodule-consumer.mjs"
   },
   "engines": {
     "node": ">=22.0.0",

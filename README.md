@@ -24,9 +24,33 @@ const catalog = sdk.getModuleCatalog(); // AI: discover modules, hints, examples
 ```
 
 **AI entry:** [AGENTS.md](AGENTS.md) · [docs/AI_APPLICATION_FACTORY.md](docs/AI_APPLICATION_FACTORY.md)  
-**Integrator scope (no ecosystem admin):** [docs/INTEGRATOR_SCOPE.md](docs/INTEGRATOR_SCOPE.md)
+**Integrator scope (no ecosystem admin):** [docs/INTEGRATOR_SCOPE.md](docs/INTEGRATOR_SCOPE.md)  
+**All integration flows (npm, submodule, monorepo, …):** [docs/SDK_INTEGRATION_FLOWS.md](docs/SDK_INTEGRATION_FLOWS.md)
 
 **Links:** [Changelog](CHANGELOG.md) | [Contributing](CONTRIBUTING.md)
+
+---
+
+## How to add the SDK to your project
+
+| Flow | When | Install |
+|------|------|---------|
+| **A — npm** (default) | Production apps, most integrators | `npm install @agentstack/sdk` |
+| **B — git submodule** | Pin SDK commit in git, vendored CI | [docs/SUBMODULE_CONSUMER.md](docs/SUBMODULE_CONSUMER.md) → `vendor/agentstack-sdk` |
+| **D — monorepo sibling** | You work inside [AgentStack](https://github.com/agentstacktech/AgentStack) | `"@agentstack/sdk": "file:../agentstack-unified-sdk/packages/core"` |
+| **E — local `file:` / `npm link`** | Developing SDK + app together | [PUBLISHING.md](PUBLISHING.md) |
+| **G — Python** | Python backends | `pip install agentstack-sdk` |
+
+Full decision tree, CI, and env checklist: **[docs/SDK_INTEGRATION_FLOWS.md](docs/SDK_INTEGRATION_FLOWS.md)**.
+
+### Submodule in one minute
+
+```bash
+git submodule add https://github.com/agentstacktech/agentstack-sdk.git vendor/agentstack-sdk
+node vendor/agentstack-sdk/scripts/bootstrap-submodule-consumer.mjs --target . --tag v0.4.13
+```
+
+Then `npm install` in your app and set `projectId` — see [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md).
 
 ---
 
@@ -144,20 +168,20 @@ agentstack-sdk/
 
 ## 📦 Установка
 
-### TypeScript/JavaScript
+See **[docs/SDK_INTEGRATION_FLOWS.md](docs/SDK_INTEGRATION_FLOWS.md)** for npm vs submodule vs monorepo vs `npm link`.
+
+**Quick paths:**
+
 ```bash
+# A — npm (default)
 npm install @agentstack/sdk
-```
+npm install @agentstack/react @tanstack/react-query   # optional UI
 
-### Python
-```bash
-pip install agentstack
-```
-> **Note:** Python SDK is in development. For now, use the REST API directly with `requests` or `httpx`.
+# B — git submodule (see SUBMODULE_CONSUMER.md)
+git submodule add https://github.com/agentstacktech/agentstack-sdk.git vendor/agentstack-sdk
 
-### React
-```bash
-npm install @agentstack/react
+# G — Python
+pip install agentstack-sdk
 ```
 
 ## 🚀 Быстрый старт
@@ -203,36 +227,29 @@ value = await sdk.neural.cache.get('key')
 
 ### React
 ```tsx
-import { AgentStackProvider, useAdminUsers } from '@agentstack/react';
+import { SDKProvider, useSDK } from '@agentstack/react';
 
 function App() {
   return (
-    <AgentStackProvider
-      apiBase="https://agentstack.tech/api"
-      apiKey="your_api_key"
+    <SDKProvider
+      config={{
+        apiBase: 'https://agentstack.tech/api',
+        apiKey: process.env.AGENTSTACK_API_KEY,
+        projectId: Number(process.env.AGENTSTACK_PROJECT_ID),
+      }}
     >
-      <AdminDashboard />
-    </AgentStackProvider>
+      <ProjectList />
+    </SDKProvider>
   );
 }
 
-function AdminDashboard() {
-  const { users, createUser, updateUser, deleteUser } = useAdminUsers();
-  
-  return (
-    <div>
-      {users.map(user => (
-        <div key={user.id}>
-          {user.username} - {user.email}
-          <button onClick={() => deleteUser(user.id)}>
-            Delete
-          </button>
-        </div>
-      ))}
-    </div>
-  );
+function ProjectList() {
+  const sdk = useSDK();
+  // useSDKQuery / sdk.platform.api — see docs/REACT_QUERY_INTEGRATION.md
 }
 ```
+
+Ecosystem admin hooks (`useAdminUsers`, …) require `sdkAudience: 'platform_operator'` in the AgentStack monorepo only — see [docs/INTEGRATOR_SCOPE.md](docs/INTEGRATOR_SCOPE.md).
 
 ## 🔧 API Reference
 

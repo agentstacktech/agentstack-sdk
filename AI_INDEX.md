@@ -12,6 +12,9 @@
 
 Универсальный SDK для экосистемы AgentStack с модульной архитектурой: TypeScript core, Python SDK, React hooks/components - единый API для всех платформ с Neural Architecture integration, i18n support, admin modules, и полной типизацией.
 
+**Integration flows (npm / submodule / monorepo / …):** [docs/SDK_INTEGRATION_FLOWS.md](docs/SDK_INTEGRATION_FLOWS.md) (`repo.platform.sdk.integration_flows.gen1`)  
+**Submodule consumer (git vendoring):** [docs/SUBMODULE_CONSUMER.md](docs/SUBMODULE_CONSUMER.md) · monorepo [docs/sdk/SDK_SUBMODULE_INTEGRATION.md](../docs/sdk/SDK_SUBMODULE_INTEGRATION.md) · scripts `submodule-add-sdk.mjs`, `bootstrap-submodule-consumer.mjs`
+
 **Versioning (v0.4.6 platform):** `SDK_VERSION.semantic` and `AGENTSTACK_CORE_VERSION` are generated from **`AGENTSTACK_CORE_VERSION`** in [`shared/constants.py`](../shared/constants.py) via `npm run sync:agentstack-version` in `packages/core` (see `src/generated/agentstack-core-version.ts`). Align `package.json` `"version"` with that string for in-repo releases. See [`docs/VERSIONING.md`](../docs/VERSIONING.md). **AI navigation:** [`docs/AI_NAVIGATION_MAP.md`](../docs/AI_NAVIGATION_MAP.md). **AgentProtocol:** [`packages/core/src/protocol/AI_INDEX.md`](packages/core/src/protocol/AI_INDEX.md). **Relay / social ADRs:** [`docs/adr/AI_INDEX.md`](../docs/adr/AI_INDEX.md). **OpTrace:** [`docs/OPTRACE_FOR_AGENTS.md`](../docs/OPTRACE_FOR_AGENTS.md) — `getOrCreateCorrelationIds` / `optraceLog` in `packages/core/src/utils/optrace.ts` + HTTP client headers.
 
 ---

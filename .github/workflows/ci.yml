@@ -29,6 +29,7 @@ jobs:
           npm run check:docs-urls
           npm run check:package-exports
           npm run check:docs-api-symbols
+          npm run test:sdk-submodule
 
       - name: Economy + finance SDK parity
         run: npm run check:economy-parity && npm run check:finance-parity

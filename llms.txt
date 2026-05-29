@@ -1,8 +1,10 @@
 # AgentStack SDK — curated docs for LLMs
 
 AGENTS.md
+docs/SDK_INTEGRATION_FLOWS.md
 docs/INTEGRATOR_SCOPE.md
 docs/PROJECT_CONTEXT.md
+docs/SUBMODULE_CONSUMER.md
 docs/quick-start.md
 docs/AI_APPLICATION_FACTORY.md
 docs/AI_INTEGRATOR_GUIDE.md

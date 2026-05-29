@@ -2,6 +2,8 @@
 
 Универсальный API клиент для AgentStack с модульной архитектурой, Neural интеграцией и AI-First i18n. Поддерживает TypeScript, автоматическое управление состоянием и обработку ошибок.
 
+**Install paths (npm, git submodule, monorepo):** [../../docs/SDK_INTEGRATION_FLOWS.md](../../docs/SDK_INTEGRATION_FLOWS.md)
+
 **NEW!** 🌍 **AgentI18n** - Zero Config translations for AI agents!
 
 ## 🚀 Быстрый старт
@@ -10,6 +12,7 @@
 
 ```bash
 npm install @agentstack/sdk
+# or git submodule — see docs/SDK_INTEGRATION_FLOWS.md
 ```
 
 ### Базовое использование

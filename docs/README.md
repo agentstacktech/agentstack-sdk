@@ -10,6 +10,8 @@ User-facing docs for **`@agentstack/sdk`**. Production API base: **`https://agen
 | [quick-start.md](./quick-start.md) | Install, env vars, first calls |
 | [INTEGRATOR_SCOPE.md](./INTEGRATOR_SCOPE.md) | Tenant vs platform operator (no `/api/admin` for integrators) |
 | [PROJECT_CONTEXT.md](./PROJECT_CONTEXT.md) | `projectId` / `X-Project-ID` — where scope is set |
+| [SDK_INTEGRATION_FLOWS.md](./SDK_INTEGRATION_FLOWS.md) | All flows: npm, submodule, monorepo, link, publish, Python, AI |
+| [SUBMODULE_CONSUMER.md](./SUBMODULE_CONSUMER.md) | Git submodule instead of npm |
 | [AI_INTEGRATOR_GUIDE.md](./AI_INTEGRATOR_GUIDE.md) | Integrator patterns |
 | [SDK_MODULE_CATALOG.md](./SDK_MODULE_CATALOG.md) | `getModuleCatalog()` index |
 | [AI_APPLICATION_FACTORY.md](./AI_APPLICATION_FACTORY.md) | Discover → validate → deploy |
