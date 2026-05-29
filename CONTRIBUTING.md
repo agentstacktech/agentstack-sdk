@@ -1,5 +1,7 @@
 # Contributing to AgentStack SDK
 
+**RU:** [CONTRIBUTING_ru.md](./CONTRIBUTING_ru.md)
+
 Thank you for your interest in contributing to AgentStack SDK!
 
 ## Getting Started
@@ -27,7 +29,12 @@ npm run build
 
 ```bash
 npm run test
+npm run check:docs-i18n
 ```
+
+### Documentation (i18n)
+
+English is canonical. Update `*_ru.md` in the same PR. See [docs/DOCS_I18N.md](docs/DOCS_I18N.md).
 
 ### Linting
 

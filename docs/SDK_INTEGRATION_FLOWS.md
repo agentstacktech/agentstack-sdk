@@ -1,6 +1,7 @@
 # SDK integration flows — all ways to consume `@agentstack/sdk`
 
 **Genetic tag:** `repo.platform.sdk.integration_flows.gen1`  
+**RU:** [SDK_INTEGRATION_FLOWS_ru.md](./SDK_INTEGRATION_FLOWS_ru.md)  
 **Mirror:** https://github.com/agentstacktech/agentstack-sdk
 
 One-page map of **every supported way** to depend on the SDK, when to pick each, and what to run after install.

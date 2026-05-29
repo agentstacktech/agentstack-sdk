@@ -1,6 +1,7 @@
 # AI integrator guide — AgentStack SDK
 
-**Genetic tags:** `repo.platform.sdk.gen1` · `repo.platform.sdk.ai_surface.gen1` · `repo.platform.sdk.agent_protocol.gen1`
+**Genetic tags:** `repo.platform.sdk.gen1` · `repo.platform.sdk.ai_surface.gen1` · `repo.platform.sdk.agent_protocol.gen1`  
+**RU:** [AI_INTEGRATOR_GUIDE_ru.md](./AI_INTEGRATOR_GUIDE_ru.md)
 
 ---
 

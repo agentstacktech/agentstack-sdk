@@ -1,5 +1,7 @@
-# AgentStack SDK — curated docs for LLMs
+# AgentStack SDK — curated docs for LLMs (English only — do not add *_ru.md)
 
+docs/DOCS_I18N.md
+docs/DOC_HUB.md
 AGENTS.md
 docs/SDK_INTEGRATION_FLOWS.md
 docs/INTEGRATOR_SCOPE.md
@@ -7,6 +9,7 @@ docs/PROJECT_CONTEXT.md
 docs/SUBMODULE_CONSUMER.md
 docs/quick-start.md
 docs/AI_APPLICATION_FACTORY.md
+docs/AI_ERROR_ACTION_MATRIX.md
 docs/AI_INTEGRATOR_GUIDE.md
 docs/SDK_MODULE_CATALOG.md
 docs/AI_ERROR_ACTION_MATRIX.md

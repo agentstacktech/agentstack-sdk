@@ -1,6 +1,7 @@
 # SDK architecture
 
-**Genetic tag:** `repo.platform.sdk.unified.gen1`
+**Genetic tag:** `repo.platform.sdk.unified.gen1`  
+**RU:** [ARCHITECTURE_ru.md](./ARCHITECTURE_ru.md)
 
 ## Layers
 

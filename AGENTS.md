@@ -1,6 +1,7 @@
 # AgentStack SDK — guide for AI agents
 
 **Genetic tag:** `repo.platform.sdk.ai_surface.gen1`  
+**RU:** [AGENTS_ru.md](AGENTS_ru.md) · **Doc hub:** [docs/DOC_HUB.md](docs/DOC_HUB.md)  
 **North star:** fast, low-error construction of apps and sites on AgentStack via typed SDK + self-description.
 
 ---
@@ -30,7 +31,7 @@ sdk.updateProjectId(42);
 ```
 
 **Project context:** [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md) · `sdk.getProjectId()` · `assertProjectIdConfigured(sdk)`  
-**How to install SDK (npm / submodule / monorepo):** [docs/SDK_INTEGRATION_FLOWS.md](docs/SDK_INTEGRATION_FLOWS.md)
+**How to install SDK (npm / submodule / monorepo):** [docs/SDK_INTEGRATION_FLOWS.md](docs/SDK_INTEGRATION_FLOWS.md) · RU: [SDK_INTEGRATION_FLOWS_ru.md](docs/SDK_INTEGRATION_FLOWS_ru.md)
 
 **Production API base:** `https://agentstack.tech/api` (default via `resolveAgentStackApiBase()`).  
 **Local Core:** `AGENTSTACK_API_BASE=http://localhost:8000/api`  

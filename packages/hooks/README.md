@@ -1,5 +1,7 @@
 # @agentstack/hooks
 
+**Languages:** [English (canonical)](README.en.md) · **Русский** (this file)
+
 **Shared data hooks for AgentStack SDK - AI-First Design**
 
 ## 🤖 AI-First Philosophy

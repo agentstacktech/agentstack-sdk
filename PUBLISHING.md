@@ -1,5 +1,9 @@
 # Publishing Guide
 
+**RU:** [PUBLISHING_ru.md](./PUBLISHING_ru.md)
+
+Full mirror runbook: [../docs/sdk/SDK_MIRROR_PUBLISH_RUNBOOK.md](../docs/sdk/SDK_MIRROR_PUBLISH_RUNBOOK.md)
+
 ## After First npm Publish
 
 Once `@agentstack/sdk` is published to npm:

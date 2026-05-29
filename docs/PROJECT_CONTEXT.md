@@ -1,6 +1,7 @@
 # Project context (`project_id`)
 
-**Genetic tag:** `repo.platform.sdk.project_context.gen1`
+**Genetic tag:** `repo.platform.sdk.project_context.gen1`  
+**RU:** [PROJECT_CONTEXT_ru.md](./PROJECT_CONTEXT_ru.md)
 
 Almost every tenant API call is scoped to a **project**. The SDK carries that scope as **`projectId`** in config and as the **`X-Project-ID`** HTTP header.
 

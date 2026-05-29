@@ -1,5 +1,7 @@
 # Quick start
 
+**RU:** [quick-start_ru.md](./quick-start_ru.md)
+
 See [AGENTS.md](../AGENTS.md) for AI agents.
 
 ```bash

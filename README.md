@@ -3,7 +3,11 @@
 [![npm version](https://img.shields.io/npm/v/@agentstack/sdk.svg)](https://www.npmjs.com/package/@agentstack/sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Universal TypeScript/JavaScript SDK for the AgentStack ecosystem. Modular API for auth, projects, payments, DNA operations, and Neural Architecture.
+**Languages:** [English (canonical)](README.en.md) · **Русский** (this file)
+
+**English README (GitHub / npm / AI default):** [README.en.md](README.en.md) · **Doc hub:** [docs/DOC_HUB_ru.md](docs/DOC_HUB_ru.md) · [docs/DOC_HUB.md](docs/DOC_HUB.md)
+
+Универсальный TypeScript/JavaScript SDK для экосистемы AgentStack. Модульный API: auth, projects, payments, DNA, protocol, Neural Architecture.
 
 **Quick Start (TypeScript/JavaScript):**
 

@@ -2,6 +2,7 @@
   "name": "@agentstack/sdk",
   "version": "0.4.13",
   "description": "AgentStack-SDK - Universal API client with modular architecture and Neural integration",
+  "readme": "README.en.md",
   "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",

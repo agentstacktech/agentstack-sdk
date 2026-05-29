@@ -1,5 +1,7 @@
 # AgentStack-SDK для Python
 
+**Languages:** [English (canonical)](README.en.md) · **Русский** (this file)
+
 Модульная архитектура для работы с AgentStack API на Python.
 
 ## 🚀 Установка

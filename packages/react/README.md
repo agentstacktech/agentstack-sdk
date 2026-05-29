@@ -1,5 +1,7 @@
 # AgentStack React SDK
 
+**Languages:** [English (canonical)](README.en.md) · **Русский** (this file)
+
 Официальная React интеграция для AgentStack SDK. Предоставляет React хуки, компоненты и контекст для легкой интеграции с AgentStack API.
 
 ## 🚀 Быстрый старт

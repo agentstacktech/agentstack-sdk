@@ -1,10 +1,11 @@
 # AI React scaffold
 
-**Genetic tags:** `sdk.react.entity.gen1` · `sdk.react.invalidation.gen1`
+**Genetic tags:** `sdk.react.entity.gen1` · `sdk.react.invalidation.gen1`  
+**RU:** [AI_REACT_SCAFFOLD_ru.md](./AI_REACT_SCAFFOLD_ru.md)
 
 ```tsx
 import {
-  AgentStackProvider,
+  SDKProvider,
   useEntityData,
   useSDKMutationWithInvalidation,
   InvalidationRegistryProvider,
@@ -13,11 +14,11 @@ import { resolveAgentStackApiBase } from '@agentstack/sdk';
 
 export function App() {
   return (
-    <AgentStackProvider config={{ apiBase: resolveAgentStackApiBase() }}>
+    <SDKProvider config={{ apiBase: resolveAgentStackApiBase() }}>
       <InvalidationRegistryProvider registry={yourRegistry}>
         <WalletsList projectId={1} />
       </InvalidationRegistryProvider>
-    </AgentStackProvider>
+    </SDKProvider>
   );
 }
 

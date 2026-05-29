@@ -1,6 +1,7 @@
 # SDK module catalog
 
-**Genetic tag:** `repo.platform.sdk.gen1`
+**Genetic tag:** `repo.platform.sdk.gen1`  
+**RU:** [SDK_MODULE_CATALOG_ru.md](./SDK_MODULE_CATALOG_ru.md)
 
 Canonical copy (monorepo): [../../docs/SDK_MODULE_CATALOG.md](../../docs/SDK_MODULE_CATALOG.md)
 

@@ -1,6 +1,7 @@
 # AI Application Factory — recipes
 
 **Genetic tag:** `repo.platform.sdk.ai_app_factory.gen1`  
+**RU:** [AI_APPLICATION_FACTORY_ru.md](./AI_APPLICATION_FACTORY_ru.md)  
 **Entry:** [AGENTS.md](../AGENTS.md)
 
 Each recipe: **Task → Prerequisites → Steps → Code → Failures**

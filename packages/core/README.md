@@ -1,5 +1,7 @@
 # AgentStack Core SDK
 
+**Languages:** [English (canonical)](README.en.md) · **Русский** (this file)
+
 Универсальный API клиент для AgentStack с модульной архитектурой, Neural интеграцией и AI-First i18n. Поддерживает TypeScript, автоматическое управление состоянием и обработку ошибок.
 
 **Install paths (npm, git submodule, monorepo):** [../../docs/SDK_INTEGRATION_FLOWS.md](../../docs/SDK_INTEGRATION_FLOWS.md)

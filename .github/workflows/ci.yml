@@ -26,6 +26,8 @@ jobs:
 
       - name: Docs and export guards
         run: |
+          npm run generate:docs-i18n
+          npm run check:docs-i18n
           npm run check:docs-urls
           npm run check:package-exports
           npm run check:docs-api-symbols

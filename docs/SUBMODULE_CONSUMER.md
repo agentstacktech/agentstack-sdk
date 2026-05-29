@@ -1,6 +1,7 @@
 # Submodule consumer quick reference
 
-**Genetic tag:** `repo.platform.sdk.submodule.gen1`
+**Genetic tag:** `repo.platform.sdk.submodule.gen1`  
+**RU:** [SUBMODULE_CONSUMER_ru.md](./SUBMODULE_CONSUMER_ru.md)
 
 Vendoring `@agentstack/sdk` via git submodule instead of npm.  
 **All SDK install paths:** [SDK_INTEGRATION_FLOWS.md](./SDK_INTEGRATION_FLOWS.md) (flow **B**).

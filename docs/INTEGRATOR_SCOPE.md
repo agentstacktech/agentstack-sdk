@@ -1,6 +1,7 @@
 # Integrator scope vs platform operator
 
 **Genetic tag:** `repo.platform.sdk.integrator_scope.gen1`  
+**RU:** [INTEGRATOR_SCOPE_ru.md](./INTEGRATOR_SCOPE_ru.md)  
 **Audience:** npm consumers (`@agentstack/sdk`), third-party agents, tenant-hosted apps.
 
 AgentStack distinguishes two SDK audiences:

@@ -1,6 +1,7 @@
 # React Query integration
 
-**Genetic tag:** `sdk.react.query.gen1`
+**Genetic tag:** `sdk.react.query.gen1`  
+**RU:** [REACT_QUERY_INTEGRATION_ru.md](./REACT_QUERY_INTEGRATION_ru.md)
 
 Use `@agentstack/react` hooks — not `useState` + `useEffect` for server data.
 

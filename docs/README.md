@@ -1,31 +1,34 @@
 # AgentStack SDK documentation
 
-User-facing docs for **`@agentstack/sdk`**. Production API base: **`https://agentstack.tech/api`**.
+**RU:** [README_ru.md](./README_ru.md) · **Hub:** [DOC_HUB.md](./DOC_HUB.md) · **i18n:** [DOCS_I18N.md](./DOCS_I18N.md)
+
+User-facing docs for **`@agentstack/sdk`**. Production API base: **`https://agentstack.tech/api`**. **English is canonical**; Russian mirrors use `*_ru.md`.
 
 ## Start here
 
-| Doc | Purpose |
-|-----|---------|
-| [AGENTS.md](../AGENTS.md) | AI agents — 60s bootstrap |
-| [quick-start.md](./quick-start.md) | Install, env vars, first calls |
-| [INTEGRATOR_SCOPE.md](./INTEGRATOR_SCOPE.md) | Tenant vs platform operator (no `/api/admin` for integrators) |
-| [PROJECT_CONTEXT.md](./PROJECT_CONTEXT.md) | `projectId` / `X-Project-ID` — where scope is set |
-| [SDK_INTEGRATION_FLOWS.md](./SDK_INTEGRATION_FLOWS.md) | All flows: npm, submodule, monorepo, link, publish, Python, AI |
-| [SUBMODULE_CONSUMER.md](./SUBMODULE_CONSUMER.md) | Git submodule instead of npm |
-| [AI_INTEGRATOR_GUIDE.md](./AI_INTEGRATOR_GUIDE.md) | Integrator patterns |
-| [SDK_MODULE_CATALOG.md](./SDK_MODULE_CATALOG.md) | `getModuleCatalog()` index |
-| [AI_APPLICATION_FACTORY.md](./AI_APPLICATION_FACTORY.md) | Discover → validate → deploy |
+| Doc (EN) | RU | Purpose |
+|----------|-----|---------|
+| [AGENTS.md](../AGENTS.md) | [AGENTS_ru.md](../AGENTS_ru.md) | AI agents — 60s bootstrap |
+| [quick-start.md](./quick-start.md) | [quick-start_ru.md](./quick-start_ru.md) | Install, env vars, first calls |
+| [INTEGRATOR_SCOPE.md](./INTEGRATOR_SCOPE.md) | [INTEGRATOR_SCOPE_ru.md](./INTEGRATOR_SCOPE_ru.md) | Tenant vs platform operator |
+| [PROJECT_CONTEXT.md](./PROJECT_CONTEXT.md) | [PROJECT_CONTEXT_ru.md](./PROJECT_CONTEXT_ru.md) | `projectId` / `X-Project-ID` |
+| [SDK_INTEGRATION_FLOWS.md](./SDK_INTEGRATION_FLOWS.md) | [SDK_INTEGRATION_FLOWS_ru.md](./SDK_INTEGRATION_FLOWS_ru.md) | All install flows |
+| [SUBMODULE_CONSUMER.md](./SUBMODULE_CONSUMER.md) | [SUBMODULE_CONSUMER_ru.md](./SUBMODULE_CONSUMER_ru.md) | Git submodule |
+| [AI_INTEGRATOR_GUIDE.md](./AI_INTEGRATOR_GUIDE.md) | [AI_INTEGRATOR_GUIDE_ru.md](./AI_INTEGRATOR_GUIDE_ru.md) | Integrator patterns |
+| [AI_APPLICATION_FACTORY.md](./AI_APPLICATION_FACTORY.md) | [AI_APPLICATION_FACTORY_ru.md](./AI_APPLICATION_FACTORY_ru.md) | Discover → validate → deploy |
+| [AI_ERROR_ACTION_MATRIX.md](./AI_ERROR_ACTION_MATRIX.md) | [AI_ERROR_ACTION_MATRIX_ru.md](./AI_ERROR_ACTION_MATRIX_ru.md) | Errors → actions |
+| [SDK_MODULE_CATALOG.md](./SDK_MODULE_CATALOG.md) | — | `getModuleCatalog()` index |
 
 ## Deep dives
 
-| Doc | Purpose |
-|-----|---------|
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | Package layout |
-| [MODULAR_ARCHITECTURE.md](./MODULAR_ARCHITECTURE.md) | Module overview |
-| [PROTEIN_SYSTEM_GUIDE.md](./PROTEIN_SYSTEM_GUIDE.md) | Protein / commands |
-| [REACT_QUERY_INTEGRATION.md](./REACT_QUERY_INTEGRATION.md) | `@agentstack/react` + TanStack Query |
-| [AI_REACT_SCAFFOLD.md](./AI_REACT_SCAFFOLD.md) | React scaffold for agents |
-| [AI_ERROR_ACTION_MATRIX.md](./AI_ERROR_ACTION_MATRIX.md) | Errors → actions |
+| Doc (EN) | RU | Purpose |
+|----------|-----|---------|
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | [ARCHITECTURE_ru.md](./ARCHITECTURE_ru.md) | Package layout |
+| [MODULAR_ARCHITECTURE.md](./MODULAR_ARCHITECTURE.md) | [MODULAR_ARCHITECTURE_ru.md](./MODULAR_ARCHITECTURE_ru.md) | Module overview |
+| [PROTEIN_SYSTEM_GUIDE.md](./PROTEIN_SYSTEM_GUIDE.md) | [PROTEIN_SYSTEM_GUIDE_ru.md](./PROTEIN_SYSTEM_GUIDE_ru.md) | Protein / commands |
+| [SDK_MODULE_CATALOG.md](./SDK_MODULE_CATALOG.md) | [SDK_MODULE_CATALOG_ru.md](./SDK_MODULE_CATALOG_ru.md) | Module catalog intro |
+| [REACT_QUERY_INTEGRATION.md](./REACT_QUERY_INTEGRATION.md) | [REACT_QUERY_INTEGRATION_ru.md](./REACT_QUERY_INTEGRATION_ru.md) | React + TanStack Query |
+| [AI_REACT_SCAFFOLD.md](./AI_REACT_SCAFFOLD.md) | [AI_REACT_SCAFFOLD_ru.md](./AI_REACT_SCAFFOLD_ru.md) | React scaffold for agents |
 
 ## Platform (monorepo)
 

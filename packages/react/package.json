@@ -2,6 +2,7 @@
   "name": "@agentstack/react",
   "version": "0.4.13",
   "description": "React integration for AgentStack SDK",
+  "readme": "README.en.md",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [

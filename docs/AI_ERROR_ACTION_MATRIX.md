@@ -1,6 +1,7 @@
 # AI error action matrix
 
-**Genetic tag:** `repo.platform.sdk.ai_app_factory.gen1`
+**Genetic tag:** `repo.platform.sdk.ai_app_factory.gen1`  
+**RU:** [AI_ERROR_ACTION_MATRIX_ru.md](./AI_ERROR_ACTION_MATRIX_ru.md)
 
 | Signal | Agent action |
 |--------|----------------|

@@ -1,0 +1,736 @@
+{
+  "generatedAt": "2026-05-29T21:55:51.722Z",
+  "entries": [
+    {
+      "path": "README.en.md",
+      "lang": "en",
+      "h2": [
+        "Quick start",
+        "How to add the SDK",
+        "Key docs (English canonical)",
+        "Production API",
+        "React (integrator-safe)",
+        "Links"
+      ],
+      "pairRole": "pair-stub",
+      "mirror": "README.md"
+    },
+    {
+      "path": "README.md",
+      "lang": "ru",
+      "h2": [
+        "How to add the SDK to your project",
+        "🎯 Цели проекта",
+        "🏗️ Архитектура",
+        "🚀 Ключевые особенности",
+        "📦 Установка",
+        "🚀 Быстрый старт",
+        "🔧 API Reference",
+        "🎨 React Hooks",
+        "🔧 Конфигурация",
+        "🧪 Тестирование",
+        "📚 Примеры использования",
+        "🔒 Безопасность",
+        "📊 Мониторинг и метрики",
+        "Production API base",
+        "🤝 Contributing",
+        "📞 Поддержка"
+      ],
+      "pairRole": "pair-stub",
+      "mirror": "README.en.md"
+    },
+    {
+      "path": "docs/DOCS_I18N.md",
+      "lang": "en",
+      "h2": [
+        "Priority",
+        "File naming",
+        "What to translate",
+        "Maintainer workflow",
+        "CI",
+        "Registry"
+      ],
+      "pairRole": "paired",
+      "mirror": "docs/DOCS_I18N_ru.md"
+    },
+    {
+      "path": "docs/DOCS_I18N_ru.md",
+      "lang": "ru",
+      "h2": [
+        "Приоритет",
+        "Имена файлов",
+        "Что переводить",
+        "Workflow для maintainers",
+        "CI",
+        "Реестр"
+      ],
+      "pairRole": "paired",
+      "mirror": "docs/DOCS_I18N.md"
+    },
+    {
+      "path": "docs/DOC_HUB.md",
+      "lang": "en",
+      "h2": [
+        "Start here (P0 — bilingual)",
+        "AI & integrators",
+        "Deep dives",
+        "Repo root",
+        "Platform (monorepo)",
+        "i18n maintenance",
+        "Examples"
+      ],
+      "pairRole": "paired",
+      "mirror": "docs/DOC_HUB_ru.md"
+    },
+    {
+      "path": "docs/DOC_HUB_ru.md",
+      "lang": "ru",
+      "h2": [
+        "С чего начать (P0 — двуязычно)",
+        "AI и интеграторы",
+        "Углублённо",
+        "Корень репозитория",
+        "Платформа (monorepo)",
+        "Примеры"
+      ],
+      "pairRole": "paired",
+      "mirror": "docs/DOC_HUB.md"
+    },
+    {
+      "path": "docs/README.md",
+      "lang": "en",
+      "h2": [
+        "Start here",
+        "Deep dives",
+        "Platform (monorepo)",
+        "Examples",
+        "Support"
+      ],
+      "pairRole": "paired",
+      "mirror": "docs/README_ru.md"
+    },
+    {
+      "path": "docs/README_ru.md",
+      "lang": "ru",
+      "h2": [
+        "С чего начать",
+        "Углублённо",
+        "Платформа",
+        "Примеры",
+        "Поддержка"
+      ],
+      "pairRole": "paired",
+      "mirror": "docs/README.md"
+    },
+    {
+      "path": "docs/SDK_INTEGRATION_FLOWS.md",
+      "lang": "en",
+      "h2": [
+        "Decision tree",
+        "Flow A — npm (default for apps)",
+        "Flow B — git submodule (vendored source)",
+        "Flow C — platform submodule (full AgentStack)",
+        "Flow D — AgentStack monorepo sibling (this repo)",
+        "Flow E — local SDK development (`npm link`)",
+        "Flow F — maintain / publish SDK (AgentStack team)",
+        "Flow G — Python (`agentstack-sdk`)",
+        "Flow H — AI / automation (no app install)",
+        "Runtime checklist (any flow)",
+        "Compare at a glance"
+      ],
+      "pairRole": "paired",
+      "mirror": "docs/SDK_INTEGRATION_FLOWS_ru.md"
+    },
+    {
+      "path": "docs/SDK_INTEGRATION_FLOWS_ru.md",
+      "lang": "ru",
+      "h2": [
+        "Дерево решений",
+        "Поток A — npm (по умолчанию)",
+        "Поток B — git submodule",
+        "Поток C — submodule всей платформы",
+        "Поток D — sibling в monorepo AgentStack",
+        "Поток E — локальная разработка (`npm link`)",
+        "Поток F — publish SDK (команда AgentStack)",
+        "Поток G — Python",
+        "Поток H — AI / automation",
+        "Чеклист после установки (любой поток)",
+        "Сравнение"
+      ],
+      "pairRole": "paired",
+      "mirror": "docs/SDK_INTEGRATION_FLOWS.md"
+    },
+    {
+      "path": "docs/quick-start.md",
+      "lang": "en",
+      "h2": [
+        "Environment variables",
+        "Local development"
+      ],
+      "pairRole": "paired",
+      "mirror": "docs/quick-start_ru.md"
+    },
+    {
+      "path": "docs/quick-start_ru.md",
+      "lang": "ru",
+      "h2": [
+        "Переменные окружения",
+        "Локальная разработка"
+      ],
+      "pairRole": "paired",
+      "mirror": "docs/quick-start.md"
+    },
+    {
+      "path": "docs/INTEGRATOR_SCOPE.md",
+      "lang": "en",
+      "h2": [
+        "What integrators should use instead",
+        "Runtime guards (TypeScript)",
+        "API base URL",
+        "Configuration",
+        "Discovery for AI agents"
+      ],
+      "pairRole": "paired",
+      "mirror": "docs/INTEGRATOR_SCOPE_ru.md"
+    },
+    {
+      "path": "docs/INTEGRATOR_SCOPE_ru.md",
+      "lang": "ru",
+      "h2": [
+        "Чем пользоваться интеграторам",
+        "Защита в рантайме (TypeScript)",
+        "Базовый URL API",
+        "Конфигурация",
+        "Discovery для AI"
+      ],
+      "pairRole": "paired",
+      "mirror": "docs/INTEGRATOR_SCOPE.md"
+    },
+    {
+      "path": "docs/PROJECT_CONTEXT.md",
+      "lang": "en",
+      "h2": [
+        "Where it is set",
+        "HTTP behavior (`HTTPClient`)",
+        "Recommended integrator flow",
+        "Messenger embed",
+        "Platform operator note",
+        "Helpers (package exports)"
+      ],
+      "pairRole": "paired",
+      "mirror": "docs/PROJECT_CONTEXT_ru.md"
+    },
+    {
+      "path": "docs/PROJECT_CONTEXT_ru.md",
+      "lang": "ru",
+      "h2": [
+        "Где задаётся",
+        "HTTP (`HTTPClient`)",
+        "Рекомендуемый flow интегратора",
+        "Messenger embed",
+        "Оператор платформы",
+        "Хелперы (экспорт пакета)"
+      ],
+      "pairRole": "paired",
+      "mirror": "docs/PROJECT_CONTEXT.md"
+    },
+    {
+      "path": "docs/SUBMODULE_CONSUMER.md",
+      "lang": "en",
+      "h2": [
+        "Scripts (in this repo)",
+        "Default layout",
+        "Example `.gitmodules`"
+      ],
+      "pairRole": "paired",
+      "mirror": "docs/SUBMODULE_CONSUMER_ru.md"
+    },
+    {
+      "path": "docs/SUBMODULE_CONSUMER_ru.md",
+      "lang": "ru",
+      "h2": [
+        "Скрипты (в этом репозитории)",
+        "Типовая структура",
+        "Пример `.gitmodules`"
+      ],
+      "pairRole": "paired",
+      "mirror": "docs/SUBMODULE_CONSUMER.md"
+    },
+    {
+      "path": "AGENTS.md",
+      "lang": "en",
+      "h2": [
+        "60-second bootstrap",
+        "Discover → validate → execute",
+        "Decision tree",
+        "Genetic routing (hot paths)",
+        "Anti-patterns",
+        "Links"
+      ],
+      "pairRole": "paired",
+      "mirror": "AGENTS_ru.md"
+    },
+    {
+      "path": "AGENTS_ru.md",
+      "lang": "ru",
+      "h2": [
+        "Bootstrap за 60 секунд",
+        "Discover → validate → execute",
+        "Дерево решений",
+        "Анти-паттерны",
+        "Ссылки"
+      ],
+      "pairRole": "paired",
+      "mirror": "AGENTS.md"
+    },
+    {
+      "path": "docs/AI_INTEGRATOR_GUIDE.md",
+      "lang": "en",
+      "h2": [
+        "1. Install and environment",
+        "2. Self-description (call first)",
+        "3. AgentProtocol patterns",
+        "4. Commerce, economy, support, integrations",
+        "5. Messenger (high level)",
+        "6. Media offload",
+        "7. OpTrace and errors",
+        "8. MCP / REST parity",
+        "9. Application factory recipes",
+        "10. Python parity"
+      ],
+      "pairRole": "paired",
+      "mirror": "docs/AI_INTEGRATOR_GUIDE_ru.md"
+    },
+    {
+      "path": "docs/AI_INTEGRATOR_GUIDE_ru.md",
+      "lang": "ru",
+      "h2": [
+        "1. Установка и окружение",
+        "2. Self-description (вызывать первым)",
+        "3. Паттерны AgentProtocol",
+        "4. Commerce, economy, support, integrations",
+        "5. Messenger (кратко)",
+        "6. Media offload",
+        "7. OpTrace и ошибки",
+        "8. MCP / REST parity",
+        "9. Рецепты Application Factory",
+        "10. Python parity"
+      ],
+      "pairRole": "paired",
+      "mirror": "docs/AI_INTEGRATOR_GUIDE.md"
+    },
+    {
+      "path": "docs/AI_APPLICATION_FACTORY.md",
+      "lang": "en",
+      "h2": [
+        "R1 — Static site (hosting)",
+        "R2 — CRUD mini-app (REST + DNA)",
+        "R3 — Shop (commerce)",
+        "R4 — Support channel",
+        "R5 — Logic blueprint",
+        "R6 — Comfort task (headless)"
+      ],
+      "pairRole": "paired",
+      "mirror": "docs/AI_APPLICATION_FACTORY_ru.md"
+    },
+    {
+      "path": "docs/AI_APPLICATION_FACTORY_ru.md",
+      "lang": "ru",
+      "h2": [
+        "R1 — Статический сайт (hosting)",
+        "R2 — CRUD mini-app (REST + DNA)",
+        "R3 — Магазин (commerce)",
+        "R4 — Support channel",
+        "R5 — Logic blueprint",
+        "R6 — Comfort task (headless)"
+      ],
+      "pairRole": "paired",
+      "mirror": "docs/AI_APPLICATION_FACTORY.md"
+    },
+    {
+      "path": "docs/AI_ERROR_ACTION_MATRIX.md",
+      "lang": "en",
+      "h2": [],
+      "pairRole": "paired",
+      "mirror": "docs/AI_ERROR_ACTION_MATRIX_ru.md"
+    },
+    {
+      "path": "docs/AI_ERROR_ACTION_MATRIX_ru.md",
+      "lang": "ru",
+      "h2": [],
+      "pairRole": "paired",
+      "mirror": "docs/AI_ERROR_ACTION_MATRIX.md"
+    },
+    {
+      "path": "docs/SDK_DOCS_I18N_ROADMAP.md",
+      "lang": "en",
+      "h2": [
+        "Done (P0–P3)",
+        "Optional later",
+        "Maintainer checklist"
+      ],
+      "pairRole": "paired",
+      "mirror": "docs/SDK_DOCS_I18N_ROADMAP_ru.md"
+    },
+    {
+      "path": "docs/SDK_DOCS_I18N_ROADMAP_ru.md",
+      "lang": "ru",
+      "h2": [
+        "Сделано (P0–P3)",
+        "Опционально",
+        "Чеклист"
+      ],
+      "pairRole": "paired",
+      "mirror": "docs/SDK_DOCS_I18N_ROADMAP.md"
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "lang": "en",
+      "h2": [
+        "Layers",
+        "Patterns"
+      ],
+      "pairRole": "pair-stub",
+      "mirror": "docs/ARCHITECTURE_ru.md"
+    },
+    {
+      "path": "docs/ARCHITECTURE_ru.md",
+      "lang": "ru",
+      "h2": [
+        "Слои",
+        "Паттерны"
+      ],
+      "pairRole": "pair-stub",
+      "mirror": "docs/ARCHITECTURE.md"
+    },
+    {
+      "path": "docs/REACT_QUERY_INTEGRATION.md",
+      "lang": "en",
+      "h2": [],
+      "pairRole": "pair-stub",
+      "mirror": "docs/REACT_QUERY_INTEGRATION_ru.md"
+    },
+    {
+      "path": "docs/REACT_QUERY_INTEGRATION_ru.md",
+      "lang": "ru",
+      "h2": [],
+      "pairRole": "pair-stub",
+      "mirror": "docs/REACT_QUERY_INTEGRATION.md"
+    },
+    {
+      "path": "packages/core/README.en.md",
+      "lang": "en",
+      "h2": [
+        "Install",
+        "Quick start",
+        "Docs"
+      ],
+      "pairRole": "pair-stub",
+      "mirror": "packages/core/README.md"
+    },
+    {
+      "path": "packages/core/README.md",
+      "lang": "en",
+      "h2": [
+        "🚀 Быстрый старт",
+        "Entity snapshot repository (structural cache)",
+        "🌍 NEW! AgentI18n - AI-First Translations",
+        "🏗️ Архитектура",
+        "🔐 Аутентификация (AgentAuth)",
+        "💳 Платежи (AgentPayments)",
+        "📊 Аналитика (AgentAnalytics)",
+        "🔑 API ключи и проекты (AgentAPI)",
+        "🔔 Webhooks (AgentWebhooks)",
+        "💰 Кошельки (AgentWallets)",
+        "🔔 Уведомления (AgentNotifications)",
+        "⏰ Планировщик (AgentScheduler)",
+        "Platform operator (not for npm integrators)",
+        "🧠 Neural архитектура",
+        "⚙️ Конфигурация",
+        "🔄 Обработка ошибок",
+        "📊 Метрики и мониторинг",
+        "🧪 Тестирование",
+        "📚 Дополнительные ресурсы",
+        "🤝 Поддержка",
+        "📄 Лицензия"
+      ],
+      "pairRole": "pair-stub",
+      "mirror": "packages/core/README.en.md"
+    },
+    {
+      "path": "packages/react/README.en.md",
+      "lang": "en",
+      "h2": [
+        "Install",
+        "Quick start",
+        "Docs"
+      ],
+      "pairRole": "pair-stub",
+      "mirror": "packages/react/README.md"
+    },
+    {
+      "path": "packages/react/README.md",
+      "lang": "en",
+      "h2": [
+        "🚀 Быстрый старт",
+        "🎣 React Hooks",
+        "🧩 Компоненты",
+        "🔧 Конфигурация",
+        "🎨 Стилизация",
+        "🔄 Управление состоянием",
+        "🚨 Обработка ошибок",
+        "📱 SSR поддержка",
+        "🧪 Тестирование",
+        "📚 Дополнительные ресурсы",
+        "🤝 Поддержка",
+        "📄 Лицензия"
+      ],
+      "pairRole": "pair-stub",
+      "mirror": "packages/react/README.en.md"
+    },
+    {
+      "path": "packages/python/README.en.md",
+      "lang": "en",
+      "h2": [
+        "Install",
+        "Quick start",
+        "Parity"
+      ],
+      "pairRole": "pair-stub",
+      "mirror": "packages/python/README.md"
+    },
+    {
+      "path": "packages/python/README.md",
+      "lang": "en",
+      "h2": [
+        "🚀 Установка",
+        "📦 Быстрый старт",
+        "🏗️ Модульная архитектура",
+        "⚙️ Конфигурация",
+        "🔧 Утилиты",
+        "📝 Требования",
+        "🐛 Обработка ошибок",
+        "📚 Дополнительные ресурсы",
+        "📄 Лицензия"
+      ],
+      "pairRole": "pair-stub",
+      "mirror": "packages/python/README.en.md"
+    },
+    {
+      "path": "packages/hooks/README.en.md",
+      "lang": "en",
+      "h2": [],
+      "pairRole": "pair-stub",
+      "mirror": "packages/hooks/README.md"
+    },
+    {
+      "path": "packages/hooks/README.md",
+      "lang": "en",
+      "h2": [
+        "🤖 AI-First Philosophy",
+        "📦 Installation",
+        "🚀 Quick Start",
+        "📚 Available Hooks",
+        "🎯 Hook Pattern",
+        "🔧 Options",
+        "📖 Type Definitions",
+        "🎨 Example: Custom Dashboard",
+        "🚀 Advanced: Custom UI",
+        "🤖 AI Usage Guide",
+        "📊 React Query Integration",
+        "🔗 Links",
+        "📄 License"
+      ],
+      "pairRole": "pair-stub",
+      "mirror": "packages/hooks/README.en.md"
+    },
+    {
+      "path": "docs/MODULAR_ARCHITECTURE.md",
+      "lang": "en",
+      "h2": [
+        "Module map",
+        "AgentAuth (authentication)",
+        "AgentAdmin (platform operator only)",
+        "AgentNeural (client-side)",
+        "AgentPayments",
+        "Configuration",
+        "Benefits",
+        "Resources"
+      ],
+      "pairRole": "pair-stub",
+      "mirror": "docs/MODULAR_ARCHITECTURE_ru.md"
+    },
+    {
+      "path": "docs/MODULAR_ARCHITECTURE_ru.md",
+      "lang": "ru",
+      "h2": [
+        "🎯 Обзор",
+        "📦 Структура модулей",
+        "🎨 Преимущества модульной архитектуры",
+        "🔧 Конфигурация SDK",
+        "🚀 Быстрый старт",
+        "📚 Дополнительные ресурсы"
+      ],
+      "pairRole": "pair-stub",
+      "mirror": "docs/MODULAR_ARCHITECTURE.md"
+    },
+    {
+      "path": "docs/PROTEIN_SYSTEM_GUIDE.md",
+      "lang": "en",
+      "h2": [
+        "Core components",
+        "Quick start",
+        "Common command types",
+        "Page composition",
+        "Game data",
+        "Caching and events",
+        "Related docs"
+      ],
+      "pairRole": "pair-stub",
+      "mirror": "docs/PROTEIN_SYSTEM_GUIDE_ru.md"
+    },
+    {
+      "path": "docs/PROTEIN_SYSTEM_GUIDE_ru.md",
+      "lang": "ru",
+      "h2": [
+        "🎯 Overview",
+        "🏗️ Architecture",
+        "🚀 Quick Start",
+        "🧬 Protein Commands",
+        "🎨 Page Composition System",
+        "🎮 Game Data System",
+        "⚡ Advanced Features",
+        "🔄 Event System",
+        "💾 Cache Management",
+        "📊 Performance Metrics",
+        "🛠️ Configuration",
+        "🔧 Troubleshooting",
+        "📚 Examples",
+        "🚀 Best Practices",
+        "📖 API Reference",
+        "🤝 Contributing",
+        "📄 License"
+      ],
+      "pairRole": "pair-stub",
+      "mirror": "docs/PROTEIN_SYSTEM_GUIDE.md"
+    },
+    {
+      "path": "docs/AI_REACT_SCAFFOLD.md",
+      "lang": "en",
+      "h2": [],
+      "pairRole": "paired",
+      "mirror": "docs/AI_REACT_SCAFFOLD_ru.md"
+    },
+    {
+      "path": "docs/AI_REACT_SCAFFOLD_ru.md",
+      "lang": "ru",
+      "h2": [],
+      "pairRole": "paired",
+      "mirror": "docs/AI_REACT_SCAFFOLD.md"
+    },
+    {
+      "path": "docs/SDK_MODULE_CATALOG.md",
+      "lang": "en",
+      "h2": [],
+      "pairRole": "paired",
+      "mirror": "docs/SDK_MODULE_CATALOG_ru.md"
+    },
+    {
+      "path": "docs/SDK_MODULE_CATALOG_ru.md",
+      "lang": "ru",
+      "h2": [
+        "В рантайме",
+        "Integrator scope",
+        "Обновление каталога"
+      ],
+      "pairRole": "paired",
+      "mirror": "docs/SDK_MODULE_CATALOG.md"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "lang": "en",
+      "h2": [
+        "Getting Started",
+        "Development Workflow",
+        "Code Style",
+        "Pull Request Guidelines",
+        "Questions?"
+      ],
+      "pairRole": "paired",
+      "mirror": "CONTRIBUTING_ru.md"
+    },
+    {
+      "path": "CONTRIBUTING_ru.md",
+      "lang": "ru",
+      "h2": [
+        "Начало",
+        "Документация (i18n)"
+      ],
+      "pairRole": "paired",
+      "mirror": "CONTRIBUTING.md"
+    },
+    {
+      "path": "PUBLISHING.md",
+      "lang": "en",
+      "h2": [
+        "After First npm Publish",
+        "npm Publish Steps"
+      ],
+      "pairRole": "paired",
+      "mirror": "PUBLISHING_ru.md"
+    },
+    {
+      "path": "PUBLISHING_ru.md",
+      "lang": "ru",
+      "h2": [
+        "После первого npm publish",
+        "Шаги npm",
+        "README на GitHub mirror"
+      ],
+      "pairRole": "paired",
+      "mirror": "PUBLISHING.md"
+    },
+    {
+      "path": "SECURITY.md",
+      "lang": "en",
+      "h2": [
+        "Supported versions",
+        "Reporting a vulnerability",
+        "Secrets"
+      ],
+      "pairRole": "paired",
+      "mirror": "SECURITY_ru.md"
+    },
+    {
+      "path": "SECURITY_ru.md",
+      "lang": "ru",
+      "h2": [
+        "Поддерживаемые версии",
+        "Сообщить об уязвимости",
+        "Секреты"
+      ],
+      "pairRole": "paired",
+      "mirror": "SECURITY.md"
+    },
+    {
+      "path": "examples/ai/README.md",
+      "lang": "en",
+      "h2": [
+        "Environments",
+        "Local development"
+      ],
+      "pairRole": "paired",
+      "mirror": "examples/ai/README_ru.md"
+    },
+    {
+      "path": "examples/ai/README_ru.md",
+      "lang": "ru",
+      "h2": [
+        "Окружение",
+        "Локально"
+      ],
+      "pairRole": "paired",
+      "mirror": "examples/ai/README.md"
+    }
+  ]
+}

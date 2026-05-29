@@ -1,5 +1,7 @@
 # AI examples
 
+**RU:** [README_ru.md](./README_ru.md)
+
 Runnable with `npx tsx` from `agentstack-unified-sdk` after `npm run build` in `packages/core`.
 
 ## Environments

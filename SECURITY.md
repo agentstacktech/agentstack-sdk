@@ -1,5 +1,7 @@
 # Security Policy
 
+**RU:** [SECURITY_ru.md](./SECURITY_ru.md)
+
 ## Supported versions
 
 Security fixes are published for the current platform line aligned with `AGENTSTACK_CORE_VERSION` in the AgentStack monorepo (`shared/constants.py`).
