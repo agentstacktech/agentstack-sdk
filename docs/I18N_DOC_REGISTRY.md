@@ -1,64 +1,38 @@
 # SDK i18n doc registry (auto-generated)
 
-Generated: 2026-05-29T21:55:51.722Z · Run `npm run generate:docs-i18n`
+Generated: 2026-05-30T01:53:46.618Z · `npm run generate:docs-i18n`
 
-| File | Lang | Role | Mirror |
-|------|------|------|--------|
-| README.en.md | en | pair-stub | README.md |
-| README.md | ru | pair-stub | README.en.md |
-| DOCS_I18N.md | en | paired | DOCS_I18N_ru.md |
-| DOCS_I18N_ru.md | ru | paired | DOCS_I18N.md |
-| DOC_HUB.md | en | paired | DOC_HUB_ru.md |
-| DOC_HUB_ru.md | ru | paired | DOC_HUB.md |
-| README.md | en | paired | README_ru.md |
-| README_ru.md | ru | paired | README.md |
-| SDK_INTEGRATION_FLOWS.md | en | paired | SDK_INTEGRATION_FLOWS_ru.md |
-| SDK_INTEGRATION_FLOWS_ru.md | ru | paired | SDK_INTEGRATION_FLOWS.md |
-| quick-start.md | en | paired | quick-start_ru.md |
-| quick-start_ru.md | ru | paired | quick-start.md |
-| INTEGRATOR_SCOPE.md | en | paired | INTEGRATOR_SCOPE_ru.md |
-| INTEGRATOR_SCOPE_ru.md | ru | paired | INTEGRATOR_SCOPE.md |
-| PROJECT_CONTEXT.md | en | paired | PROJECT_CONTEXT_ru.md |
-| PROJECT_CONTEXT_ru.md | ru | paired | PROJECT_CONTEXT.md |
-| SUBMODULE_CONSUMER.md | en | paired | SUBMODULE_CONSUMER_ru.md |
-| SUBMODULE_CONSUMER_ru.md | ru | paired | SUBMODULE_CONSUMER.md |
-| AGENTS.md | en | paired | AGENTS_ru.md |
-| AGENTS_ru.md | ru | paired | AGENTS.md |
-| AI_INTEGRATOR_GUIDE.md | en | paired | AI_INTEGRATOR_GUIDE_ru.md |
-| AI_INTEGRATOR_GUIDE_ru.md | ru | paired | AI_INTEGRATOR_GUIDE.md |
-| AI_APPLICATION_FACTORY.md | en | paired | AI_APPLICATION_FACTORY_ru.md |
-| AI_APPLICATION_FACTORY_ru.md | ru | paired | AI_APPLICATION_FACTORY.md |
-| AI_ERROR_ACTION_MATRIX.md | en | paired | AI_ERROR_ACTION_MATRIX_ru.md |
-| AI_ERROR_ACTION_MATRIX_ru.md | ru | paired | AI_ERROR_ACTION_MATRIX.md |
-| SDK_DOCS_I18N_ROADMAP.md | en | paired | SDK_DOCS_I18N_ROADMAP_ru.md |
-| SDK_DOCS_I18N_ROADMAP_ru.md | ru | paired | SDK_DOCS_I18N_ROADMAP.md |
-| ARCHITECTURE.md | en | pair-stub | ARCHITECTURE_ru.md |
-| ARCHITECTURE_ru.md | ru | pair-stub | ARCHITECTURE.md |
-| REACT_QUERY_INTEGRATION.md | en | pair-stub | REACT_QUERY_INTEGRATION_ru.md |
-| REACT_QUERY_INTEGRATION_ru.md | ru | pair-stub | REACT_QUERY_INTEGRATION.md |
-| README.en.md | en | pair-stub | README.md |
-| README.md | en | pair-stub | README.en.md |
-| README.en.md | en | pair-stub | README.md |
-| README.md | en | pair-stub | README.en.md |
-| README.en.md | en | pair-stub | README.md |
-| README.md | en | pair-stub | README.en.md |
-| README.en.md | en | pair-stub | README.md |
-| README.md | en | pair-stub | README.en.md |
-| MODULAR_ARCHITECTURE.md | en | pair-stub | MODULAR_ARCHITECTURE_ru.md |
-| MODULAR_ARCHITECTURE_ru.md | ru | pair-stub | MODULAR_ARCHITECTURE.md |
-| PROTEIN_SYSTEM_GUIDE.md | en | pair-stub | PROTEIN_SYSTEM_GUIDE_ru.md |
-| PROTEIN_SYSTEM_GUIDE_ru.md | ru | pair-stub | PROTEIN_SYSTEM_GUIDE.md |
-| AI_REACT_SCAFFOLD.md | en | paired | AI_REACT_SCAFFOLD_ru.md |
-| AI_REACT_SCAFFOLD_ru.md | ru | paired | AI_REACT_SCAFFOLD.md |
-| SDK_MODULE_CATALOG.md | en | paired | SDK_MODULE_CATALOG_ru.md |
-| SDK_MODULE_CATALOG_ru.md | ru | paired | SDK_MODULE_CATALOG.md |
-| CONTRIBUTING.md | en | paired | CONTRIBUTING_ru.md |
-| CONTRIBUTING_ru.md | ru | paired | CONTRIBUTING.md |
-| PUBLISHING.md | en | paired | PUBLISHING_ru.md |
-| PUBLISHING_ru.md | ru | paired | PUBLISHING.md |
-| SECURITY.md | en | paired | SECURITY_ru.md |
-| SECURITY_ru.md | ru | paired | SECURITY.md |
-| README.md | en | paired | README_ru.md |
-| README_ru.md | ru | paired | README.md |
+| EN | RU | Role | Lines EN/RU | Ratio | Status |
+|----|-----|------|-------------|-------|--------|
+| `README.en.md` | `README.md` | paired | 204/704 | 0.29 | legacy-ru-path |
+| `docs/DOCS_I18N.md` | `docs/DOCS_I18N_ru.md` | paired | 97/93 | 1.04 | balanced |
+| `docs/DOC_HUB.md` | `docs/DOC_HUB_ru.md` | paired | 69/68 | 1.01 | balanced |
+| `docs/GLOSSARY.md` | `docs/GLOSSARY_ru.md` | paired | 22/22 | 1 | balanced |
+| `docs/README.md` | `docs/README_ru.md` | paired | 54/51 | 1.06 | balanced |
+| `docs/SDK_INTEGRATION_FLOWS.md` | `docs/SDK_INTEGRATION_FLOWS_ru.md` | paired | 234/184 | 1.27 | balanced |
+| `docs/quick-start.md` | `docs/quick-start_ru.md` | paired | 40/42 | 0.95 | balanced |
+| `docs/INTEGRATOR_SCOPE.md` | `docs/INTEGRATOR_SCOPE_ru.md` | paired | 82/81 | 1.01 | balanced |
+| `docs/PROJECT_CONTEXT.md` | `docs/PROJECT_CONTEXT_ru.md` | paired | 93/84 | 1.11 | balanced |
+| `docs/SUBMODULE_CONSUMER.md` | `docs/SUBMODULE_CONSUMER_ru.md` | paired | 34/34 | 1 | balanced |
+| `AGENTS.md` | `AGENTS_ru.md` | paired | 102/85 | 1.2 | balanced |
+| `docs/AI_INTEGRATOR_GUIDE.md` | `docs/AI_INTEGRATOR_GUIDE_ru.md` | paired | 104/105 | 0.99 | balanced |
+| `docs/AI_APPLICATION_FACTORY.md` | `docs/AI_APPLICATION_FACTORY_ru.md` | paired | 105/103 | 1.02 | balanced |
+| `docs/AI_ERROR_ACTION_MATRIX.md` | `docs/AI_ERROR_ACTION_MATRIX_ru.md` | paired | 17/17 | 1 | balanced |
+| `docs/SDK_DOCS_I18N_ROADMAP.md` | `docs/SDK_DOCS_I18N_ROADMAP_ru.md` | paired | 39/41 | 0.95 | balanced |
+| `docs/ARCHITECTURE.md` | `docs/ARCHITECTURE_ru.md` | paired | 73/53 | 1.38 | balanced |
+| `docs/REACT_QUERY_INTEGRATION.md` | `docs/REACT_QUERY_INTEGRATION_ru.md` | paired | 102/102 | 1 | balanced |
+| `packages/core/README.en.md` | `packages/core/README.md` | paired | 97/1106 | 0.09 | legacy-ru-path |
+| `packages/react/README.en.md` | `packages/react/README.md` | paired | 85/666 | 0.13 | legacy-ru-path |
+| `packages/python/README.en.md` | `packages/python/README.md` | paired | 50/269 | 0.19 | legacy-ru-path |
+| `packages/hooks/README.en.md` | `packages/hooks/README.md` | paired | 42/295 | 0.14 | legacy-ru-path |
+| `docs/MODULAR_ARCHITECTURE.md` | `docs/MODULAR_ARCHITECTURE_ru.md` | paired | 213/328 | 0.65 | balanced |
+| `docs/PROTEIN_SYSTEM_GUIDE.md` | `docs/PROTEIN_SYSTEM_GUIDE_ru.md` | paired | 275/495 | 0.56 | balanced |
+| `docs/AI_REACT_SCAFFOLD.md` | `docs/AI_REACT_SCAFFOLD_ru.md` | paired | 41/41 | 1 | balanced |
+| `docs/SDK_MODULE_CATALOG.md` | `docs/SDK_MODULE_CATALOG_ru.md` | paired | 34/26 | 1.31 | balanced |
+| `CONTRIBUTING.md` | `CONTRIBUTING_ru.md` | paired | 76/75 | 1.01 | balanced |
+| `PUBLISHING.md` | `PUBLISHING_ru.md` | paired | 28/27 | 1.04 | balanced |
+| `SECURITY.md` | `SECURITY_ru.md` | paired | 21/19 | 1.11 | balanced |
+| `examples/ai/README.md` | `examples/ai/README_ru.md` | paired | 28/30 | 0.93 | balanced |
+| `examples/typescript/economy/README.md` | `examples/typescript/economy/README_ru.md` | paired | 17/22 | 0.77 | balanced |
 
-Policy: [DOCS_I18N.md](./DOCS_I18N.md)
+Matrix: [DOC_SYNC_MATRIX.md](./DOC_SYNC_MATRIX.md) · Policy: [DOCS_I18N.md](./DOCS_I18N.md)

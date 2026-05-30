@@ -1,5 +1,7 @@
 # Economy SDK examples
 
+**RU:** [README_ru.md](./README_ru.md)
+
 ## Environments
 
 | Env | `AGENTSTACK_API_BASE` |

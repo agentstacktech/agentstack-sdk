@@ -2,6 +2,8 @@
 
 **EN:** [PROTEIN_SYSTEM_GUIDE.md](./PROTEIN_SYSTEM_GUIDE.md)
 
+> **Сначала protocol:** для нового кода используйте `sdk.platform.protocol.executeCommand` и инвалидацию снапшотов. Низкоуровневый `sdk.protein.*` — совместимость; канон: [AGENT_PROTOCOL_QUICKSTART.md](https://github.com/agentstacktech/AgentStack/blob/master/docs/AGENT_PROTOCOL_QUICKSTART.md).
+
 **Version:** 0.3.6  
 **Author:** Lance (Александр Васильев)  
 **Date:** 2025-01-13  

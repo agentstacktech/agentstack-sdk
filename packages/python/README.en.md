@@ -28,10 +28,22 @@ async def main():
 asyncio.run(main())
 ```
 
+## Modules (subset)
+
+| Python | TypeScript equivalent |
+|--------|----------------------|
+| `sdk.auth` | `sdk.platform.auth` |
+| `sdk.platform.api` | `sdk.platform.api` |
+| DNA helpers | `sdk.platform.dna` (partial) |
+
 ## Parity
 
-See monorepo [PYTHON_SDK_PARITY.md](https://github.com/agentstacktech/AgentStack/blob/master/docs/ecosystem/PYTHON_SDK_PARITY.md).
+[PYTHON_SDK_PARITY.md](https://github.com/agentstacktech/AgentStack/blob/master/docs/ecosystem/PYTHON_SDK_PARITY.md) · RU: [PYTHON_SDK_PARITY_ru.md](https://github.com/agentstacktech/AgentStack/blob/master/docs/ecosystem/PYTHON_SDK_PARITY_ru.md)
 
 Integration flows: [SDK_INTEGRATION_FLOWS.md](../../docs/SDK_INTEGRATION_FLOWS.md) (flow **G**).
+
+## Docs
+
+[AGENTS.md](../../AGENTS.md) · [DOC_HUB.md](../../docs/DOC_HUB.md)
 
 Full Russian guide: [README.md](README.md).

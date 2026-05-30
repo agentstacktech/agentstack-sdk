@@ -1,7 +1,7 @@
 # AgentStack SDK — гид для AI-агентов
 
 **Genetic tag:** `repo.platform.sdk.ai_surface.gen1`  
-**EN:** [AGENTS.md](AGENTS.md)
+**EN:** [AGENTS.md](AGENTS.md) · **Хаб:** [docs/DOC_HUB_ru.md](docs/DOC_HUB_ru.md) · **Глоссарий:** [docs/GLOSSARY_ru.md](docs/GLOSSARY_ru.md)
 
 ---
 
@@ -47,7 +47,7 @@ sdk.updateProjectId(42);
 ## Дерево решений
 
 - **CRUD / проекты** → `sdk.platform.api` или `sdk.platform.dna`
-- **DNA command bus** → `sdk.platform.protocol.executeCommand`
+- **DNA command bus** → `sdk.platform.protocol.executeCommand` (новый код — не сырой `sdk.protein.*`, см. [PROTEIN_SYSTEM_GUIDE_ru.md](docs/PROTEIN_SYSTEM_GUIDE_ru.md))
 - **Снапшоты** → `sdk.platform.protocol.readThroughSnapshot`
 - **MCP** → `https://agentstack.tech/mcp`
 - **Tenant-приложения** → не `sdk.admin` ([INTEGRATOR_SCOPE_ru.md](docs/INTEGRATOR_SCOPE_ru.md))
@@ -62,8 +62,23 @@ sdk.updateProjectId(42);
 
 ---
 
+## Genetic routing
+
+| Tag | Документ |
+|-----|----------|
+| `repo.platform.sdk.ai_surface.gen1` | [SDK_AI_SURFACE_ru.md](../docs/SDK_AI_SURFACE_ru.md) |
+| `repo.platform.sdk.agent_protocol.gen1` | [PROTEIN_SYSTEM_GUIDE_ru.md](docs/PROTEIN_SYSTEM_GUIDE_ru.md) |
+| `repo.platform.sdk.docs_i18n.gen1` | [DOCS_I18N_ru.md](docs/DOCS_I18N_ru.md) |
+
+---
+
 ## Ссылки
 
-- Хаб документов: [docs/DOC_HUB_ru.md](docs/DOC_HUB_ru.md)
+- Модульная архитектура: [docs/MODULAR_ARCHITECTURE_ru.md](docs/MODULAR_ARCHITECTURE_ru.md)
+- Protein / protocol: [docs/PROTEIN_SYSTEM_GUIDE_ru.md](docs/PROTEIN_SYSTEM_GUIDE_ru.md)
+- Каталог модулей: [docs/SDK_MODULE_CATALOG_ru.md](docs/SDK_MODULE_CATALOG_ru.md)
+- Хаб: [docs/DOC_HUB_ru.md](docs/DOC_HUB_ru.md)
+- Scope: [docs/INTEGRATOR_SCOPE_ru.md](docs/INTEGRATOR_SCOPE_ru.md)
+- Ошибки: [docs/AI_ERROR_ACTION_MATRIX_ru.md](docs/AI_ERROR_ACTION_MATRIX_ru.md)
 - Swagger: https://agentstack.tech/swagger
 - MCP: https://agentstack.tech/mcp

@@ -29,12 +29,12 @@ npm run build
 
 ```bash
 npm run test
-npm run check:docs-i18n
+npm run check:docs-i18n:all
 ```
 
 ### Documentation (i18n)
 
-English is canonical. Update `*_ru.md` in the same PR. See [docs/DOCS_I18N.md](docs/DOCS_I18N.md).
+English is canonical. Update `*_ru.md` in the same PR. See [docs/DOCS_I18N.md](docs/DOCS_I18N.md). Run `npm run check:docs-i18n:all` before PR.
 
 ### Linting
 

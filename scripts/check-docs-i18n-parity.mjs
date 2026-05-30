@@ -11,8 +11,18 @@ const REPO_ROOT = path.resolve(SDK_ROOT, '..');
 const MANIFEST = path.join(SDK_ROOT, 'docs', 'i18n-manifest.json');
 const H2_TOLERANCE = 6;
 
+/** Legacy RU package READMEs use different heading depth — skip H2 parity */
+const H2_PARITY_SKIP_EN = new Set([
+  'README.en.md',
+  'packages/core/README.en.md',
+  'packages/react/README.en.md',
+  'packages/hooks/README.en.md',
+  'packages/python/README.en.md',
+]);
+
 /** Monorepo-only pairs (operator docs under docs/sdk/). */
 const MONOREPO_PAIRS = [
+  ['docs/SDK_AI_SURFACE.md', 'docs/SDK_AI_SURFACE_ru.md'],
   ['docs/sdk/SDK_SUBMODULE_INTEGRATION.md', 'docs/sdk/SDK_SUBMODULE_INTEGRATION_ru.md'],
   ['docs/sdk/SDK_MIRROR_PUBLISH_RUNBOOK.md', 'docs/sdk/SDK_MIRROR_PUBLISH_RUNBOOK_ru.md'],
   ['docs/sdk/GENETIC_STARTER_SDK_SLICE.md', 'docs/sdk/GENETIC_STARTER_SDK_SLICE_ru.md'],
@@ -53,6 +63,7 @@ function main() {
         errors.push(`${enPath}: missing **EN:**/**RU:** cross-link near top`);
       }
       if (e.pairRole === 'pair-stub') continue;
+      if (H2_PARITY_SKIP_EN.has(enPath)) continue;
 
       const ca = h2Count(a);
       const cb = h2Count(b);

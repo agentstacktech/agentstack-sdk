@@ -21,6 +21,8 @@
     "test:sdk-submodule": "node tests/sdk-submodule-lock.test.mjs",
     "generate:docs-i18n": "node scripts/generate-docs-i18n-manifest.mjs",
     "check:docs-i18n": "node scripts/check-docs-i18n-parity.mjs",
+    "check:docs-i18n-depth": "node scripts/check-docs-i18n-depth.mjs",
+    "check:docs-i18n:all": "npm run generate:docs-i18n && npm run check:docs-i18n && npm run check:docs-i18n-depth && npm run check:docs-urls && npm run check:docs-api-symbols",
     "mirror:readme": "node scripts/mirror-readme-for-github.mjs",
     "submodule:add": "node scripts/submodule-add-sdk.mjs",
     "submodule:link": "node scripts/link-sdk-deps.mjs",

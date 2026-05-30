@@ -1,736 +1,605 @@
 {
-  "generatedAt": "2026-05-29T21:55:51.722Z",
+  "generatedAt": "2026-05-30T01:53:46.618Z",
   "entries": [
     {
       "path": "README.en.md",
       "lang": "en",
-      "h2": [
-        "Quick start",
-        "How to add the SDK",
-        "Key docs (English canonical)",
-        "Production API",
-        "React (integrator-safe)",
-        "Links"
-      ],
-      "pairRole": "pair-stub",
-      "mirror": "README.md"
+      "mirror": "README.md",
+      "pairRole": "paired",
+      "lineCount": 204,
+      "codeFences": 10,
+      "syncStatus": "legacy-ru-path",
+      "diataxis": null
     },
     {
       "path": "README.md",
       "lang": "ru",
-      "h2": [
-        "How to add the SDK to your project",
-        "🎯 Цели проекта",
-        "🏗️ Архитектура",
-        "🚀 Ключевые особенности",
-        "📦 Установка",
-        "🚀 Быстрый старт",
-        "🔧 API Reference",
-        "🎨 React Hooks",
-        "🔧 Конфигурация",
-        "🧪 Тестирование",
-        "📚 Примеры использования",
-        "🔒 Безопасность",
-        "📊 Мониторинг и метрики",
-        "Production API base",
-        "🤝 Contributing",
-        "📞 Поддержка"
-      ],
-      "pairRole": "pair-stub",
-      "mirror": "README.en.md"
+      "mirror": "README.en.md",
+      "pairRole": "paired",
+      "lineCount": 704,
+      "codeFences": 56,
+      "syncStatus": "legacy-ru-path",
+      "diataxis": null
     },
     {
       "path": "docs/DOCS_I18N.md",
       "lang": "en",
-      "h2": [
-        "Priority",
-        "File naming",
-        "What to translate",
-        "Maintainer workflow",
-        "CI",
-        "Registry"
-      ],
+      "mirror": "docs/DOCS_I18N_ru.md",
       "pairRole": "paired",
-      "mirror": "docs/DOCS_I18N_ru.md"
+      "lineCount": 97,
+      "codeFences": 0,
+      "syncStatus": "balanced",
+      "diataxis": null
     },
     {
       "path": "docs/DOCS_I18N_ru.md",
       "lang": "ru",
-      "h2": [
-        "Приоритет",
-        "Имена файлов",
-        "Что переводить",
-        "Workflow для maintainers",
-        "CI",
-        "Реестр"
-      ],
+      "mirror": "docs/DOCS_I18N.md",
       "pairRole": "paired",
-      "mirror": "docs/DOCS_I18N.md"
+      "lineCount": 93,
+      "codeFences": 0,
+      "syncStatus": "balanced",
+      "diataxis": null
     },
     {
       "path": "docs/DOC_HUB.md",
       "lang": "en",
-      "h2": [
-        "Start here (P0 — bilingual)",
-        "AI & integrators",
-        "Deep dives",
-        "Repo root",
-        "Platform (monorepo)",
-        "i18n maintenance",
-        "Examples"
-      ],
+      "mirror": "docs/DOC_HUB_ru.md",
       "pairRole": "paired",
-      "mirror": "docs/DOC_HUB_ru.md"
+      "lineCount": 69,
+      "codeFences": 0,
+      "syncStatus": "balanced",
+      "diataxis": null
     },
     {
       "path": "docs/DOC_HUB_ru.md",
       "lang": "ru",
-      "h2": [
-        "С чего начать (P0 — двуязычно)",
-        "AI и интеграторы",
-        "Углублённо",
-        "Корень репозитория",
-        "Платформа (monorepo)",
-        "Примеры"
-      ],
+      "mirror": "docs/DOC_HUB.md",
       "pairRole": "paired",
-      "mirror": "docs/DOC_HUB.md"
+      "lineCount": 68,
+      "codeFences": 0,
+      "syncStatus": "balanced",
+      "diataxis": null
+    },
+    {
+      "path": "docs/GLOSSARY.md",
+      "lang": "en",
+      "mirror": "docs/GLOSSARY_ru.md",
+      "pairRole": "paired",
+      "lineCount": 22,
+      "codeFences": 0,
+      "syncStatus": "balanced",
+      "diataxis": "reference"
+    },
+    {
+      "path": "docs/GLOSSARY_ru.md",
+      "lang": "ru",
+      "mirror": "docs/GLOSSARY.md",
+      "pairRole": "paired",
+      "lineCount": 22,
+      "codeFences": 0,
+      "syncStatus": "balanced",
+      "diataxis": "reference"
     },
     {
       "path": "docs/README.md",
       "lang": "en",
-      "h2": [
-        "Start here",
-        "Deep dives",
-        "Platform (monorepo)",
-        "Examples",
-        "Support"
-      ],
+      "mirror": "docs/README_ru.md",
       "pairRole": "paired",
-      "mirror": "docs/README_ru.md"
+      "lineCount": 54,
+      "codeFences": 0,
+      "syncStatus": "balanced",
+      "diataxis": null
     },
     {
       "path": "docs/README_ru.md",
       "lang": "ru",
-      "h2": [
-        "С чего начать",
-        "Углублённо",
-        "Платформа",
-        "Примеры",
-        "Поддержка"
-      ],
+      "mirror": "docs/README.md",
       "pairRole": "paired",
-      "mirror": "docs/README.md"
+      "lineCount": 51,
+      "codeFences": 0,
+      "syncStatus": "balanced",
+      "diataxis": null
     },
     {
       "path": "docs/SDK_INTEGRATION_FLOWS.md",
       "lang": "en",
-      "h2": [
-        "Decision tree",
-        "Flow A — npm (default for apps)",
-        "Flow B — git submodule (vendored source)",
-        "Flow C — platform submodule (full AgentStack)",
-        "Flow D — AgentStack monorepo sibling (this repo)",
-        "Flow E — local SDK development (`npm link`)",
-        "Flow F — maintain / publish SDK (AgentStack team)",
-        "Flow G — Python (`agentstack-sdk`)",
-        "Flow H — AI / automation (no app install)",
-        "Runtime checklist (any flow)",
-        "Compare at a glance"
-      ],
+      "mirror": "docs/SDK_INTEGRATION_FLOWS_ru.md",
       "pairRole": "paired",
-      "mirror": "docs/SDK_INTEGRATION_FLOWS_ru.md"
+      "lineCount": 234,
+      "codeFences": 22,
+      "syncStatus": "balanced",
+      "diataxis": "how-to"
     },
     {
       "path": "docs/SDK_INTEGRATION_FLOWS_ru.md",
       "lang": "ru",
-      "h2": [
-        "Дерево решений",
-        "Поток A — npm (по умолчанию)",
-        "Поток B — git submodule",
-        "Поток C — submodule всей платформы",
-        "Поток D — sibling в monorepo AgentStack",
-        "Поток E — локальная разработка (`npm link`)",
-        "Поток F — publish SDK (команда AgentStack)",
-        "Поток G — Python",
-        "Поток H — AI / automation",
-        "Чеклист после установки (любой поток)",
-        "Сравнение"
-      ],
+      "mirror": "docs/SDK_INTEGRATION_FLOWS.md",
       "pairRole": "paired",
-      "mirror": "docs/SDK_INTEGRATION_FLOWS.md"
+      "lineCount": 184,
+      "codeFences": 16,
+      "syncStatus": "balanced",
+      "diataxis": "how-to"
     },
     {
       "path": "docs/quick-start.md",
       "lang": "en",
-      "h2": [
-        "Environment variables",
-        "Local development"
-      ],
+      "mirror": "docs/quick-start_ru.md",
       "pairRole": "paired",
-      "mirror": "docs/quick-start_ru.md"
+      "lineCount": 40,
+      "codeFences": 4,
+      "syncStatus": "balanced",
+      "diataxis": "tutorial"
     },
     {
       "path": "docs/quick-start_ru.md",
       "lang": "ru",
-      "h2": [
-        "Переменные окружения",
-        "Локальная разработка"
-      ],
+      "mirror": "docs/quick-start.md",
       "pairRole": "paired",
-      "mirror": "docs/quick-start.md"
+      "lineCount": 42,
+      "codeFences": 4,
+      "syncStatus": "balanced",
+      "diataxis": "tutorial"
     },
     {
       "path": "docs/INTEGRATOR_SCOPE.md",
       "lang": "en",
-      "h2": [
-        "What integrators should use instead",
-        "Runtime guards (TypeScript)",
-        "API base URL",
-        "Configuration",
-        "Discovery for AI agents"
-      ],
+      "mirror": "docs/INTEGRATOR_SCOPE_ru.md",
       "pairRole": "paired",
-      "mirror": "docs/INTEGRATOR_SCOPE_ru.md"
+      "lineCount": 82,
+      "codeFences": 2,
+      "syncStatus": "balanced",
+      "diataxis": "reference"
     },
     {
       "path": "docs/INTEGRATOR_SCOPE_ru.md",
       "lang": "ru",
-      "h2": [
-        "Чем пользоваться интеграторам",
-        "Защита в рантайме (TypeScript)",
-        "Базовый URL API",
-        "Конфигурация",
-        "Discovery для AI"
-      ],
+      "mirror": "docs/INTEGRATOR_SCOPE.md",
       "pairRole": "paired",
-      "mirror": "docs/INTEGRATOR_SCOPE.md"
+      "lineCount": 81,
+      "codeFences": 2,
+      "syncStatus": "balanced",
+      "diataxis": "reference"
     },
     {
       "path": "docs/PROJECT_CONTEXT.md",
       "lang": "en",
-      "h2": [
-        "Where it is set",
-        "HTTP behavior (`HTTPClient`)",
-        "Recommended integrator flow",
-        "Messenger embed",
-        "Platform operator note",
-        "Helpers (package exports)"
-      ],
+      "mirror": "docs/PROJECT_CONTEXT_ru.md",
       "pairRole": "paired",
-      "mirror": "docs/PROJECT_CONTEXT_ru.md"
+      "lineCount": 93,
+      "codeFences": 4,
+      "syncStatus": "balanced",
+      "diataxis": "how-to"
     },
     {
       "path": "docs/PROJECT_CONTEXT_ru.md",
       "lang": "ru",
-      "h2": [
-        "Где задаётся",
-        "HTTP (`HTTPClient`)",
-        "Рекомендуемый flow интегратора",
-        "Messenger embed",
-        "Оператор платформы",
-        "Хелперы (экспорт пакета)"
-      ],
+      "mirror": "docs/PROJECT_CONTEXT.md",
       "pairRole": "paired",
-      "mirror": "docs/PROJECT_CONTEXT.md"
+      "lineCount": 84,
+      "codeFences": 4,
+      "syncStatus": "balanced",
+      "diataxis": "how-to"
     },
     {
       "path": "docs/SUBMODULE_CONSUMER.md",
       "lang": "en",
-      "h2": [
-        "Scripts (in this repo)",
-        "Default layout",
-        "Example `.gitmodules`"
-      ],
+      "mirror": "docs/SUBMODULE_CONSUMER_ru.md",
       "pairRole": "paired",
-      "mirror": "docs/SUBMODULE_CONSUMER_ru.md"
+      "lineCount": 34,
+      "codeFences": 2,
+      "syncStatus": "balanced",
+      "diataxis": "how-to"
     },
     {
       "path": "docs/SUBMODULE_CONSUMER_ru.md",
       "lang": "ru",
-      "h2": [
-        "Скрипты (в этом репозитории)",
-        "Типовая структура",
-        "Пример `.gitmodules`"
-      ],
+      "mirror": "docs/SUBMODULE_CONSUMER.md",
       "pairRole": "paired",
-      "mirror": "docs/SUBMODULE_CONSUMER.md"
+      "lineCount": 34,
+      "codeFences": 2,
+      "syncStatus": "balanced",
+      "diataxis": "how-to"
     },
     {
       "path": "AGENTS.md",
       "lang": "en",
-      "h2": [
-        "60-second bootstrap",
-        "Discover → validate → execute",
-        "Decision tree",
-        "Genetic routing (hot paths)",
-        "Anti-patterns",
-        "Links"
-      ],
+      "mirror": "AGENTS_ru.md",
       "pairRole": "paired",
-      "mirror": "AGENTS_ru.md"
+      "lineCount": 102,
+      "codeFences": 2,
+      "syncStatus": "balanced",
+      "diataxis": null
     },
     {
       "path": "AGENTS_ru.md",
       "lang": "ru",
-      "h2": [
-        "Bootstrap за 60 секунд",
-        "Discover → validate → execute",
-        "Дерево решений",
-        "Анти-паттерны",
-        "Ссылки"
-      ],
+      "mirror": "AGENTS.md",
       "pairRole": "paired",
-      "mirror": "AGENTS.md"
+      "lineCount": 85,
+      "codeFences": 2,
+      "syncStatus": "balanced",
+      "diataxis": null
     },
     {
       "path": "docs/AI_INTEGRATOR_GUIDE.md",
       "lang": "en",
-      "h2": [
-        "1. Install and environment",
-        "2. Self-description (call first)",
-        "3. AgentProtocol patterns",
-        "4. Commerce, economy, support, integrations",
-        "5. Messenger (high level)",
-        "6. Media offload",
-        "7. OpTrace and errors",
-        "8. MCP / REST parity",
-        "9. Application factory recipes",
-        "10. Python parity"
-      ],
+      "mirror": "docs/AI_INTEGRATOR_GUIDE_ru.md",
       "pairRole": "paired",
-      "mirror": "docs/AI_INTEGRATOR_GUIDE_ru.md"
+      "lineCount": 104,
+      "codeFences": 8,
+      "syncStatus": "balanced",
+      "diataxis": null
     },
     {
       "path": "docs/AI_INTEGRATOR_GUIDE_ru.md",
       "lang": "ru",
-      "h2": [
-        "1. Установка и окружение",
-        "2. Self-description (вызывать первым)",
-        "3. Паттерны AgentProtocol",
-        "4. Commerce, economy, support, integrations",
-        "5. Messenger (кратко)",
-        "6. Media offload",
-        "7. OpTrace и ошибки",
-        "8. MCP / REST parity",
-        "9. Рецепты Application Factory",
-        "10. Python parity"
-      ],
+      "mirror": "docs/AI_INTEGRATOR_GUIDE.md",
       "pairRole": "paired",
-      "mirror": "docs/AI_INTEGRATOR_GUIDE.md"
+      "lineCount": 105,
+      "codeFences": 8,
+      "syncStatus": "balanced",
+      "diataxis": null
     },
     {
       "path": "docs/AI_APPLICATION_FACTORY.md",
       "lang": "en",
-      "h2": [
-        "R1 — Static site (hosting)",
-        "R2 — CRUD mini-app (REST + DNA)",
-        "R3 — Shop (commerce)",
-        "R4 — Support channel",
-        "R5 — Logic blueprint",
-        "R6 — Comfort task (headless)"
-      ],
+      "mirror": "docs/AI_APPLICATION_FACTORY_ru.md",
       "pairRole": "paired",
-      "mirror": "docs/AI_APPLICATION_FACTORY_ru.md"
+      "lineCount": 105,
+      "codeFences": 12,
+      "syncStatus": "balanced",
+      "diataxis": "how-to"
     },
     {
       "path": "docs/AI_APPLICATION_FACTORY_ru.md",
       "lang": "ru",
-      "h2": [
-        "R1 — Статический сайт (hosting)",
-        "R2 — CRUD mini-app (REST + DNA)",
-        "R3 — Магазин (commerce)",
-        "R4 — Support channel",
-        "R5 — Logic blueprint",
-        "R6 — Comfort task (headless)"
-      ],
+      "mirror": "docs/AI_APPLICATION_FACTORY.md",
       "pairRole": "paired",
-      "mirror": "docs/AI_APPLICATION_FACTORY.md"
+      "lineCount": 103,
+      "codeFences": 12,
+      "syncStatus": "balanced",
+      "diataxis": "how-to"
     },
     {
       "path": "docs/AI_ERROR_ACTION_MATRIX.md",
       "lang": "en",
-      "h2": [],
+      "mirror": "docs/AI_ERROR_ACTION_MATRIX_ru.md",
       "pairRole": "paired",
-      "mirror": "docs/AI_ERROR_ACTION_MATRIX_ru.md"
+      "lineCount": 17,
+      "codeFences": 0,
+      "syncStatus": "balanced",
+      "diataxis": "reference"
     },
     {
       "path": "docs/AI_ERROR_ACTION_MATRIX_ru.md",
       "lang": "ru",
-      "h2": [],
+      "mirror": "docs/AI_ERROR_ACTION_MATRIX.md",
       "pairRole": "paired",
-      "mirror": "docs/AI_ERROR_ACTION_MATRIX.md"
+      "lineCount": 17,
+      "codeFences": 0,
+      "syncStatus": "balanced",
+      "diataxis": "reference"
     },
     {
       "path": "docs/SDK_DOCS_I18N_ROADMAP.md",
       "lang": "en",
-      "h2": [
-        "Done (P0–P3)",
-        "Optional later",
-        "Maintainer checklist"
-      ],
+      "mirror": "docs/SDK_DOCS_I18N_ROADMAP_ru.md",
       "pairRole": "paired",
-      "mirror": "docs/SDK_DOCS_I18N_ROADMAP_ru.md"
+      "lineCount": 39,
+      "codeFences": 2,
+      "syncStatus": "balanced",
+      "diataxis": null
     },
     {
       "path": "docs/SDK_DOCS_I18N_ROADMAP_ru.md",
       "lang": "ru",
-      "h2": [
-        "Сделано (P0–P3)",
-        "Опционально",
-        "Чеклист"
-      ],
+      "mirror": "docs/SDK_DOCS_I18N_ROADMAP.md",
       "pairRole": "paired",
-      "mirror": "docs/SDK_DOCS_I18N_ROADMAP.md"
+      "lineCount": 41,
+      "codeFences": 2,
+      "syncStatus": "balanced",
+      "diataxis": null
     },
     {
       "path": "docs/ARCHITECTURE.md",
       "lang": "en",
-      "h2": [
-        "Layers",
-        "Patterns"
-      ],
-      "pairRole": "pair-stub",
-      "mirror": "docs/ARCHITECTURE_ru.md"
+      "mirror": "docs/ARCHITECTURE_ru.md",
+      "pairRole": "paired",
+      "lineCount": 73,
+      "codeFences": 2,
+      "syncStatus": "balanced",
+      "diataxis": "explanation"
     },
     {
       "path": "docs/ARCHITECTURE_ru.md",
       "lang": "ru",
-      "h2": [
-        "Слои",
-        "Паттерны"
-      ],
-      "pairRole": "pair-stub",
-      "mirror": "docs/ARCHITECTURE.md"
+      "mirror": "docs/ARCHITECTURE.md",
+      "pairRole": "paired",
+      "lineCount": 53,
+      "codeFences": 0,
+      "syncStatus": "balanced",
+      "diataxis": "explanation"
     },
     {
       "path": "docs/REACT_QUERY_INTEGRATION.md",
       "lang": "en",
-      "h2": [],
-      "pairRole": "pair-stub",
-      "mirror": "docs/REACT_QUERY_INTEGRATION_ru.md"
+      "mirror": "docs/REACT_QUERY_INTEGRATION_ru.md",
+      "pairRole": "paired",
+      "lineCount": 102,
+      "codeFences": 6,
+      "syncStatus": "balanced",
+      "diataxis": null
     },
     {
       "path": "docs/REACT_QUERY_INTEGRATION_ru.md",
       "lang": "ru",
-      "h2": [],
-      "pairRole": "pair-stub",
-      "mirror": "docs/REACT_QUERY_INTEGRATION.md"
+      "mirror": "docs/REACT_QUERY_INTEGRATION.md",
+      "pairRole": "paired",
+      "lineCount": 102,
+      "codeFences": 6,
+      "syncStatus": "balanced",
+      "diataxis": null
     },
     {
       "path": "packages/core/README.en.md",
       "lang": "en",
-      "h2": [
-        "Install",
-        "Quick start",
-        "Docs"
-      ],
-      "pairRole": "pair-stub",
-      "mirror": "packages/core/README.md"
+      "mirror": "packages/core/README.md",
+      "pairRole": "paired",
+      "lineCount": 97,
+      "codeFences": 6,
+      "syncStatus": "legacy-ru-path",
+      "diataxis": null
     },
     {
       "path": "packages/core/README.md",
-      "lang": "en",
-      "h2": [
-        "🚀 Быстрый старт",
-        "Entity snapshot repository (structural cache)",
-        "🌍 NEW! AgentI18n - AI-First Translations",
-        "🏗️ Архитектура",
-        "🔐 Аутентификация (AgentAuth)",
-        "💳 Платежи (AgentPayments)",
-        "📊 Аналитика (AgentAnalytics)",
-        "🔑 API ключи и проекты (AgentAPI)",
-        "🔔 Webhooks (AgentWebhooks)",
-        "💰 Кошельки (AgentWallets)",
-        "🔔 Уведомления (AgentNotifications)",
-        "⏰ Планировщик (AgentScheduler)",
-        "Platform operator (not for npm integrators)",
-        "🧠 Neural архитектура",
-        "⚙️ Конфигурация",
-        "🔄 Обработка ошибок",
-        "📊 Метрики и мониторинг",
-        "🧪 Тестирование",
-        "📚 Дополнительные ресурсы",
-        "🤝 Поддержка",
-        "📄 Лицензия"
-      ],
-      "pairRole": "pair-stub",
-      "mirror": "packages/core/README.en.md"
+      "lang": "ru",
+      "mirror": "packages/core/README.en.md",
+      "pairRole": "paired",
+      "lineCount": 1106,
+      "codeFences": 83,
+      "syncStatus": "legacy-ru-path",
+      "diataxis": null
     },
     {
       "path": "packages/react/README.en.md",
       "lang": "en",
-      "h2": [
-        "Install",
-        "Quick start",
-        "Docs"
-      ],
-      "pairRole": "pair-stub",
-      "mirror": "packages/react/README.md"
+      "mirror": "packages/react/README.md",
+      "pairRole": "paired",
+      "lineCount": 85,
+      "codeFences": 4,
+      "syncStatus": "legacy-ru-path",
+      "diataxis": null
     },
     {
       "path": "packages/react/README.md",
-      "lang": "en",
-      "h2": [
-        "🚀 Быстрый старт",
-        "🎣 React Hooks",
-        "🧩 Компоненты",
-        "🔧 Конфигурация",
-        "🎨 Стилизация",
-        "🔄 Управление состоянием",
-        "🚨 Обработка ошибок",
-        "📱 SSR поддержка",
-        "🧪 Тестирование",
-        "📚 Дополнительные ресурсы",
-        "🤝 Поддержка",
-        "📄 Лицензия"
-      ],
-      "pairRole": "pair-stub",
-      "mirror": "packages/react/README.en.md"
+      "lang": "ru",
+      "mirror": "packages/react/README.en.md",
+      "pairRole": "paired",
+      "lineCount": 666,
+      "codeFences": 36,
+      "syncStatus": "legacy-ru-path",
+      "diataxis": null
     },
     {
       "path": "packages/python/README.en.md",
       "lang": "en",
-      "h2": [
-        "Install",
-        "Quick start",
-        "Parity"
-      ],
-      "pairRole": "pair-stub",
-      "mirror": "packages/python/README.md"
+      "mirror": "packages/python/README.md",
+      "pairRole": "paired",
+      "lineCount": 50,
+      "codeFences": 4,
+      "syncStatus": "legacy-ru-path",
+      "diataxis": null
     },
     {
       "path": "packages/python/README.md",
-      "lang": "en",
-      "h2": [
-        "🚀 Установка",
-        "📦 Быстрый старт",
-        "🏗️ Модульная архитектура",
-        "⚙️ Конфигурация",
-        "🔧 Утилиты",
-        "📝 Требования",
-        "🐛 Обработка ошибок",
-        "📚 Дополнительные ресурсы",
-        "📄 Лицензия"
-      ],
-      "pairRole": "pair-stub",
-      "mirror": "packages/python/README.en.md"
+      "lang": "ru",
+      "mirror": "packages/python/README.en.md",
+      "pairRole": "paired",
+      "lineCount": 269,
+      "codeFences": 24,
+      "syncStatus": "legacy-ru-path",
+      "diataxis": null
     },
     {
       "path": "packages/hooks/README.en.md",
       "lang": "en",
-      "h2": [],
-      "pairRole": "pair-stub",
-      "mirror": "packages/hooks/README.md"
+      "mirror": "packages/hooks/README.md",
+      "pairRole": "paired",
+      "lineCount": 42,
+      "codeFences": 4,
+      "syncStatus": "legacy-ru-path",
+      "diataxis": null
     },
     {
       "path": "packages/hooks/README.md",
-      "lang": "en",
-      "h2": [
-        "🤖 AI-First Philosophy",
-        "📦 Installation",
-        "🚀 Quick Start",
-        "📚 Available Hooks",
-        "🎯 Hook Pattern",
-        "🔧 Options",
-        "📖 Type Definitions",
-        "🎨 Example: Custom Dashboard",
-        "🚀 Advanced: Custom UI",
-        "🤖 AI Usage Guide",
-        "📊 React Query Integration",
-        "🔗 Links",
-        "📄 License"
-      ],
-      "pairRole": "pair-stub",
-      "mirror": "packages/hooks/README.en.md"
+      "lang": "ru",
+      "mirror": "packages/hooks/README.en.md",
+      "pairRole": "paired",
+      "lineCount": 295,
+      "codeFences": 36,
+      "syncStatus": "legacy-ru-path",
+      "diataxis": null
     },
     {
       "path": "docs/MODULAR_ARCHITECTURE.md",
       "lang": "en",
-      "h2": [
-        "Module map",
-        "AgentAuth (authentication)",
-        "AgentAdmin (platform operator only)",
-        "AgentNeural (client-side)",
-        "AgentPayments",
-        "Configuration",
-        "Benefits",
-        "Resources"
-      ],
-      "pairRole": "pair-stub",
-      "mirror": "docs/MODULAR_ARCHITECTURE_ru.md"
+      "mirror": "docs/MODULAR_ARCHITECTURE_ru.md",
+      "pairRole": "paired",
+      "lineCount": 213,
+      "codeFences": 20,
+      "syncStatus": "balanced",
+      "diataxis": "explanation"
     },
     {
       "path": "docs/MODULAR_ARCHITECTURE_ru.md",
       "lang": "ru",
-      "h2": [
-        "🎯 Обзор",
-        "📦 Структура модулей",
-        "🎨 Преимущества модульной архитектуры",
-        "🔧 Конфигурация SDK",
-        "🚀 Быстрый старт",
-        "📚 Дополнительные ресурсы"
-      ],
-      "pairRole": "pair-stub",
-      "mirror": "docs/MODULAR_ARCHITECTURE.md"
+      "mirror": "docs/MODULAR_ARCHITECTURE.md",
+      "pairRole": "paired",
+      "lineCount": 328,
+      "codeFences": 20,
+      "syncStatus": "balanced",
+      "diataxis": "explanation"
     },
     {
       "path": "docs/PROTEIN_SYSTEM_GUIDE.md",
       "lang": "en",
-      "h2": [
-        "Core components",
-        "Quick start",
-        "Common command types",
-        "Page composition",
-        "Game data",
-        "Caching and events",
-        "Related docs"
-      ],
-      "pairRole": "pair-stub",
-      "mirror": "docs/PROTEIN_SYSTEM_GUIDE_ru.md"
+      "mirror": "docs/PROTEIN_SYSTEM_GUIDE_ru.md",
+      "pairRole": "paired",
+      "lineCount": 275,
+      "codeFences": 22,
+      "syncStatus": "balanced",
+      "diataxis": "explanation"
     },
     {
       "path": "docs/PROTEIN_SYSTEM_GUIDE_ru.md",
       "lang": "ru",
-      "h2": [
-        "🎯 Overview",
-        "🏗️ Architecture",
-        "🚀 Quick Start",
-        "🧬 Protein Commands",
-        "🎨 Page Composition System",
-        "🎮 Game Data System",
-        "⚡ Advanced Features",
-        "🔄 Event System",
-        "💾 Cache Management",
-        "📊 Performance Metrics",
-        "🛠️ Configuration",
-        "🔧 Troubleshooting",
-        "📚 Examples",
-        "🚀 Best Practices",
-        "📖 API Reference",
-        "🤝 Contributing",
-        "📄 License"
-      ],
-      "pairRole": "pair-stub",
-      "mirror": "docs/PROTEIN_SYSTEM_GUIDE.md"
+      "mirror": "docs/PROTEIN_SYSTEM_GUIDE.md",
+      "pairRole": "paired",
+      "lineCount": 495,
+      "codeFences": 34,
+      "syncStatus": "balanced",
+      "diataxis": "explanation"
     },
     {
       "path": "docs/AI_REACT_SCAFFOLD.md",
       "lang": "en",
-      "h2": [],
+      "mirror": "docs/AI_REACT_SCAFFOLD_ru.md",
       "pairRole": "paired",
-      "mirror": "docs/AI_REACT_SCAFFOLD_ru.md"
+      "lineCount": 41,
+      "codeFences": 2,
+      "syncStatus": "balanced",
+      "diataxis": null
     },
     {
       "path": "docs/AI_REACT_SCAFFOLD_ru.md",
       "lang": "ru",
-      "h2": [],
+      "mirror": "docs/AI_REACT_SCAFFOLD.md",
       "pairRole": "paired",
-      "mirror": "docs/AI_REACT_SCAFFOLD.md"
+      "lineCount": 41,
+      "codeFences": 2,
+      "syncStatus": "balanced",
+      "diataxis": null
     },
     {
       "path": "docs/SDK_MODULE_CATALOG.md",
       "lang": "en",
-      "h2": [],
+      "mirror": "docs/SDK_MODULE_CATALOG_ru.md",
       "pairRole": "paired",
-      "mirror": "docs/SDK_MODULE_CATALOG_ru.md"
+      "lineCount": 34,
+      "codeFences": 2,
+      "syncStatus": "balanced",
+      "diataxis": "reference"
     },
     {
       "path": "docs/SDK_MODULE_CATALOG_ru.md",
       "lang": "ru",
-      "h2": [
-        "В рантайме",
-        "Integrator scope",
-        "Обновление каталога"
-      ],
+      "mirror": "docs/SDK_MODULE_CATALOG.md",
       "pairRole": "paired",
-      "mirror": "docs/SDK_MODULE_CATALOG.md"
+      "lineCount": 26,
+      "codeFences": 2,
+      "syncStatus": "balanced",
+      "diataxis": "reference"
     },
     {
       "path": "CONTRIBUTING.md",
       "lang": "en",
-      "h2": [
-        "Getting Started",
-        "Development Workflow",
-        "Code Style",
-        "Pull Request Guidelines",
-        "Questions?"
-      ],
+      "mirror": "CONTRIBUTING_ru.md",
       "pairRole": "paired",
-      "mirror": "CONTRIBUTING_ru.md"
+      "lineCount": 76,
+      "codeFences": 6,
+      "syncStatus": "balanced",
+      "diataxis": null
     },
     {
       "path": "CONTRIBUTING_ru.md",
       "lang": "ru",
-      "h2": [
-        "Начало",
-        "Документация (i18n)"
-      ],
+      "mirror": "CONTRIBUTING.md",
       "pairRole": "paired",
-      "mirror": "CONTRIBUTING.md"
+      "lineCount": 75,
+      "codeFences": 8,
+      "syncStatus": "balanced",
+      "diataxis": null
     },
     {
       "path": "PUBLISHING.md",
       "lang": "en",
-      "h2": [
-        "After First npm Publish",
-        "npm Publish Steps"
-      ],
+      "mirror": "PUBLISHING_ru.md",
       "pairRole": "paired",
-      "mirror": "PUBLISHING_ru.md"
+      "lineCount": 28,
+      "codeFences": 4,
+      "syncStatus": "balanced",
+      "diataxis": null
     },
     {
       "path": "PUBLISHING_ru.md",
       "lang": "ru",
-      "h2": [
-        "После первого npm publish",
-        "Шаги npm",
-        "README на GitHub mirror"
-      ],
+      "mirror": "PUBLISHING.md",
       "pairRole": "paired",
-      "mirror": "PUBLISHING.md"
+      "lineCount": 27,
+      "codeFences": 2,
+      "syncStatus": "balanced",
+      "diataxis": null
     },
     {
       "path": "SECURITY.md",
       "lang": "en",
-      "h2": [
-        "Supported versions",
-        "Reporting a vulnerability",
-        "Secrets"
-      ],
+      "mirror": "SECURITY_ru.md",
       "pairRole": "paired",
-      "mirror": "SECURITY_ru.md"
+      "lineCount": 21,
+      "codeFences": 0,
+      "syncStatus": "balanced",
+      "diataxis": null
     },
     {
       "path": "SECURITY_ru.md",
       "lang": "ru",
-      "h2": [
-        "Поддерживаемые версии",
-        "Сообщить об уязвимости",
-        "Секреты"
-      ],
+      "mirror": "SECURITY.md",
       "pairRole": "paired",
-      "mirror": "SECURITY.md"
+      "lineCount": 19,
+      "codeFences": 0,
+      "syncStatus": "balanced",
+      "diataxis": null
     },
     {
       "path": "examples/ai/README.md",
       "lang": "en",
-      "h2": [
-        "Environments",
-        "Local development"
-      ],
+      "mirror": "examples/ai/README_ru.md",
       "pairRole": "paired",
-      "mirror": "examples/ai/README_ru.md"
+      "lineCount": 28,
+      "codeFences": 2,
+      "syncStatus": "balanced",
+      "diataxis": "tutorial"
     },
     {
       "path": "examples/ai/README_ru.md",
       "lang": "ru",
-      "h2": [
-        "Окружение",
-        "Локально"
-      ],
+      "mirror": "examples/ai/README.md",
       "pairRole": "paired",
-      "mirror": "examples/ai/README.md"
+      "lineCount": 30,
+      "codeFences": 2,
+      "syncStatus": "balanced",
+      "diataxis": "tutorial"
+    },
+    {
+      "path": "examples/typescript/economy/README.md",
+      "lang": "en",
+      "mirror": "examples/typescript/economy/README_ru.md",
+      "pairRole": "paired",
+      "lineCount": 17,
+      "codeFences": 0,
+      "syncStatus": "balanced",
+      "diataxis": null
+    },
+    {
+      "path": "examples/typescript/economy/README_ru.md",
+      "lang": "ru",
+      "mirror": "examples/typescript/economy/README.md",
+      "pairRole": "paired",
+      "lineCount": 22,
+      "codeFences": 0,
+      "syncStatus": "balanced",
+      "diataxis": null
     }
   ]
 }

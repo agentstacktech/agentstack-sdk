@@ -1,31 +1,56 @@
 #!/usr/bin/env node
 /**
- * Build docs/i18n-manifest.json and docs/I18N_DOC_REGISTRY.md for SDK doc pairs.
+ * Build docs/i18n-manifest.json, I18N_DOC_REGISTRY.md, DOC_SYNC_MATRIX.md
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  lineCount,
+  h2Count,
+  codeFenceCount,
+  syncStatus,
+} from './lib/docs-i18n-utils.mjs';
 
 const SDK_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REPO_ROOT = path.resolve(SDK_ROOT, '..');
 const DOCS = path.join(SDK_ROOT, 'docs');
 const OUT = path.join(DOCS, 'i18n-manifest.json');
 const REGISTRY = path.join(DOCS, 'I18N_DOC_REGISTRY.md');
+const SYNC_MATRIX = path.join(DOCS, 'DOC_SYNC_MATRIX.md');
 const MONOREPO_SDK_DOCS = path.join(REPO_ROOT, 'docs', 'sdk');
 const MONOREPO_MANIFEST = path.join(MONOREPO_SDK_DOCS, 'i18n-manifest.json');
 const MONOREPO_REGISTRY = path.join(MONOREPO_SDK_DOCS, 'I18N_DOC_REGISTRY.md');
 
+const DIATAXIS = {
+  'docs/quick-start.md': 'tutorial',
+  'examples/ai/README.md': 'tutorial',
+  'docs/SDK_INTEGRATION_FLOWS.md': 'how-to',
+  'docs/SUBMODULE_CONSUMER.md': 'how-to',
+  'docs/PROJECT_CONTEXT.md': 'how-to',
+  'docs/AI_APPLICATION_FACTORY.md': 'how-to',
+  'docs/INTEGRATOR_SCOPE.md': 'reference',
+  'docs/AI_ERROR_ACTION_MATRIX.md': 'reference',
+  'docs/SDK_MODULE_CATALOG.md': 'reference',
+  'docs/GLOSSARY.md': 'reference',
+  'docs/ARCHITECTURE.md': 'explanation',
+  'docs/MODULAR_ARCHITECTURE.md': 'explanation',
+  'docs/PROTEIN_SYSTEM_GUIDE.md': 'explanation',
+};
+
 const MONOREPO_PAIRS = [
+  ['docs/SDK_AI_SURFACE.md', 'docs/SDK_AI_SURFACE_ru.md', 'paired'],
   ['docs/sdk/SDK_SUBMODULE_INTEGRATION.md', 'docs/sdk/SDK_SUBMODULE_INTEGRATION_ru.md', 'paired'],
   ['docs/sdk/SDK_MIRROR_PUBLISH_RUNBOOK.md', 'docs/sdk/SDK_MIRROR_PUBLISH_RUNBOOK_ru.md', 'paired'],
   ['docs/sdk/GENETIC_STARTER_SDK_SLICE.md', 'docs/sdk/GENETIC_STARTER_SDK_SLICE_ru.md', 'paired'],
 ];
 
-/** [enRelativeFromRepoRoot, ruRelativeFromRepoRoot, pairRole] */
+/** [enPath, ruPath, pairRole] — paths relative to agentstack-unified-sdk root */
 const PAIRS = [
-  ['README.en.md', 'README.md', 'pair-stub'],
+  ['README.en.md', 'README.md', 'paired'],
   ['docs/DOCS_I18N.md', 'docs/DOCS_I18N_ru.md', 'paired'],
   ['docs/DOC_HUB.md', 'docs/DOC_HUB_ru.md', 'paired'],
+  ['docs/GLOSSARY.md', 'docs/GLOSSARY_ru.md', 'paired'],
   ['docs/README.md', 'docs/README_ru.md', 'paired'],
   ['docs/SDK_INTEGRATION_FLOWS.md', 'docs/SDK_INTEGRATION_FLOWS_ru.md', 'paired'],
   ['docs/quick-start.md', 'docs/quick-start_ru.md', 'paired'],
@@ -37,106 +62,148 @@ const PAIRS = [
   ['docs/AI_APPLICATION_FACTORY.md', 'docs/AI_APPLICATION_FACTORY_ru.md', 'paired'],
   ['docs/AI_ERROR_ACTION_MATRIX.md', 'docs/AI_ERROR_ACTION_MATRIX_ru.md', 'paired'],
   ['docs/SDK_DOCS_I18N_ROADMAP.md', 'docs/SDK_DOCS_I18N_ROADMAP_ru.md', 'paired'],
-  ['docs/ARCHITECTURE.md', 'docs/ARCHITECTURE_ru.md', 'pair-stub'],
-  ['docs/REACT_QUERY_INTEGRATION.md', 'docs/REACT_QUERY_INTEGRATION_ru.md', 'pair-stub'],
-  ['packages/core/README.en.md', 'packages/core/README.md', 'pair-stub'],
-  ['packages/react/README.en.md', 'packages/react/README.md', 'pair-stub'],
-  ['packages/python/README.en.md', 'packages/python/README.md', 'pair-stub'],
-  ['packages/hooks/README.en.md', 'packages/hooks/README.md', 'pair-stub'],
-  ['docs/MODULAR_ARCHITECTURE.md', 'docs/MODULAR_ARCHITECTURE_ru.md', 'pair-stub'],
-  ['docs/PROTEIN_SYSTEM_GUIDE.md', 'docs/PROTEIN_SYSTEM_GUIDE_ru.md', 'pair-stub'],
+  ['docs/ARCHITECTURE.md', 'docs/ARCHITECTURE_ru.md', 'paired'],
+  ['docs/REACT_QUERY_INTEGRATION.md', 'docs/REACT_QUERY_INTEGRATION_ru.md', 'paired'],
+  ['packages/core/README.en.md', 'packages/core/README.md', 'paired'],
+  ['packages/react/README.en.md', 'packages/react/README.md', 'paired'],
+  ['packages/python/README.en.md', 'packages/python/README.md', 'paired'],
+  ['packages/hooks/README.en.md', 'packages/hooks/README.md', 'paired'],
+  ['docs/MODULAR_ARCHITECTURE.md', 'docs/MODULAR_ARCHITECTURE_ru.md', 'paired'],
+  ['docs/PROTEIN_SYSTEM_GUIDE.md', 'docs/PROTEIN_SYSTEM_GUIDE_ru.md', 'paired'],
   ['docs/AI_REACT_SCAFFOLD.md', 'docs/AI_REACT_SCAFFOLD_ru.md', 'paired'],
   ['docs/SDK_MODULE_CATALOG.md', 'docs/SDK_MODULE_CATALOG_ru.md', 'paired'],
   ['CONTRIBUTING.md', 'CONTRIBUTING_ru.md', 'paired'],
   ['PUBLISHING.md', 'PUBLISHING_ru.md', 'paired'],
   ['SECURITY.md', 'SECURITY_ru.md', 'paired'],
   ['examples/ai/README.md', 'examples/ai/README_ru.md', 'paired'],
+  ['examples/typescript/economy/README.md', 'examples/typescript/economy/README_ru.md', 'paired'],
 ];
 
-function h2Set(md) {
-  return [...md.matchAll(/^## (.+)$/gm)].map((m) => m[1].trim());
+function readMeta(rel) {
+  const full = path.join(SDK_ROOT, rel);
+  if (!fs.existsSync(full)) {
+    return { lines: 0, h2: [], fences: 0 };
+  }
+  const text = fs.readFileSync(full, 'utf8');
+  return { lines: lineCount(full), h2: h2Count(text), fences: codeFenceCount(text) };
 }
 
 function main() {
-  const seen = new Set();
+  const generatedAt = new Date().toISOString();
   const entries = [];
+  const matrixRows = [];
 
   for (const [enPath, ruPath, pairRole] of PAIRS) {
-    for (const rel of [enPath, ruPath]) {
-      if (seen.has(rel)) continue;
-      seen.add(rel);
-      const full = path.join(SDK_ROOT, rel);
-      const lang = rel.endsWith('_ru.md') || rel === 'README.md' ? 'ru' : 'en';
-      const mirror = rel === enPath ? ruPath : rel === ruPath ? enPath : null;
-      const text = fs.existsSync(full) ? fs.readFileSync(full, 'utf8') : '';
-      entries.push({
-        path: rel.replace(/\\/g, '/'),
-        lang,
-        h2: text ? h2Set(text) : [],
-        pairRole: rel === enPath || rel === ruPath ? pairRole : 'single',
-        mirror: mirror ? mirror.replace(/\\/g, '/') : null,
-      });
-    }
+    const enMeta = readMeta(enPath);
+    const ruMeta = readMeta(ruPath);
+    const status = syncStatus(pairRole, enMeta.lines, ruMeta.lines, enPath);
+    const ratio =
+      ruMeta.lines > 0 ? Number((enMeta.lines / ruMeta.lines).toFixed(2)) : null;
+
+    entries.push({
+      path: enPath,
+      lang: 'en',
+      mirror: ruPath,
+      pairRole,
+      lineCount: enMeta.lines,
+      h2Count: enMeta.h2.length,
+      codeFences: enMeta.fences,
+      syncStatus: status,
+      diataxis: DIATAXIS[enPath] ?? null,
+    });
+    entries.push({
+      path: ruPath,
+      lang: 'ru',
+      mirror: enPath,
+      pairRole,
+      lineCount: ruMeta.lines,
+      h2Count: ruMeta.h2.length,
+      codeFences: ruMeta.fences,
+      syncStatus: status,
+      diataxis: DIATAXIS[enPath] ?? null,
+    });
+
+    matrixRows.push({
+      enPath,
+      ruPath,
+      pairRole,
+      linesEn: enMeta.lines,
+      linesRu: ruMeta.lines,
+      ratio,
+      status,
+      diataxis: DIATAXIS[enPath] ?? '—',
+    });
   }
 
-  const generatedAt = new Date().toISOString();
   fs.writeFileSync(OUT, `${JSON.stringify({ generatedAt, entries }, null, 2)}\n`);
 
-  const lines = [
+  const registryLines = [
     '# SDK i18n doc registry (auto-generated)',
     '',
-    `Generated: ${generatedAt} · Run \`npm run generate:docs-i18n\``,
+    `Generated: ${generatedAt} · \`npm run generate:docs-i18n\``,
     '',
-    '| File | Lang | Role | Mirror |',
-    '|------|------|------|--------|',
-    ...entries.map((e) => {
-      const base = path.basename(e.path);
-      const mirrorBase = e.mirror ? path.basename(e.mirror) : '—';
-      return `| ${base} | ${e.lang} | ${e.pairRole} | ${mirrorBase} |`;
+    '| EN | RU | Role | Lines EN/RU | Ratio | Status |',
+    '|----|-----|------|-------------|-------|--------|',
+    ...matrixRows.map((r) => {
+      const ratio = r.ratio ?? '—';
+      return `| \`${r.enPath}\` | \`${r.ruPath}\` | ${r.pairRole} | ${r.linesEn}/${r.linesRu} | ${ratio} | ${r.status} |`;
     }),
     '',
-    'Policy: [DOCS_I18N.md](./DOCS_I18N.md)',
+    'Matrix: [DOC_SYNC_MATRIX.md](./DOC_SYNC_MATRIX.md) · Policy: [DOCS_I18N.md](./DOCS_I18N.md)',
   ];
-  fs.writeFileSync(REGISTRY, `${lines.join('\n')}\n`);
+  fs.writeFileSync(REGISTRY, `${registryLines.join('\n')}\n`);
 
-  const monoEntries = [];
+  const matrixDoc = [
+    '# SDK documentation sync matrix',
+    '',
+    '**Genetic tag:** `repo.platform.sdk.docs_i18n.gen1`',
+    '**RU:** [DOC_SYNC_MATRIX_ru.md](./DOC_SYNC_MATRIX_ru.md) (summary)',
+    '',
+    `Generated: ${generatedAt} · Do not edit by hand — run \`npm run generate:docs-i18n\``,
+    '',
+    '| EN | RU | Diátaxis | Lines EN | Lines RU | Ratio | Status |',
+    '|----|-----|----------|----------|----------|-------|--------|',
+    ...matrixRows.map((r) => {
+      return `| [${r.enPath}](${r.enPath}) | [${r.ruPath}](${r.ruPath}) | ${r.diataxis} | ${r.linesEn} | ${r.linesRu} | ${r.ratio ?? '—'} | **${r.status}** |`;
+    }),
+    '',
+    'Statuses: **balanced** (0.6–1.4), **legacy-ru-path** (README.en ↔ long RU README.md). See [DOCS_I18N.md](./DOCS_I18N.md).',
+  ];
+  fs.writeFileSync(SYNC_MATRIX, `${matrixDoc.join('\n')}\n`);
+
+  const monoRows = [];
   for (const [enPath, ruPath, pairRole] of MONOREPO_PAIRS) {
-    for (const rel of [enPath, ruPath]) {
-      const full = path.join(REPO_ROOT, rel);
-      const lang = rel.endsWith('_ru.md') ? 'ru' : 'en';
-      const mirror = rel === enPath ? ruPath : enPath;
-      const text = fs.existsSync(full) ? fs.readFileSync(full, 'utf8') : '';
-      monoEntries.push({
-        path: rel.replace(/\\/g, '/'),
-        lang,
-        pairRole,
-        mirror: mirror.replace(/\\/g, '/'),
-        h2Count: text ? h2Set(text).length : 0,
-      });
-    }
+    const enFull = path.join(REPO_ROOT, enPath);
+    const ruFull = path.join(REPO_ROOT, ruPath);
+    const linesEn = lineCount(enFull);
+    const linesRu = lineCount(ruFull);
+    monoRows.push({ enPath, ruPath, pairRole, linesEn, linesRu });
   }
   fs.mkdirSync(MONOREPO_SDK_DOCS, { recursive: true });
   fs.writeFileSync(
     MONOREPO_MANIFEST,
-    `${JSON.stringify({ generatedAt, entries: monoEntries }, null, 2)}\n`,
+    `${JSON.stringify({ generatedAt, pairs: monoRows }, null, 2)}\n`,
   );
-  const monoLines = [
-    '# Monorepo SDK docs i18n registry (auto-generated)',
-    '',
-    `Generated: ${generatedAt} · \`npm run generate:docs-i18n\` in agentstack-unified-sdk`,
-    '',
-    '| EN | RU | Role |',
-    '|----|-----|------|',
-    ...MONOREPO_PAIRS.map(([en, ru, role]) => {
-      return `| [${path.basename(en)}](./${path.basename(en)}) | [${path.basename(ru)}](./${path.basename(ru)}) | ${role} |`;
-    }),
-  ];
-  fs.writeFileSync(MONOREPO_REGISTRY, `${monoLines.join('\n')}\n`);
+  fs.writeFileSync(
+    MONOREPO_REGISTRY,
+    [
+      '# Monorepo SDK docs i18n registry (auto-generated)',
+      '',
+      `Generated: ${generatedAt}`,
+      '',
+      '| EN | RU | Lines EN/RU |',
+      '|----|-----|-------------|',
+      ...monoRows.map(
+        (r) =>
+          `| [${path.basename(r.enPath)}](./${path.basename(r.enPath)}) | [${path.basename(r.ruPath)}](./${path.basename(r.ruPath)}) | ${r.linesEn}/${r.linesRu} |`,
+      ),
+    ].join('\n') + '\n',
+  );
 
   console.log(`wrote ${OUT} (${entries.length} entries)`);
   console.log(`wrote ${REGISTRY}`);
-  console.log(`wrote ${MONOREPO_MANIFEST} (${monoEntries.length} entries)`);
-  console.log(`wrote ${MONOREPO_REGISTRY}`);
+  console.log(`wrote ${SYNC_MATRIX}`);
+  console.log(`wrote ${MONOREPO_MANIFEST}`);
 }
 
 main();

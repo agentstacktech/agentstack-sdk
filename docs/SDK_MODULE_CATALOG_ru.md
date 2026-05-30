@@ -3,23 +3,23 @@
 **Genetic tag:** `repo.platform.sdk.gen1`  
 **EN:** [SDK_MODULE_CATALOG.md](./SDK_MODULE_CATALOG.md)
 
-Канонический список в monorepo: [docs/SDK_MODULE_CATALOG.md](https://github.com/agentstacktech/AgentStack/blob/master/docs/SDK_MODULE_CATALOG.md).
-
-## В рантайме
+## Discovery в runtime
 
 ```typescript
 const catalog = sdk.getModuleCatalog();
 const matrix = sdk.getCapabilityMatrix();
 ```
 
-Вызывайте **до** произвольных API: в каталоге — `accessPaths`, `aiHints`, `examples`.
+**Scope:** `admin` скрыт для npm-интеграторов. [INTEGRATOR_SCOPE_ru.md](./INTEGRATOR_SCOPE_ru.md).
 
-## Integrator scope
+## Таблица в monorepo
 
-Модули `admin` / `adminData` **скрыты**, если `sdkAudience` не `platform_operator`. См. [INTEGRATOR_SCOPE_ru.md](./INTEGRATOR_SCOPE_ru.md).
+[../../docs/SDK_MODULE_CATALOG.md](../../docs/SDK_MODULE_CATALOG.md) — генерируется из кода.
 
-## Обновление каталога
+## Workflow
 
-В monorepo: `python agentstack-core/scripts/build_module_catalog.py` — не редактируйте сгенерированные JSON вручную.
+1. `getModuleCatalog()`  
+2. `getCapabilityMatrix()`  
+3. Вызов через `sdk.platform.*`  
 
-Тело каталога (таблицы модулей) — только на **английском** в EN-файле и в выводе `getModuleCatalog()`.
+См. [MODULAR_ARCHITECTURE_ru.md](./MODULAR_ARCHITECTURE_ru.md) · [SDK_AI_SURFACE_ru.md](../../docs/SDK_AI_SURFACE_ru.md).

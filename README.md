@@ -383,57 +383,13 @@ const predictions = await sdk.neural.patterns.predict('payment_success', {
 
 ## 🎨 React Hooks
 
-### Admin Hooks
-```tsx
-import { 
-  useAdminUsers, 
-  useAdminStats, 
-  useAdminDashboard 
-} from '@agentstack/react';
+### Admin Hooks (только оператор платформы)
 
-function AdminPanel() {
-  const { 
-    users, 
-    loading, 
-    error, 
-    createUser, 
-    updateUser, 
-    deleteUser,
-    bulkUpdateUsers 
-  } = useAdminUsers();
+Хуки `useAdminUsers`, `useAdminStats`, `useAdminDashboard` — **не** для tenant npm-приложений. Нужен `sdkAudience: 'platform_operator'` в monorepo AgentStack.
 
-  const { stats, refreshStats } = useAdminStats();
-  
-  const { metrics, refreshMetrics } = useAdminDashboard();
+Пример: [examples/typescript/operator-admin-usage.ts](examples/typescript/operator-admin-usage.ts) · [docs/INTEGRATOR_SCOPE_ru.md](docs/INTEGRATOR_SCOPE_ru.md)
 
-  return (
-    <div>
-      <h2>System Statistics</h2>
-      <p>Total Users: {stats?.total_users}</p>
-      <p>Active Users: {stats?.active_users}</p>
-      
-      <h2>Dashboard Metrics</h2>
-      <p>Revenue: {metrics?.total_revenue?.value}</p>
-      
-      <h2>Users</h2>
-      {loading ? (
-        <div>Loading...</div>
-      ) : (
-        users.map(user => (
-          <div key={user.id}>
-            {user.username} - {user.email}
-            <button onClick={() => deleteUser(user.id)}>
-              Delete
-            </button>
-          </div>
-        ))
-      )}
-    </div>
-  );
-}
-```
-
-### Core Hooks
+### Core Hooks (интегратор)
 ```tsx
 import { 
   useAuth, 

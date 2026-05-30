@@ -1,7 +1,7 @@
 # AgentStack SDK — guide for AI agents
 
 **Genetic tag:** `repo.platform.sdk.ai_surface.gen1`  
-**RU:** [AGENTS_ru.md](AGENTS_ru.md) · **Doc hub:** [docs/DOC_HUB.md](docs/DOC_HUB.md)  
+**RU:** [AGENTS_ru.md](AGENTS_ru.md) · **Doc hub:** [docs/DOC_HUB.md](docs/DOC_HUB.md) · **Glossary:** [docs/GLOSSARY.md](docs/GLOSSARY.md)  
 **North star:** fast, low-error construction of apps and sites on AgentStack via typed SDK + self-description.
 
 ---
@@ -56,7 +56,7 @@ Full recipes: [docs/AI_APPLICATION_FACTORY.md](docs/AI_APPLICATION_FACTORY.md)
 ## Decision tree
 
 - **CRUD / projects / users** → `sdk.platform.api` or `sdk.platform.dna`
-- **DNA command bus** → `sdk.platform.protocol.executeCommand` (not raw `/commands` fetch)
+- **DNA command bus** → `sdk.platform.protocol.executeCommand` (not raw `/commands` fetch; prefer protocol over legacy `sdk.protein.*` for new code — [docs/PROTEIN_SYSTEM_GUIDE.md](docs/PROTEIN_SYSTEM_GUIDE.md))
 - **Rules engine** → `sdk.platform.command` or `protocol.executeRulesCommand`
 - **Cached read model** → `sdk.platform.protocol.readThroughSnapshot`
 - **MCP automation** → `https://agentstack.tech/mcp` (`agentstack.execute`) — mirror of platform actions
@@ -92,6 +92,8 @@ Full recipes: [docs/AI_APPLICATION_FACTORY.md](docs/AI_APPLICATION_FACTORY.md)
 
 - Swagger: https://agentstack.tech/swagger  
 - MCP: https://agentstack.tech/mcp  
+- Modular architecture: [docs/MODULAR_ARCHITECTURE.md](docs/MODULAR_ARCHITECTURE.md)  
+- Protein / protocol: [docs/PROTEIN_SYSTEM_GUIDE.md](docs/PROTEIN_SYSTEM_GUIDE.md)  
 - Module catalog: [docs/SDK_MODULE_CATALOG.md](docs/SDK_MODULE_CATALOG.md)  
 - Integrator scope (no admin): [docs/INTEGRATOR_SCOPE.md](docs/INTEGRATOR_SCOPE.md)  
 - Submodule vendor: [docs/SUBMODULE_CONSUMER.md](docs/SUBMODULE_CONSUMER.md)  

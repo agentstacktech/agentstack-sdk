@@ -41,11 +41,56 @@ Exception: `AGENTS.md` stays English-only in `llms.txt`; optional `AGENTS_ru.md`
 3. Run `npm run generate:docs-i18n` then `npm run check:docs-i18n`.
 4. Update [DOC_HUB.md](./DOC_HUB.md) if you add a new paired doc.
 
+## Diátaxis (navigation)
+
+Organize docs in [DOC_HUB.md](./DOC_HUB.md) as:
+
+| Lane | Purpose |
+|------|---------|
+| **Tutorial** | First success in ~15 minutes |
+| **How-to** | Solve a specific task |
+| **Reference** | Facts, tables, invariants |
+| **Explanation** | Why the SDK is shaped this way |
+
+Templates: [templates/](templates/) · Terms: [GLOSSARY.md](./GLOSSARY.md)
+
+## Naming exceptions
+
+| Path | Language | Note |
+|------|----------|------|
+| `README.en.md` | EN | GitHub/npm canonical |
+| `README.md` (repo root) | RU | Extended narrative — not `FOO.md` EN rule |
+| `packages/*/README.md` | RU | `README.en.md` is npm readme |
+| `docs/README.md` | EN | Doc tree index |
+
+## Sync statuses (manifest)
+
+| Status | Meaning |
+|--------|---------|
+| `balanced` | EN/RU line ratio 0.6–1.4 |
+| `en-thin` | Expand English |
+| `ru-thin` | Expand Russian |
+| `legacy-ru-path` | EN in `README.en.md`; long RU in `README.md` (ratio N/A) |
+| `stub` | Temporary; not allowed for P0 |
+| `en-only` | No RU mirror (listed in HUB) |
+
+Matrix: [DOC_SYNC_MATRIX.md](./DOC_SYNC_MATRIX.md) (auto-generated).
+
+## PR checklist
+
+1. Edit **English** first, then **`_ru.md`**
+2. Same `##` headings and code blocks in both languages
+3. `npm run check:docs-i18n:all`
+4. Update [DOC_HUB.md](./DOC_HUB.md) if adding a doc
+5. Do not add `*_ru.md` to [llms.txt](../llms.txt)
+
 ## CI
 
-- `check:docs-i18n` — mirror exists, header cross-link, rough `##` section parity (tolerance ±6).
-- `llms.txt` — **English paths only** (do not add `*_ru.md`).
+- `check:docs-i18n` — pairs, cross-links, H2 ±6
+- `check:docs-i18n-depth` — line ratio + code fences for P0
+- `check:docs-api-symbols` — EN integrator docs (no `sdk.admin`)
+- `llms.txt` — **English only**
 
 ## Registry
 
-Auto-generated: [i18n-manifest.json](./i18n-manifest.json) · human table: [I18N_DOC_REGISTRY.md](./I18N_DOC_REGISTRY.md).
+[i18n-manifest.json](./i18n-manifest.json) · [I18N_DOC_REGISTRY.md](./I18N_DOC_REGISTRY.md) · [DOC_SYNC_MATRIX.md](./DOC_SYNC_MATRIX.md)
