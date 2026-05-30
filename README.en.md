@@ -11,7 +11,7 @@ Universal TypeScript/JavaScript SDK for the AgentStack ecosystem — modular API
 
 ---
 
-## Tutorial — first call (15 min)
+## 🚀 Tutorial — first call (15 min)
 
 ```bash
 npm install @agentstack/sdk
@@ -40,7 +40,7 @@ Deep dive: [docs/quick-start.md](docs/quick-start.md) · AI: [AGENTS.md](AGENTS.
 
 ---
 
-## Project goals
+## 🎯 Project goals
 
 - **Consistency** — one SDK for platform APIs
 - **Simplicity** — intuitive surfaces (`sdk.platform`, subpath exports)
@@ -53,41 +53,48 @@ Deep dive: [docs/quick-start.md](docs/quick-start.md) · AI: [AGENTS.md](AGENTS.
 
 ---
 
-## Repository layout
+## 🏗️ Repository layout
 
 ```
 agentstack-unified-sdk/
 ├── packages/
-│   ├── core/          # @agentstack/sdk
-│   ├── react/         # @agentstack/react
-│   ├── hooks/         # @agentstack/hooks
-│   └── python/        # agentstack-sdk (pip)
-├── docs/              # Integrator docs (EN + *_ru.md)
+│   ├── core/                          # @agentstack/sdk
+│   │   ├── src/
+│   │   │   ├── client/                # HTTP + WebSocket
+│   │   │   ├── modules/               # AgentAuth, AgentAPI, …
+│   │   │   ├── types/
+│   │   │   └── utils/                 # cache, retry, logger
+│   ├── react/                         # @agentstack/react
+│   │   ├── hooks/                     # useAuth, useSDKQuery, …
+│   │   └── components/                # SDKProvider, guards
+│   ├── hooks/                         # @agentstack/hooks (headless)
+│   └── python/                        # agentstack-sdk (pip)
+├── docs/                              # EN canonical + *_ru.md
 ├── examples/
-│   ├── typescript/
-│   └── ai/
-├── scripts/           # i18n, submodule, mirror
+│   ├── typescript/                    # modular, economy, admin (operator)
+│   └── ai/                            # bootstrap, catalog
+├── scripts/                           # i18n, submodule, mirror
 └── tests/
 ```
 
 ---
 
-## Key features
+## 🚀 Key features
 
 ### Core SDK
 
-- Smart **HTTP client** (retries, auth headers, `X-Project-ID`)
-- **Type-safe** TypeScript with subpath exports
-- **Modular** `Agent*` domains + stable **`sdk.platform`** facade
-- **Protocol bus** — `sdk.platform.protocol.executeCommand` + snapshots
-- **Neural** client cache and events (optional)
-- **Interceptors** for logging and correlation (OpTrace-friendly)
+- **Smart HTTP client** — automatic retry, caching, `X-Project-ID`
+- **Type-safe API** — full TypeScript + subpath exports
+- **Modular architecture** — `Agent*` modules + **`sdk.platform`** facade
+- **Protocol bus** — `sdk.platform.protocol.executeCommand` + snapshots (**preferred**)
+- **Neural cache** — client-side predictions and TTL
+- **Interceptors** — logging, correlation (OpTrace-friendly)
 
-### SDK modules (integrator)
+### 🎯 SDK modules (integrator)
 
 | Module | Role |
 |--------|------|
-| `sdk.platform.auth` | Login, tokens, profile |
+| `sdk.platform.auth` | Login, tokens, profile, settings |
 | `sdk.platform.api` | Projects, tenant users |
 | `sdk.platform.dna` | 8DNA tables |
 | `sdk.platform.protocol` | Commands + snapshots (**preferred**) |
@@ -99,23 +106,29 @@ agentstack-unified-sdk/
 | `sdk.commerce` | Shop, cart, checkout |
 | `sdk.i18n` | Zero-config translations |
 
-**Platform operator only:** `sdk.admin`, `/api/admin/*` — not in default npm catalog. See [docs/INTEGRATOR_SCOPE.md](docs/INTEGRATOR_SCOPE.md).
+### Platform operator (not for tenant npm apps)
 
-### Neural Architecture (client)
+- User management, system stats, bulk ops — **`sdk.admin`**, `/api/admin/*`
+- Requires `sdkAudience: 'platform_operator'` in the AgentStack monorepo
+- Example: [examples/typescript/operator-admin-usage.ts](examples/typescript/operator-admin-usage.ts) · [docs/INTEGRATOR_SCOPE.md](docs/INTEGRATOR_SCOPE.md)
 
-- Neural cache get/set with TTL
-- Event emit for diagnostics
-- Pattern helpers (where enabled)
+### 🧠 Neural Architecture (client)
 
-### React integration
+- **Neural cache** — intelligent caching with TTL and prefix invalidation
+- **Neural events** — cross-module diagnostics
+- **Pattern analysis** — usage helpers where enabled
+- **Auto optimization** — retry/backoff tuned per route
 
-- `SDKProvider` + `useSDK()` ([docs/REACT_QUERY_INTEGRATION.md](docs/REACT_QUERY_INTEGRATION.md))
-- React Query hooks (`useSDKQuery`, mutations)
-- Admin hooks — **monorepo `platform_operator` only**
+### ⚛️ React integration
+
+- **`SDKProvider`** + `useSDK()` — canonical ([docs/REACT_QUERY_INTEGRATION.md](docs/REACT_QUERY_INTEGRATION.md)); `AgentStackProvider` is an alias
+- Domain hooks: `useAuth`, `useProfile`, `useSettings`, `usePayments`, `useProjects`
+- React Query: `useSDKQuery`, `useSDKMutation`, invalidation after protocol commands
+- Admin hooks — **monorepo operator only** (see above)
 
 ---
 
-## How to install (flows A–H)
+## 📦 How to install (flows A–H)
 
 | Flow | When | Install |
 |------|------|---------|
@@ -137,7 +150,7 @@ node vendor/agentstack-sdk/scripts/bootstrap-submodule-consumer.mjs --target . -
 
 ---
 
-## Quick start by runtime
+## 🚀 Quick start by runtime
 
 ### TypeScript / Node
 
@@ -203,7 +216,7 @@ function ProjectList() {
 
 ---
 
-## API reference (overview)
+## 🔧 API reference (overview)
 
 ### Auth (`sdk.platform.auth`)
 
@@ -262,11 +275,74 @@ await sdk.analytics.trackEvent({
 });
 ```
 
+### Webhooks & scheduler
+
+```typescript
+const hook = await sdk.webhooks.createWebhook({
+  url: 'https://example.com/hook',
+  events: ['user.created'],
+  secret: process.env.WEBHOOK_SECRET!,
+});
+
+const task = await sdk.scheduler.createTask({
+  name: 'Daily sync',
+  task_type: 'http_request',
+  schedule: '0 2 * * *',
+  payload: { url: 'https://api.example.com/sync' },
+});
+```
+
+### Docs helper
+
+```typescript
+const help = await sdk.docs.getHelp('auth');
+```
+
 Full module map: [docs/MODULAR_ARCHITECTURE.md](docs/MODULAR_ARCHITECTURE.md) · Protein: [docs/PROTEIN_SYSTEM_GUIDE.md](docs/PROTEIN_SYSTEM_GUIDE.md)
 
 ---
 
-## Configuration
+## 🎨 React Hooks
+
+### Admin hooks (platform operator only)
+
+`useAdminUsers`, `useAdminStats`, `useAdminDashboard` are **not** for tenant npm apps. Use `sdkAudience: 'platform_operator'` in the AgentStack monorepo.
+
+Example: [examples/typescript/operator-admin-usage.ts](examples/typescript/operator-admin-usage.ts)
+
+### Core hooks (integrator)
+
+```tsx
+import { SDKProvider, useAuth, useProjects, usePayments } from '@agentstack/react';
+
+function App() {
+  const { user, login, logout, isAuthenticated } = useAuth();
+  const { projects } = useProjects();
+  const { createPayment } = usePayments();
+
+  return (
+    <SDKProvider config={{ apiBase: 'https://agentstack.tech/api', apiKey: 'key', projectId: 1 }}>
+      {isAuthenticated ? (
+        <div>
+          <h1>Welcome, {user?.email}</h1>
+          <button onClick={logout}>Logout</button>
+          <ul>{projects?.map((p) => <li key={p.id}>{p.name}</li>)}</ul>
+        </div>
+      ) : (
+        <button onClick={() => login({ email: 'user@example.com', password: 'pass', project_id: 1 })}>
+          Login
+        </button>
+      )}
+    </SDKProvider>
+  );
+}
+```
+
+See [packages/react/README.en.md](packages/react/README.en.md) for `useProfile`, `useSettings`, and React Query patterns.
+
+---
+
+## ⚙️ Configuration
 
 ```typescript
 const sdk = new AgentStackSDK({
@@ -283,6 +359,20 @@ const sdk = new AgentStackSDK({
 });
 ```
 
+### Python
+
+```python
+sdk = AgentStackSDK(
+    api_base="https://agentstack.tech/api",
+    api_key="your_api_key",
+    neural={
+        "cache": {"enabled": True, "ttl": 300, "max_size": 1000},
+        "events": {"enabled": True, "buffer_size": 10000},
+    },
+    retry={"attempts": 3, "delay": 1000, "backoff": "exponential"},
+)
+```
+
 ---
 
 ## Environment variables
@@ -297,7 +387,7 @@ const sdk = new AgentStackSDK({
 
 ---
 
-## Testing
+## 🧪 Testing
 
 ```bash
 cd agentstack-unified-sdk
@@ -307,9 +397,26 @@ npm run test
 npm run check:docs-i18n:all
 ```
 
+### Unit test sketch
+
+```typescript
+import { AgentStackSDK, resolveAgentStackApiBase } from '@agentstack/sdk';
+
+const sdk = new AgentStackSDK({
+  apiBase: resolveAgentStackApiBase(),
+  apiKey: 'test_key',
+});
+
+const projects = await sdk.platform.api.getProjects();
+expect(Array.isArray(projects)).toBe(true);
+
+const ids = sdk.getModuleCatalog().modules.map((m) => m.id);
+expect(ids).not.toContain('admin'); // integrator catalog
+```
+
 ---
 
-## Examples
+## 📚 Examples
 
 | Path | Description |
 |------|-------------|
@@ -317,13 +424,60 @@ npm run check:docs-i18n:all
 | [examples/ai/](examples/ai/) | AI bootstrap |
 | [examples/typescript/economy/](examples/typescript/economy/) | Economy / AGNT |
 
+### Project dashboard (integrator)
+
+```typescript
+class ProjectDashboard {
+  constructor(private sdk: AgentStackSDK) {}
+
+  async getDashboardData(projectId: number) {
+    const project = await this.sdk.platform.api.getProject(projectId);
+    const catalog = this.sdk.getModuleCatalog();
+    return { project, catalog };
+  }
+}
+```
+
+### Neural cache pattern
+
+```typescript
+async getUserProfile(userId: string) {
+  const key = `user:${userId}:profile`;
+  const cached = await this.sdk.neural.cache.get(key);
+  if (cached) return cached;
+  const profile = await this.sdk.platform.api.getUser(userId);
+  await this.sdk.neural.cache.set(key, profile, 300);
+  return profile;
+}
+```
+
 ---
 
-## Security
+## 🔒 Security
 
-- Never commit API keys; use env vars
+- Never commit API keys; use environment variables
 - Tenant apps: no `sdk.admin` — [INTEGRATOR_SCOPE](docs/INTEGRATOR_SCOPE.md)
 - HTTPS production base: `https://agentstack.tech/api`
+
+```typescript
+const sdk = new AgentStackSDK({
+  apiBase: process.env.AGENTSTACK_API_BASE,
+  apiKey: process.env.AGENTSTACK_API_KEY,
+  timeout: 30000,
+});
+```
+
+---
+
+## 📊 Monitoring & metrics
+
+```typescript
+const metrics = await sdk.getMetrics?.();
+// requests, cache hit rate, average latency (when exposed)
+
+const neuralMetrics = await sdk.neural.getMetrics?.();
+// cache hit rate, event throughput (when enabled)
+```
 
 ---
 
@@ -365,7 +519,7 @@ npm run check:docs-i18n:all
 
 ---
 
-## Contributing & support
+## 🤝 Contributing & support
 
 [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md) · [CHANGELOG.md](CHANGELOG.md)
 
@@ -376,7 +530,7 @@ Doc maintenance: `npm run generate:docs-i18n` · `npm run check:docs-i18n:all`
 
 ---
 
-## Links
+## 📎 Links
 
 - Platform: https://github.com/agentstacktech/AgentStack
 - Site: https://agentstack.tech

@@ -12,7 +12,13 @@ AgentStack SDK uses modular design: each `Agent*` module owns one domain. **Inte
 
 ---
 
-## Module map
+## 🎯 Overview
+
+Each `Agent*` module owns one domain. Integrators start with **`sdk.platform.*`** and **`sdk.getModuleCatalog()`** — not raw protein calls when protocol covers the flow.
+
+---
+
+## 📦 Module map
 
 | Module | Integrator | Notes |
 |--------|------------|-------|
@@ -31,7 +37,7 @@ AgentStack SDK uses modular design: each `Agent*` module owns one domain. **Inte
 
 ## Module reference
 
-### AgentAuth — authentication
+### 🔐 AgentAuth — authentication
 
 - Login / logout, access & refresh tokens
 - Sessions and API keys
@@ -49,7 +55,7 @@ const sessions = await sdk.platform.auth.getSessions();
 
 ---
 
-### AgentAdmin — platform operator only
+### 👑 AgentAdmin — platform operator only
 
 Not in the npm tenant catalog. Tenant apps use `sdk.platform.api` / `sdk.platform.rbac` for project-scoped users.
 
@@ -57,7 +63,7 @@ Not in the npm tenant catalog. Tenant apps use `sdk.platform.api` / `sdk.platfor
 
 ---
 
-### AgentNeural — client-side neural layer
+### 🧠 AgentNeural — client-side neural layer
 
 ```typescript
 await sdk.neural.cache.set('user:123:profile', userProfile, 300);
@@ -76,7 +82,7 @@ const patterns = await sdk.neural.patterns.analyze('user_behavior', {
 
 ---
 
-### AgentDocs — in-SDK help
+### 📚 AgentDocs — in-SDK help
 
 ```typescript
 const help = await sdk.docs.getHelp('auth');
@@ -89,7 +95,7 @@ const examples = await sdk.docs.getCodeExamples({
 
 ---
 
-### AgentPayments — payments
+### 💳 AgentPayments — payments
 
 ```typescript
 const payment = await sdk.payments.createPayment({
@@ -102,7 +108,7 @@ const status = await sdk.payments.getPaymentStatus(payment.id);
 
 ---
 
-### AgentAnalytics — metrics
+### 📊 AgentAnalytics — metrics
 
 ```typescript
 await sdk.analytics.trackEvent({
@@ -115,7 +121,7 @@ const metrics = await sdk.analytics.getDashboardMetrics();
 
 ---
 
-### AgentWebhooks — webhooks
+### 🔗 AgentWebhooks — webhooks
 
 ```typescript
 const webhook = await sdk.webhooks.createWebhook({
@@ -128,7 +134,7 @@ await sdk.webhooks.testWebhook(webhook.id);
 
 ---
 
-### AgentScheduler — scheduled tasks
+### ⏰ AgentScheduler — scheduled tasks
 
 ```typescript
 const task = await sdk.scheduler.createTask({
@@ -142,7 +148,7 @@ await sdk.scheduler.executeTask(task.id);
 
 ---
 
-### AgentAPI — projects and health
+### 🔧 AgentAPI — projects and health
 
 Prefer `sdk.platform.api` for integrators.
 
@@ -153,7 +159,7 @@ const health = await sdk.healthCheck();
 
 ---
 
-## Configuration
+## ⚙️ Configuration
 
 ```typescript
 import { AgentStackSDK, resolveAgentStackApiBase } from '@agentstack/sdk';
@@ -174,17 +180,18 @@ const sdk = new AgentStackSDK({
 
 ---
 
-## Benefits
+## 🎨 Benefits of modular architecture
 
 1. **Separation of concerns** — one module per domain  
-2. **Predictable naming** — `Agent*` prefix on root SDK modules  
-3. **Tree-shakeable subpaths** — `@agentstack/sdk/commerce/*`, etc.  
-4. **Full TypeScript** — typed facades and DNA tables  
-5. **Extensibility** — new modules without breaking `sdk.platform`
+2. **Ease of use** — `sdk.platform.*` facade for integrators  
+3. **Predictability** — `Agent*` prefix on root SDK modules  
+4. **Extensibility** — new modules without breaking `sdk.platform`  
+5. **TypeScript** — typed facades and DNA tables  
+6. **Tree-shakeable subpaths** — `@agentstack/sdk/commerce/*`, etc.
 
 ---
 
-## Quick start
+## 🚀 Quick start
 
 ```typescript
 import { AgentStackSDK, resolveAgentStackApiBase } from '@agentstack/sdk';
@@ -201,7 +208,7 @@ const catalog = sdk.getModuleCatalog();
 
 ---
 
-## Resources
+## 📚 Resources
 
 - [examples/typescript/](../examples/typescript/)
 - [quick-start.md](./quick-start.md)

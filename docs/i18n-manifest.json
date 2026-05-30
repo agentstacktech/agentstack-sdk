@@ -1,13 +1,13 @@
 {
-  "generatedAt": "2026-05-30T02:00:00.160Z",
+  "generatedAt": "2026-05-30T02:41:17.905Z",
   "entries": [
     {
       "path": "README.en.md",
       "lang": "en",
       "mirror": "README.md",
       "pairRole": "paired",
-      "lineCount": 385,
-      "codeFences": 30,
+      "lineCount": 539,
+      "codeFences": 48,
       "syncStatus": "legacy-ru-path",
       "diataxis": null
     },
@@ -346,8 +346,8 @@
       "lang": "en",
       "mirror": "packages/core/README.md",
       "pairRole": "paired",
-      "lineCount": 286,
-      "codeFences": 34,
+      "lineCount": 339,
+      "codeFences": 44,
       "syncStatus": "legacy-ru-path",
       "diataxis": null
     },
@@ -366,8 +366,8 @@
       "lang": "en",
       "mirror": "packages/react/README.md",
       "pairRole": "paired",
-      "lineCount": 204,
-      "codeFences": 12,
+      "lineCount": 302,
+      "codeFences": 18,
       "syncStatus": "legacy-ru-path",
       "diataxis": null
     },
@@ -386,8 +386,8 @@
       "lang": "en",
       "mirror": "packages/python/README.md",
       "pairRole": "paired",
-      "lineCount": 75,
-      "codeFences": 6,
+      "lineCount": 93,
+      "codeFences": 10,
       "syncStatus": "legacy-ru-path",
       "diataxis": null
     },
@@ -406,8 +406,8 @@
       "lang": "en",
       "mirror": "packages/hooks/README.md",
       "pairRole": "paired",
-      "lineCount": 67,
-      "codeFences": 6,
+      "lineCount": 156,
+      "codeFences": 18,
       "syncStatus": "legacy-ru-path",
       "diataxis": null
     },
@@ -426,7 +426,7 @@
       "lang": "en",
       "mirror": "docs/MODULAR_ARCHITECTURE_ru.md",
       "pairRole": "paired",
-      "lineCount": 213,
+      "lineCount": 220,
       "codeFences": 20,
       "syncStatus": "balanced",
       "diataxis": "explanation"

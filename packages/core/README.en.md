@@ -8,7 +8,7 @@ TypeScript client for AgentStack — modular API, AgentProtocol, DNA, commerce, 
 
 ---
 
-## Quick start
+## 🚀 Quick start
 
 ```bash
 npm install @agentstack/sdk
@@ -72,7 +72,7 @@ const label = sdk.protocol.readPath(snapshotKeyProjectData(projectId), 'name');
 
 ---
 
-## AgentI18n (zero config)
+## 🌍 AgentI18n (zero config)
 
 ```typescript
 sdk.i18n.t('user_management');
@@ -88,7 +88,7 @@ sdk.i18n.getAvailableKeys('modules');
 
 ---
 
-## Architecture
+## 🏗️ Architecture
 
 ```
 AgentStackSDK
@@ -110,7 +110,9 @@ Deep dive: [docs/MODULAR_ARCHITECTURE.md](../../docs/MODULAR_ARCHITECTURE.md)
 
 ---
 
-## Authentication (`sdk.platform.auth`)
+## 🔐 Authentication (`sdk.platform.auth`)
+
+### Login & registration
 
 ```typescript
 const tokens = await sdk.platform.auth.login({
@@ -119,14 +121,56 @@ const tokens = await sdk.platform.auth.login({
   project_id: 1,
 });
 
-const profile = await sdk.platform.auth.getProfile();
-const sessions = await sdk.platform.auth.getSessions();
 await sdk.platform.auth.logout();
+const refreshed = await sdk.platform.auth.refresh(tokens.refresh_token);
+```
+
+### Profile
+
+```typescript
+const profile = await sdk.platform.auth.getProfile();
+const profileData = await sdk.platform.auth.getProfileData();
+
+await sdk.platform.auth.updateProfileData({
+  display_name: 'Alex Developer',
+  bio: 'Integrator',
+  social_links: { github: 'https://github.com/example' },
+});
+```
+
+### Settings
+
+```typescript
+const settings = await sdk.platform.auth.getSettings();
+await sdk.platform.auth.updateSettings({
+  theme: 'dark',
+  language: 'en',
+  notifications: { email: true, push: false },
+});
+await sdk.platform.auth.setTheme('dark');
+```
+
+### Security
+
+```typescript
+await sdk.platform.auth.changePassword({
+  currentPassword: 'old',
+  newPassword: 'new',
+});
+const sessions = await sdk.platform.auth.getSessions();
+```
+
+### OAuth
+
+```typescript
+const providers = await sdk.platform.auth.getOAuthProviders();
+await sdk.platform.auth.connectOAuthProvider({ provider: 'google', code: 'oauth_code' });
+await sdk.platform.auth.disconnectOAuthProvider('google');
 ```
 
 ---
 
-## Payments (`sdk.payments`)
+## 💳 Payments (`sdk.payments`)
 
 ```typescript
 const payment = await sdk.payments.createPayment({
@@ -142,7 +186,7 @@ const stats = await sdk.payments.getPaymentStats();
 
 ---
 
-## Analytics (`sdk.analytics`)
+## 📊 Analytics (`sdk.analytics`)
 
 ```typescript
 await sdk.analytics.trackEvent({
@@ -156,7 +200,7 @@ const metrics = await sdk.analytics.getDashboardMetrics();
 
 ---
 
-## API keys & projects (`sdk.platform.api`)
+## 🔑 API keys & projects (`sdk.platform.api`)
 
 ```typescript
 const projects = await sdk.platform.api.getProjects();
@@ -166,7 +210,7 @@ const health = await sdk.healthCheck();
 
 ---
 
-## Webhooks (`sdk.webhooks`)
+## 🔔 Webhooks (`sdk.webhooks`)
 
 ```typescript
 const webhook = await sdk.webhooks.createWebhook({
@@ -179,7 +223,7 @@ await sdk.webhooks.testWebhook(webhook.id);
 
 ---
 
-## Wallets (`sdk.wallets`)
+## 💰 Wallets (`sdk.wallets`)
 
 ```typescript
 const balance = await sdk.wallets.getBalance({ project_id: 1 });
@@ -189,7 +233,7 @@ See capability matrix before calling optional domains.
 
 ---
 
-## Notifications (`sdk.notifications`)
+## 🔔 Notifications (`sdk.notifications`)
 
 ```typescript
 await sdk.notifications.send({
@@ -202,7 +246,7 @@ await sdk.notifications.send({
 
 ---
 
-## Scheduler (`sdk.scheduler`)
+## ⏰ Scheduler (`sdk.scheduler`)
 
 ```typescript
 const task = await sdk.scheduler.createTask({
@@ -216,7 +260,7 @@ await sdk.scheduler.executeTask(task.id);
 
 ---
 
-## Neural architecture (`sdk.neural`)
+## 🧠 Neural architecture (`sdk.neural`)
 
 ```typescript
 await sdk.neural.cache.set('user:1', profile, 300);
@@ -227,13 +271,13 @@ await sdk.neural.emitEvent('page_view', { page: '/home' });
 
 ---
 
-## Platform operator (not for npm integrators)
+## 👑 Platform operator (not for npm integrators)
 
 `AgentAdmin`, `sdk.admin`, `/api/admin/*` — monorepo only. See [docs/INTEGRATOR_SCOPE.md](../../docs/INTEGRATOR_SCOPE.md).
 
 ---
 
-## Configuration
+## ⚙️ Configuration
 
 ```typescript
 const sdk = new AgentStackSDK({
@@ -249,7 +293,7 @@ const sdk = new AgentStackSDK({
 
 ---
 
-## Error handling
+## 🔄 Error handling
 
 - SDK throws typed errors with HTTP status
 - Use `retry` config for transient failures
@@ -257,7 +301,16 @@ const sdk = new AgentStackSDK({
 
 ---
 
-## Testing
+## 📊 Metrics & monitoring
+
+```typescript
+const metrics = await sdk.getMetrics?.();
+const neuralMetrics = await sdk.neural.getMetrics?.();
+```
+
+---
+
+## 🧪 Testing
 
 ```bash
 npm run test -w @agentstack/sdk
@@ -265,7 +318,7 @@ npm run test -w @agentstack/sdk
 
 ---
 
-## AI discovery
+## 🤖 AI discovery
 
 ```typescript
 const catalog = sdk.getModuleCatalog();
@@ -276,7 +329,7 @@ const matrix = sdk.getCapabilityMatrix();
 
 ---
 
-## Resources
+## 📚 Resources
 
 - [docs/PROTEIN_SYSTEM_GUIDE.md](../../docs/PROTEIN_SYSTEM_GUIDE.md)
 - [docs/PROJECT_CONTEXT.md](../../docs/PROJECT_CONTEXT.md)

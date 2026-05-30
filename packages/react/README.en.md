@@ -8,7 +8,7 @@ Official React integration — `SDKProvider`, hooks, and TanStack Query helpers 
 
 ---
 
-## Quick start
+## 🚀 Quick start
 
 ```bash
 npm install @agentstack/react @agentstack/sdk @tanstack/react-query
@@ -63,17 +63,20 @@ function Dashboard() {
 
 ---
 
-## Hooks overview
+## 🎣 Hooks overview
 
 | Hook | Purpose |
 |------|---------|
-| `useAuth` | Login state, profile |
+| `useAuth` | Login state, profile, 2FA helpers |
+| `useProfile` | Profile CRUD, avatar, username |
+| `useSettings` | Theme, notifications, privacy |
+| `useProjects` | Project list / create |
+| `usePayments` | Payments list / create |
 | `useSDK` | `AgentStackSDK` instance |
 | `useSDKQuery` | Server read (React Query) |
 | `useSDKMutation` | Server write |
 | `useSDKInfiniteQuery` | Pagination |
 | `useEntityData` | CRUD list helper |
-| `useProfile` / `useSettings` | Profile & settings shortcuts |
 
 Full guide: [docs/REACT_QUERY_INTEGRATION.md](../../docs/REACT_QUERY_INTEGRATION.md)
 
@@ -121,6 +124,80 @@ function LoginForm() {
 
 ---
 
+## useProfile
+
+```tsx
+import { useProfile } from '@agentstack/react';
+
+function ProfileEditor() {
+  const { profileData, isLoading, updateProfile, setDisplayName, setBio } = useProfile();
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        updateProfile({ display_name: 'Alex', bio: 'Integrator' });
+      }}
+    >
+      <input defaultValue={profileData?.display_name ?? ''} />
+      <button type="submit" disabled={isLoading}>Save</button>
+    </form>
+  );
+}
+```
+
+---
+
+## useSettings
+
+```tsx
+import { useSettings } from '@agentstack/react';
+
+function SettingsPanel() {
+  const { settings, setTheme, setNotification } = useSettings();
+
+  return (
+    <div>
+      <select value={settings?.theme ?? 'system'} onChange={(e) => setTheme(e.target.value)}>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="system">System</option>
+      </select>
+      <label>
+        <input
+          type="checkbox"
+          checked={settings?.notifications?.email ?? false}
+          onChange={(e) => setNotification('email', e.target.checked)}
+        />
+        Email
+      </label>
+    </div>
+  );
+}
+```
+
+---
+
+## usePayments
+
+```tsx
+import { usePayments } from '@agentstack/react';
+
+function PayButton() {
+  const { createPayment, getPayments, isLoading } = usePayments();
+
+  const handlePay = async () => {
+    await createPayment({ amount: 1000, currency: 'USD', description: 'Order', project_id: 1 });
+    const { payments } = await getPayments({ project_id: 1 });
+    console.log(payments);
+  };
+
+  return <button onClick={handlePay} disabled={isLoading}>Pay</button>;
+}
+```
+
+---
+
 ## useSDKQuery & mutations
 
 ```tsx
@@ -149,13 +226,22 @@ function Projects() {
 
 ---
 
-## Invalidation
+## 🧩 Components
+
+| Component | Purpose |
+|-----------|---------|
+| `SDKProvider` | SDK + React Query context (canonical) |
+| `AgentStackProvider` | Legacy name — prefer `SDKProvider` |
+
+---
+
+## 🔄 Invalidation
 
 After `sdk.platform.protocol.executeCommand`, invalidate React Query keys and snapshot prefixes — see monorepo `cacheInvalidation.ts`.
 
 ---
 
-## Admin hooks (operator only)
+## 👑 Admin hooks (operator only)
 
 `useAdminUsers`, `useAdminStats`, `useAdminDashboard` require `sdkAudience: 'platform_operator'` in the AgentStack monorepo — not for tenant npm apps.
 
@@ -163,7 +249,7 @@ Example: [examples/typescript/operator-admin-usage.ts](../../examples/typescript
 
 ---
 
-## Configuration
+## ⚙️ Configuration
 
 Pass the same fields as `AgentStackSDK` config into `SDKProvider`:
 
@@ -180,13 +266,25 @@ Pass the same fields as `AgentStackSDK` config into `SDKProvider`:
 
 ---
 
-## Error handling
+## 🎨 Styling & state
+
+Use your design system — hooks return data and actions only. For global SDK state, keep a single `SDKProvider` at the app root; nest feature providers below it.
+
+---
+
+## 📱 SSR
+
+Initialize `SDKProvider` only in client components (or after hydration). Pass `apiBase` from server env into config — do not embed secrets in client bundles.
+
+---
+
+## 🚨 Error handling
 
 Wrap routes in error boundaries; surface `error` from hooks. See [docs/AI_ERROR_ACTION_MATRIX.md](../../docs/AI_ERROR_ACTION_MATRIX.md).
 
 ---
 
-## Testing
+## 🧪 Testing
 
 ```bash
 npm run test -w @agentstack/react
@@ -194,7 +292,7 @@ npm run test -w @agentstack/react
 
 ---
 
-## Resources
+## 📚 Resources
 
 - [docs/AI_REACT_SCAFFOLD.md](../../docs/AI_REACT_SCAFFOLD.md)
 - [docs/INTEGRATOR_SCOPE.md](../../docs/INTEGRATOR_SCOPE.md)
