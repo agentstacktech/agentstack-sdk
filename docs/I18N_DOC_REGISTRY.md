@@ -1,13 +1,13 @@
 # SDK i18n doc registry (auto-generated)
 
-Generated: 2026-05-30T01:53:46.618Z · `npm run generate:docs-i18n`
+Generated: 2026-05-30T02:00:00.160Z · `npm run generate:docs-i18n`
 
 | EN | RU | Role | Lines EN/RU | Ratio | Status |
 |----|-----|------|-------------|-------|--------|
-| `README.en.md` | `README.md` | paired | 204/704 | 0.29 | legacy-ru-path |
+| `README.en.md` | `README.md` | paired | 385/704 | 0.55 | legacy-ru-path |
 | `docs/DOCS_I18N.md` | `docs/DOCS_I18N_ru.md` | paired | 97/93 | 1.04 | balanced |
 | `docs/DOC_HUB.md` | `docs/DOC_HUB_ru.md` | paired | 69/68 | 1.01 | balanced |
-| `docs/GLOSSARY.md` | `docs/GLOSSARY_ru.md` | paired | 22/22 | 1 | balanced |
+| `docs/GLOSSARY.md` | `docs/GLOSSARY_ru.md` | paired | 44/44 | 1 | balanced |
 | `docs/README.md` | `docs/README_ru.md` | paired | 54/51 | 1.06 | balanced |
 | `docs/SDK_INTEGRATION_FLOWS.md` | `docs/SDK_INTEGRATION_FLOWS_ru.md` | paired | 234/184 | 1.27 | balanced |
 | `docs/quick-start.md` | `docs/quick-start_ru.md` | paired | 40/42 | 0.95 | balanced |
@@ -21,10 +21,10 @@ Generated: 2026-05-30T01:53:46.618Z · `npm run generate:docs-i18n`
 | `docs/SDK_DOCS_I18N_ROADMAP.md` | `docs/SDK_DOCS_I18N_ROADMAP_ru.md` | paired | 39/41 | 0.95 | balanced |
 | `docs/ARCHITECTURE.md` | `docs/ARCHITECTURE_ru.md` | paired | 73/53 | 1.38 | balanced |
 | `docs/REACT_QUERY_INTEGRATION.md` | `docs/REACT_QUERY_INTEGRATION_ru.md` | paired | 102/102 | 1 | balanced |
-| `packages/core/README.en.md` | `packages/core/README.md` | paired | 97/1106 | 0.09 | legacy-ru-path |
-| `packages/react/README.en.md` | `packages/react/README.md` | paired | 85/666 | 0.13 | legacy-ru-path |
-| `packages/python/README.en.md` | `packages/python/README.md` | paired | 50/269 | 0.19 | legacy-ru-path |
-| `packages/hooks/README.en.md` | `packages/hooks/README.md` | paired | 42/295 | 0.14 | legacy-ru-path |
+| `packages/core/README.en.md` | `packages/core/README.md` | paired | 286/1106 | 0.26 | legacy-ru-path |
+| `packages/react/README.en.md` | `packages/react/README.md` | paired | 204/666 | 0.31 | legacy-ru-path |
+| `packages/python/README.en.md` | `packages/python/README.md` | paired | 75/269 | 0.28 | legacy-ru-path |
+| `packages/hooks/README.en.md` | `packages/hooks/README.md` | paired | 67/295 | 0.23 | legacy-ru-path |
 | `docs/MODULAR_ARCHITECTURE.md` | `docs/MODULAR_ARCHITECTURE_ru.md` | paired | 213/328 | 0.65 | balanced |
 | `docs/PROTEIN_SYSTEM_GUIDE.md` | `docs/PROTEIN_SYSTEM_GUIDE_ru.md` | paired | 275/495 | 0.56 | balanced |
 | `docs/AI_REACT_SCAFFOLD.md` | `docs/AI_REACT_SCAFFOLD_ru.md` | paired | 41/41 | 1 | balanced |

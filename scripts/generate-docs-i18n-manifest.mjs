@@ -38,12 +38,35 @@ const DIATAXIS = {
   'docs/PROTEIN_SYSTEM_GUIDE.md': 'explanation',
 };
 
-const MONOREPO_PAIRS = [
+const MONOREPO_PAIRS_STATIC = [
   ['docs/SDK_AI_SURFACE.md', 'docs/SDK_AI_SURFACE_ru.md', 'paired'],
-  ['docs/sdk/SDK_SUBMODULE_INTEGRATION.md', 'docs/sdk/SDK_SUBMODULE_INTEGRATION_ru.md', 'paired'],
-  ['docs/sdk/SDK_MIRROR_PUBLISH_RUNBOOK.md', 'docs/sdk/SDK_MIRROR_PUBLISH_RUNBOOK_ru.md', 'paired'],
-  ['docs/sdk/GENETIC_STARTER_SDK_SLICE.md', 'docs/sdk/GENETIC_STARTER_SDK_SLICE_ru.md', 'paired'],
+  ['docs/SDK_FEATURE_QUICKSTART.md', 'docs/SDK_FEATURE_QUICKSTART_ru.md', 'paired'],
+  ['docs/AGENT_PROTOCOL_QUICKSTART.md', 'docs/AGENT_PROTOCOL_QUICKSTART_ru.md', 'paired'],
 ];
+
+/** Auto-pair docs/** *_ru.md when sibling EN exists (P3-2). */
+function discoverMonorepoRuPairs() {
+  const seen = new Set(MONOREPO_PAIRS_STATIC.map(([e]) => e));
+  const out = [...MONOREPO_PAIRS_STATIC];
+
+  function scanDir(relDir) {
+    const abs = path.join(REPO_ROOT, relDir);
+    if (!fs.existsSync(abs)) return;
+    for (const name of fs.readdirSync(abs)) {
+      if (!name.endsWith('_ru.md')) continue;
+      const ruPath = path.join(relDir, name).replace(/\\/g, '/');
+      const enName = name.replace(/_ru\.md$/, '.md');
+      const enPath = path.join(relDir, enName).replace(/\\/g, '/');
+      if (!fs.existsSync(path.join(REPO_ROOT, enPath)) || seen.has(enPath)) continue;
+      seen.add(enPath);
+      out.push([enPath, ruPath, 'paired']);
+    }
+  }
+
+  scanDir('docs/sdk');
+  scanDir('docs/ecosystem');
+  return out.sort((a, b) => a[0].localeCompare(b[0]));
+}
 
 /** [enPath, ruPath, pairRole] — paths relative to agentstack-unified-sdk root */
 const PAIRS = [
@@ -172,6 +195,7 @@ function main() {
   fs.writeFileSync(SYNC_MATRIX, `${matrixDoc.join('\n')}\n`);
 
   const monoRows = [];
+  const MONOREPO_PAIRS = discoverMonorepoRuPairs();
   for (const [enPath, ruPath, pairRole] of MONOREPO_PAIRS) {
     const enFull = path.join(REPO_ROOT, enPath);
     const ruFull = path.join(REPO_ROOT, ruPath);
@@ -193,10 +217,21 @@ function main() {
       '',
       '| EN | RU | Lines EN/RU |',
       '|----|-----|-------------|',
-      ...monoRows.map(
-        (r) =>
-          `| [${path.basename(r.enPath)}](./${path.basename(r.enPath)}) | [${path.basename(r.ruPath)}](./${path.basename(r.ruPath)}) | ${r.linesEn}/${r.linesRu} |`,
-      ),
+      ...monoRows.map((r) => {
+        const enLink =
+          r.enPath.startsWith('docs/sdk/') ?
+            `./${path.basename(r.enPath)}`
+          : r.enPath.startsWith('docs/ecosystem/') ?
+            `../ecosystem/${path.basename(r.enPath)}`
+          : `../${path.basename(r.enPath)}`;
+        const ruLink =
+          r.ruPath.startsWith('docs/sdk/') ?
+            `./${path.basename(r.ruPath)}`
+          : r.ruPath.startsWith('docs/ecosystem/') ?
+            `../ecosystem/${path.basename(r.ruPath)}`
+          : `../${path.basename(r.ruPath)}`;
+        return `| [${path.basename(r.enPath)}](${enLink}) | [${path.basename(r.ruPath)}](${ruLink}) | ${r.linesEn}/${r.linesRu} |`;
+      }),
     ].join('\n') + '\n',
   );
 

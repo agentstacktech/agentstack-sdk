@@ -1,8 +1,10 @@
 # @agentstack/hooks
 
-**Languages:** **English** (npm readme) · [Русский](README.md)
+**Languages:** **English** (npm readme) · [Русский extended reference](README.md)
 
-Headless React Query hooks built on `@agentstack/sdk` — use with or without `@agentstack/react` UI helpers.
+Headless React Query hooks on `@agentstack/sdk` — use with or without `@agentstack/react` UI.
+
+---
 
 ## Install
 
@@ -10,32 +12,55 @@ Headless React Query hooks built on `@agentstack/sdk` — use with or without `@
 npm install @agentstack/hooks @agentstack/sdk @tanstack/react-query
 ```
 
-Requires a configured SDK instance (via parent `SDKProvider` or manual client).
+Wrap your tree with `QueryClientProvider` and an SDK instance (via `@agentstack/react` `SDKProvider` or custom context).
 
-## Use
+---
+
+## useSDKQuery
 
 ```tsx
 import { useSDKQuery } from '@agentstack/hooks';
 import { useSDK } from '@agentstack/react';
 
 function List() {
+  const sdk = useSDK();
   return useSDKQuery({
     queryKey: ['projects'],
-    queryFn: (sdk) => sdk.platform.api.getProjects(),
+    queryFn: () => sdk.platform.api.getProjects(),
   });
 }
 ```
 
-Prefer `@agentstack/react` for `SDKProvider` + auth hooks — [docs/REACT_QUERY_INTEGRATION.md](../../docs/REACT_QUERY_INTEGRATION.md).
+---
 
-## Docs
+## useSDKMutation
 
-- [DOC_HUB.md](../../docs/DOC_HUB.md)
-- [INTEGRATOR_SCOPE.md](../../docs/INTEGRATOR_SCOPE.md)
+```tsx
+import { useSDKMutation } from '@agentstack/hooks';
 
-## Related packages
+const mutation = useSDKMutation({
+  mutationFn: (sdk, payload: { name: string }) =>
+    sdk.platform.api.createProject({ name: payload.name }),
+});
+```
 
-- `@agentstack/react` — `SDKProvider` and UI hooks
-- `@agentstack/sdk` — core client
+---
 
-Russian guide: [README.md](README.md).
+## Patterns
+
+| Pattern | Hook |
+|---------|------|
+| List + pagination | `useSDKInfiniteQuery` |
+| Write + cache bust | `useSDKMutationWithInvalidation` |
+| Entity CRUD boilerplate | `useEntityData` |
+
+Prefer `@agentstack/react` for `SDKProvider` and `useAuth` — [docs/REACT_QUERY_INTEGRATION.md](../../docs/REACT_QUERY_INTEGRATION.md).
+
+---
+
+## Related
+
+- `@agentstack/react` — `SDKProvider`, domain hooks
+- [docs/DOC_HUB.md](../../docs/DOC_HUB.md)
+
+**Russian extended README:** [README.md](README.md).

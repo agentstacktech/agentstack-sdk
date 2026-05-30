@@ -60,7 +60,7 @@ Russian mirrors: same filenames with `_ru.md` — see [DOC_HUB_ru.md](./DOC_HUB_
 
 ## Maintenance
 
-[DOCS_I18N.md](./DOCS_I18N.md) · [templates/](./templates/) · `npm run check:docs-i18n:all`
+[DOCS_I18N.md](./DOCS_I18N.md) · [DOC_STYLE_GAP.md](./DOC_STYLE_GAP.md) · [templates/](./templates/) · `npm run check:docs-i18n:all`
 
 ## Examples
 

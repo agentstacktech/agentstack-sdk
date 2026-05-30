@@ -58,7 +58,7 @@
 
 ## Поддержка
 
-[DOCS_I18N_ru.md](./DOCS_I18N_ru.md) · [templates/](./templates/) · `npm run check:docs-i18n:all`
+[DOCS_I18N_ru.md](./DOCS_I18N_ru.md) · [DOC_STYLE_GAP_ru.md](./DOC_STYLE_GAP_ru.md) · `npm run check:docs-i18n:all`
 
 ## Примеры
 

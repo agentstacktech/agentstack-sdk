@@ -22,11 +22,11 @@ const FENCE_TOLERANCE = 6;
 const LEGACY_RU_README_EN = LEGACY_RU_EXTENDED_EN;
 
 const MIN_EN_LINES = {
-  'README.en.md': 180,
-  'packages/core/README.en.md': 70,
-  'packages/react/README.en.md': 60,
-  'packages/hooks/README.en.md': 40,
-  'packages/python/README.en.md': 40,
+  'README.en.md': 280,
+  'packages/core/README.en.md': 200,
+  'packages/react/README.en.md': 150,
+  'packages/hooks/README.en.md': 65,
+  'packages/python/README.en.md': 75,
   'docs/PROTEIN_SYSTEM_GUIDE.md': 260,
 };
 

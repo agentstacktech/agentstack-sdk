@@ -5,17 +5,39 @@
 
 | Термин | Определение |
 |--------|-------------|
-| **интегратор** | Потребитель SDK по умолчанию (`sdkAudience: integrator`). Tenant-приложения. Без `sdk.admin`. |
-| **оператор платформы** | Ops AgentStack / monorepo SPA (`platform_operator`). Доступ к admin. |
-| **контекст проекта** | `projectId` / `X-Project-ID`. См. [PROJECT_CONTEXT_ru.md](./PROJECT_CONTEXT_ru.md). |
+| **интегратор** | Потребитель SDK по умолчанию (`integrator`). Без `sdk.admin`. |
+| **оператор платформы** | Monorepo / ops (`platform_operator`). |
+| **контекст проекта** | `projectId`, `X-Project-ID`. [PROJECT_CONTEXT_ru.md](./PROJECT_CONTEXT_ru.md). |
+| **sdk.platform** | Стабильный срез для AI: auth, api, dna, protocol, … |
+| **sdk.protocol** | То же, что `sdk.platform.protocol`. |
+| **AgentProtocol** | REST + 8DNA + command bus + snapshots. |
 | **8DNA** | Таблицы genetic data. Не тикер токена. |
-| **AGNT / agUSD** | Единицы AgentNet economy (v1). |
-| **protein-команда** | Составной read через `sdk.protein`. |
-| **protocol** | Предпочтительно: `sdk.platform.protocol`. |
-| **каталог модулей** | `sdk.getModuleCatalog()`. |
-| **матрица возможностей** | `sdk.getCapabilityMatrix()`. |
-| **AgentProtocol** | REST + DNA + команды + снапшоты. |
+| **AGNT** | Единица AgentNet (L0 ledger). |
+| **agUSD** | Привязка к USD (v1). |
+| **protein-команда** | Составной read через protein bus (`sdk.protein` legacy). |
+| **protocol-команда** | Предпочтительно: `executeCommand`. |
+| **снапшот** | JSON-кэш; `invalidateSnapshotPrefix`. |
+| **каталог модулей** | `getModuleCatalog()`. |
+| **матрица возможностей** | `getCapabilityMatrix()`. |
+| **DNA-таблица** | `sdk.platform.dna`, `data_*_8dna`. |
+| **integrator scope** | Без admin API на npm по умолчанию. |
 | **production API** | `https://agentstack.tech/api`. |
-| **SDKProvider** | React provider из `@agentstack/react`. |
+| **SDKProvider** | Корень React. `AgentStackProvider` — алиас. |
+| **useSDK** | Хук клиента SDK. |
+| **useSDKQuery** | React Query + SDK. |
+| **submodule** | `vendor/agentstack-sdk` + `sdk.lock.json`. |
+| **зеркало** | `agentstacktech/agentstack-sdk`. |
+| **file: зависимость** | Ссылка на `packages/core`. |
+| **sdkAudience** | `integrator` или `platform_operator`. |
+| **commerce** | `sdk.commerce` — shop, cart, checkout. |
+| **capability task** | `@agentstack/sdk/capability-tasks`. |
+| **MCP** | `https://agentstack.tech/mcp`. |
+| **OpTrace** | Корреляция / телеметрия. |
+| **LineageRegistry** | Lineage on-chain (не отдельный тикер). |
+| **AgentNetTimelock** | Governance v1. |
+| **legacy-ru-path** | EN: `README.en.md`, RU: длинный `README.md`. |
+| **balanced** | Ratio 0.6–1.4 в [DOC_SYNC_MATRIX.md](./DOC_SYNC_MATRIX.md). |
+| **Diátaxis** | tutorial · how-to · reference · explanation. |
+| **genetic tag** | Адрес в `docs/AI_NAVIGATION_MAP.md`. |
 
 Термины согласованы с английским глоссарием.

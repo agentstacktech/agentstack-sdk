@@ -5,7 +5,7 @@
 
 **Languages:** [English (canonical)](README.en.md) · **Русский** (this file)
 
-**English README (GitHub / npm / AI default):** [README.en.md](README.en.md) · **Doc hub:** [docs/DOC_HUB_ru.md](docs/DOC_HUB_ru.md) · [docs/DOC_HUB.md](docs/DOC_HUB.md)
+**English README (GitHub / npm / AI default):** [README.en.md](README.en.md) — полный narrative на русском в этом файле; сверка стиля: [docs/DOC_STYLE_GAP_ru.md](docs/DOC_STYLE_GAP_ru.md) · **Doc hub:** [docs/DOC_HUB_ru.md](docs/DOC_HUB_ru.md)
 
 Универсальный TypeScript/JavaScript SDK для экосистемы AgentStack. Модульный API: auth, projects, payments, DNA, protocol, Neural Architecture.
 
