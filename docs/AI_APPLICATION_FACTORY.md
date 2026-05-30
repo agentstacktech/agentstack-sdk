@@ -69,7 +69,7 @@ See monorepo [../../docs/sdk/COMMERCE_SHOP_SDK.md](../../docs/sdk/COMMERCE_SHOP_
 ## R4 — Support channel
 
 ```typescript
-const inbox = await sdk.support.listInbox({ projectId: 1 });
+const inbox = await sdk.support.getInbox({ project_id: 1 });
 ```
 
 Gene: `sdk.support.gen2`.

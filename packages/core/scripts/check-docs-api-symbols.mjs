@@ -12,6 +12,20 @@ const forbidden = [
   { pattern: /sdk\.projects\.get\s*\(/, message: 'Use sdk.platform.api.getProject(id) or sdk.platform.dna.get — projects is DNATableWrapper' },
   { pattern: /sdk\.admin\./, message: 'sdk.admin is platform-operator only — see docs/INTEGRATOR_SCOPE.md' },
   { pattern: /await sdk\.admin\b/, message: 'sdk.admin is platform-operator only — see docs/INTEGRATOR_SCOPE.md' },
+  { pattern: /scheduler\.runTask\s*\(/, message: 'Use executeTask(), not runTask()' },
+  { pattern: /scheduler\.stopTask\s*\(/, message: 'Use deactivateTask() or cancelTaskExecution()' },
+  { pattern: /scheduler\.getTaskHistory\s*\(/, message: 'Use getTaskExecutions()' },
+  { pattern: /payments\.updatePayment\s*\(/, message: 'No updatePayment on AgentPayments' },
+  { pattern: /payments\.createRefund\s*\(/, message: 'Use refundPayment()' },
+  { pattern: /webhooks\.sendNotification\s*\(/, message: 'Use sdk.notifications.createNotification' },
+  { pattern: /neural\.setCacheConfig\s*\(/, message: 'Use neural.cache.set/get' },
+  { pattern: /neural\.getFromCache\s*\(/, message: 'Use neural.cache.get' },
+  { pattern: /error\.statusCode/, message: 'Use ServerError.status, not error.statusCode' },
+  { pattern: /platform\.api\.getUser\s*\(/, message: 'No platform.api.getUser — use getProjectUsers or auth profile' },
+  { pattern: /platform\.api\.get_projects\s*\(/, message: 'Use getProjects(), not get_projects()' },
+  { pattern: /support\.listInbox\s*\(/, message: 'Use support.getInbox({ project_id })' },
+  { pattern: /\bwallets\.list\s*\(/, message: 'Use wallets.getWallets()' },
+  { pattern: /\bwallets\.create\s*\(/, message: 'Use wallets.createWallet()' },
 ];
 
 const allowAdminIn = new Set([

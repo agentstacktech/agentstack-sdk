@@ -390,17 +390,21 @@ const config: SDKConfig = {
 const sdk = new AgentStackSDK(config);
 ```
 
-### Protein System Configuration
+### Protein / SDK configuration
 
 ```typescript
-// Настройка белковой системы
-sdk.protein.updateConfig({
-  cacheTTL: 600000, // 10 minutes
-  maxCacheSize: 500,
-  enableBatchProcessing: true,
-  batchSize: 10
+const sdk = new AgentStackSDK({
+  apiBase: 'https://agentstack.tech/api',
+  projectId: 1,
+  enableCaching: true,
+  neural: { cache: { enabled: true, ttl: 300 } },
 });
+
+// Очистка клиентского protein cache (если доступно)
+sdk.protein.clearProteinCache?.();
 ```
+
+`protein.updateConfig` **нет** в SDK — настройка через конструктор `AgentStackSDK` и `sdk.updateConfig` только для HTTP/logging.
 
 ## 🔧 Troubleshooting
 
@@ -411,18 +415,13 @@ sdk.protein.updateConfig({
 3. **Memory Usage** - Очищайте кэши регулярно
 4. **Event Handling** - Убедитесь в правильной настройке обработчиков
 
-### Debug Mode
+### Debug (development)
 
 ```typescript
-// Включение отладочного режима
-sdk.updateConfig({
-  debug: true,
-  logLevel: 'verbose'
-});
+sdk.updateConfig({ logging: { level: 'debug', enabled: true } });
 
-// Просмотр детальной информации
 sdk.on('protein:request:start', (data) => {
-  console.log('Debug - Request:', JSON.stringify(data, null, 2));
+  console.debug('protein start', data);
 });
 ```
 

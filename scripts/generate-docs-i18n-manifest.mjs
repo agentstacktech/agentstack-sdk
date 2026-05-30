@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import {
   lineCount,
   h2Count,
+  extractH2Slugs,
   codeFenceCount,
   syncStatus,
 } from './lib/docs-i18n-utils.mjs';
@@ -105,10 +106,15 @@ const PAIRS = [
 function readMeta(rel) {
   const full = path.join(SDK_ROOT, rel);
   if (!fs.existsSync(full)) {
-    return { lines: 0, h2: [], fences: 0 };
+    return { lines: 0, h2Count: 0, h2Slugs: [], fences: 0 };
   }
   const text = fs.readFileSync(full, 'utf8');
-  return { lines: lineCount(full), h2: h2Count(text), fences: codeFenceCount(text) };
+  return {
+    lines: lineCount(full),
+    h2Count: h2Count(text),
+    h2Slugs: extractH2Slugs(text),
+    fences: codeFenceCount(text),
+  };
 }
 
 function main() {
@@ -129,7 +135,8 @@ function main() {
       mirror: ruPath,
       pairRole,
       lineCount: enMeta.lines,
-      h2Count: enMeta.h2.length,
+      h2Count: enMeta.h2Count,
+      h2Slugs: enMeta.h2Slugs,
       codeFences: enMeta.fences,
       syncStatus: status,
       diataxis: DIATAXIS[enPath] ?? null,
@@ -140,7 +147,8 @@ function main() {
       mirror: enPath,
       pairRole,
       lineCount: ruMeta.lines,
-      h2Count: ruMeta.h2.length,
+      h2Count: ruMeta.h2Count,
+      h2Slugs: ruMeta.h2Slugs,
       codeFences: ruMeta.fences,
       syncStatus: status,
       diataxis: DIATAXIS[enPath] ?? null,
@@ -152,6 +160,10 @@ function main() {
       pairRole,
       linesEn: enMeta.lines,
       linesRu: ruMeta.lines,
+      fencesEn: enMeta.fences,
+      fencesRu: ruMeta.fences,
+      h2En: enMeta.h2Count,
+      h2Ru: ruMeta.h2Count,
       ratio,
       status,
       diataxis: DIATAXIS[enPath] ?? '—',
@@ -184,10 +196,10 @@ function main() {
     '',
     `Generated: ${generatedAt} · Do not edit by hand — run \`npm run generate:docs-i18n\``,
     '',
-    '| EN | RU | Diátaxis | Lines EN | Lines RU | Ratio | Status |',
-    '|----|-----|----------|----------|----------|-------|--------|',
+    '| EN | RU | Diátaxis | Lines EN | Lines RU | Fences EN/RU | H2 EN/RU | Ratio | Status |',
+    '|----|-----|----------|----------|----------|--------------|----------|-------|--------|',
     ...matrixRows.map((r) => {
-      return `| [${r.enPath}](${r.enPath}) | [${r.ruPath}](${r.ruPath}) | ${r.diataxis} | ${r.linesEn} | ${r.linesRu} | ${r.ratio ?? '—'} | **${r.status}** |`;
+      return `| [${r.enPath}](${r.enPath}) | [${r.ruPath}](${r.ruPath}) | ${r.diataxis} | ${r.linesEn} | ${r.linesRu} | ${r.fencesEn}/${r.fencesRu} | ${r.h2En}/${r.h2Ru} | ${r.ratio ?? '—'} | **${r.status}** |`;
     }),
     '',
     'Statuses: **balanced** (0.6–1.4), **legacy-ru-path** (README.en ↔ long RU README.md). See [DOCS_I18N.md](./DOCS_I18N.md).',

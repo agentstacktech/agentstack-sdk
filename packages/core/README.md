@@ -2,6 +2,8 @@
 
 **Languages:** [English (canonical)](README.en.md) · **Русский** (this file)
 
+> **API-truth:** канонические сигнатуры и новые интеграции — в [README.en.md](README.en.md). Этот файл — расширенный RU-narrative; при расхождении следуйте EN. Интеграторы: предпочитайте `sdk.platform.auth`, не устаревшие имена методов ниже.
+
 Универсальный API клиент для AgentStack с модульной архитектурой, Neural интеграцией и AI-First i18n. Поддерживает TypeScript, автоматическое управление состоянием и обработку ошибок.
 
 **Install paths (npm, git submodule, monorepo):** [../../docs/SDK_INTEGRATION_FLOWS.md](../../docs/SDK_INTEGRATION_FLOWS.md)
@@ -189,31 +191,22 @@ AgentStackSDK
 
 ## 🔐 Аутентификация (AgentAuth)
 
-### Вход и регистрация
+### Вход и токены
 
 ```typescript
-// Вход в систему
-const tokens = await sdk.auth.login({
+// Предпочитайте sdk.platform.auth (тот же AgentAuth)
+const tokens = await sdk.platform.auth.login({
   email: 'user@example.com',
   password: 'password',
   project_id: 1,
 });
 
-// Регистрация
-const newUser = await sdk.auth.register({
-  email: 'newuser@example.com',
-  password: 'securepassword',
-  project_id: 1,
-});
+await sdk.platform.auth.logout();
 
-// Выход
-await sdk.auth.logout();
-
-// Обновление токена
-const newTokens = await sdk.auth.refreshToken({
-  refresh_token: tokens.refresh_token,
-});
+const newTokens = await sdk.platform.auth.refresh(tokens.refresh_token);
 ```
+
+Регистрация пользователя — через продуктовый signup/API проекта, не через отдельный `sdk.auth.register`.
 
 ### Управление профилем
 
@@ -289,9 +282,12 @@ await sdk.auth.changePassword({
 const status2FA = await sdk.auth.get2FAStatus();
 await sdk.auth.toggle2FA(true);
 
-// Активные сессии
-const sessions = await sdk.auth.getActiveSessions();
-await sdk.auth.revokeSession('session_id');
+// Сессии
+const { sessions_by_project } = await sdk.platform.auth.getSessions();
+const first = Object.values(sessions_by_project)[0]?.[0];
+if (first) {
+  await sdk.platform.auth.terminateSession(first.session_uuid, 'Remote sign-out');
+}
 
 // События безопасности
 const alerts = await sdk.auth.getSecurityAlerts();
@@ -303,9 +299,11 @@ const alerts = await sdk.auth.getSecurityAlerts();
 // Получение провайдеров OAuth
 const providers = await sdk.auth.getOAuthProviders();
 
-// Подключение провайдера
-const redirectUrl = await sdk.auth.connectOAuthProvider('google');
-// Перенаправьте пользователя на redirectUrl
+// Подключение провайдера (после OAuth redirect с code)
+await sdk.platform.auth.connectOAuthProvider({
+  provider: 'google',
+  code: 'oauth_code_from_redirect',
+});
 
 // Отключение провайдера
 await sdk.auth.disconnectOAuthProvider('google');
@@ -327,13 +325,8 @@ const payment = await sdk.payments.createPayment({
 // Получение платежа
 const paymentDetails = await sdk.payments.getPayment(payment.id);
 
-// Обновление платежа
-await sdk.payments.updatePayment(payment.id, {
-  description: 'Обновленное описание',
-});
-
 // Отмена платежа
-await sdk.payments.cancelPayment(payment.id);
+await sdk.payments.cancelPayment(payment.id, 'Запрос пользователя');
 
 // Список платежей
 const payments = await sdk.payments.getPayments({
@@ -344,43 +337,39 @@ const payments = await sdk.payments.getPayments({
 });
 ```
 
-### Способы оплаты
+### Способы оплаты и провайдеры
 
 ```typescript
-// Получение способов оплаты
 const methods = await sdk.payments.getPaymentMethods();
-
-// Добавление способа оплаты
-const newMethod = await sdk.payments.addPaymentMethod({
-  type: 'card',
-  token: 'tok_visa_123',
+await sdk.payments.configureProvider({
+  provider_name: 'stripe',
+  merchant_id: 1,
+  api_key: process.env.STRIPE_KEY!,
+  webhook_secret: process.env.STRIPE_WH_SECRET!,
 });
-
-// Удаление способа оплаты
-await sdk.payments.removePaymentMethod(method.id);
-
-// Установка способа оплаты по умолчанию
-await sdk.payments.setDefaultPaymentMethod(method.id);
+const providers = await sdk.payments.getProviders();
 ```
 
-### Возвраты
+### Возвраты и транзакции
 
 ```typescript
-// Создание возврата
-const refund = await sdk.payments.createRefund(payment.id, {
-  amount: 1000, // $10.00
+await sdk.payments.refundPayment(payment.id, {
+  amount: 1000,
   reason: 'Запрос клиента',
 });
 
-// Получение возвратов
-const refunds = await sdk.payments.getRefunds(payment.id);
+const transactions = await sdk.payments.getTransactions({ limit: 50 });
+const stats = await sdk.payments.getPaymentStats({ project_id: 1 });
 ```
 
-### Кошельки
+### Payment webhooks
 
 ```typescript
-// Получение кошельков проекта
-const wallets = await sdk.payments.getWallets(projectId);
+const wh = await sdk.payments.createPaymentWebhook({
+  url: 'https://example.com/payments/hook',
+  events: ['payment.completed'],
+});
+const logs = await sdk.payments.getWebhookLogs(wh.id, { limit: 20 });
 ```
 
 ## 📊 Аналитика (AgentAnalytics)
@@ -399,28 +388,26 @@ await sdk.analytics.trackEvent({
   project_id: 1,
 });
 
-// Массовое отслеживание
-await sdk.analytics.trackBulkEvents([
-  {
-    event_type: 'page_view',
-    properties: { page: '/dashboard' },
-    project_id: 1,
-  },
-  {
-    event_type: 'button_click',
-    properties: { button: 'upgrade' },
-    project_id: 1,
-  },
-]);
+// Несколько событий — отдельные вызовы trackEvent
+await sdk.analytics.trackEvent({
+  event_type: 'page_view',
+  properties: { page: '/dashboard' },
+  project_id: 1,
+});
+await sdk.analytics.trackEvent({
+  event_type: 'button_click',
+  properties: { button: 'upgrade' },
+  project_id: 1,
+});
 ```
 
 ### Дашборд и метрики
 
 ```typescript
 // Получение метрик дашборда
-const metrics = await sdk.analytics.getDashboardMetrics(1, {
-  period: '30d',
-  metrics: ['total_events', 'unique_users', 'total_revenue'],
+const metrics = await sdk.analytics.getDashboardMetrics({
+  project_id: 1,
+  period: 'month',
 });
 
 // Статистика использования
@@ -563,25 +550,22 @@ await sdk.webhooks.deleteWebhook(webhook.id);
 await sdk.webhooks.testWebhook(webhook.id);
 ```
 
-### Уведомления
+### Доставка уведомлений
+
+Исходящие уведомления — модуль `sdk.notifications` (не `sdk.webhooks`):
 
 ```typescript
-// Отправка уведомления
-const notification = await sdk.webhooks.sendNotification({
+const notification = await sdk.notifications.createNotification({
   project_id: 1,
   user_id: 123,
   channel: 'email',
   subject: 'Добро пожаловать!',
   body: 'Спасибо за регистрацию',
 });
-
-// Получение уведомлений
-const notifications = await sdk.webhooks.getNotifications(1, {
-  channel: 'email',
-  status: 'sent',
-  limit: 20,
-});
+await sdk.notifications.markAsRead(notification.id);
 ```
+
+Журнал доставок по проекту (BFF) — `sdk.webhooks.getNotifications(projectId, …)`.
 
 ## 💰 Кошельки (AgentWallets)
 
@@ -761,19 +745,14 @@ await sdk.scheduler.deleteTask(task.id);
 ### Управление выполнением
 
 ```typescript
-// Запуск задачи
-await sdk.scheduler.runTask(task.id);
+await sdk.scheduler.executeTask(task.id);
+await sdk.scheduler.deactivateTask(task.id);
 
-// Остановка задачи
-await sdk.scheduler.stopTask(task.id);
-
-// Получение истории выполнения
-const history = await sdk.scheduler.getTaskHistory(task.id, {
+const { executions } = await sdk.scheduler.getTaskExecutions(task.id, {
   limit: 20,
   offset: 0,
 });
 
-// Статистика задач
 const stats = await sdk.scheduler.getTaskStats();
 ```
 
@@ -781,46 +760,24 @@ const stats = await sdk.scheduler.getTaskStats();
 
 `sdk.admin` and `sdk.platform.adminData` require `sdkAudience: 'platform_operator'` (AgentStack monorepo ops only). Tenant apps: [docs/INTEGRATOR_SCOPE.md](../../docs/INTEGRATOR_SCOPE.md) — use `sdk.platform.api`, `sdk.platform.rbac`, `sdk.platform.economy`.
 
-## 🧠 Neural архитектура
+## 🧠 Neural архитектура (`sdk.neural`)
 
-### Кэширование
-
-```typescript
-// Настройка кэша
-const cache = await sdk.neural.setCacheConfig({
-  enabled: true,
-  ttl: 300000, // 5 минут
-  maxSize: 1000,
-});
-
-// Получение из кэша
-const cachedData = await sdk.neural.getFromCache('user:123');
-
-// Сохранение в кэш
-await sdk.neural.setCache('user:123', userData, 600000); // 10 минут
-
-// Очистка кэша
-await sdk.neural.clearCache('user:123');
-```
-
-### События
+Канонические примеры — в [README.en.md](./README.en.md). Кратко:
 
 ```typescript
-// Эмиссия события
-await sdk.neural.emitEvent('user:updated', {
+const status = await sdk.neural.getStatus();
+
+await sdk.neural.cache.set('user:1', profile, 300, ['users']);
+const cached = await sdk.neural.cache.get('user:1');
+await sdk.neural.cache.invalidateByPattern('user:*');
+
+await sdk.neural.emitEvent('page_view', { page: '/home' });
+const { events } = await sdk.neural.getEvents({ limit: 20, type: 'page_view' });
+
+const patterns = await sdk.neural.patterns.analyze('user_behavior', {
   user_id: 123,
-  changes: ['display_name', 'bio'],
-});
-
-// Подписка на события
-sdk.neural.on('user:updated', (data) => {
-  console.log('Пользователь обновлен:', data);
-});
-
-// Получение событий
-const events = await sdk.neural.getEvents({
-  type: 'user:updated',
-  limit: 20,
+  project_id: 1,
+  period: '30d',
 });
 ```
 
@@ -912,60 +869,30 @@ const sdk = new AgentStackSDK({
 
 ## 🔄 Обработка ошибок
 
-### Типы ошибок
-
 ```typescript
-import { AgentStackError, ErrorType } from '@agentstack/sdk';
+import { AgentStackError } from '@agentstack/sdk';
 
 try {
-  await sdk.auth.login(credentials);
+  await sdk.platform.auth.login({ email, password, project_id: 1 });
 } catch (error) {
   if (error instanceof AgentStackError) {
-    switch (error.type) {
-      case ErrorType.AUTHENTICATION_ERROR:
-        console.log('Ошибка аутентификации:', error.message);
-        break;
-      case ErrorType.VALIDATION_ERROR:
-        console.log('Ошибка валидации:', error.message);
-        break;
-      case ErrorType.RATE_LIMIT_ERROR:
-        console.log('Превышен лимит запросов:', error.message);
-        break;
-      case ErrorType.NETWORK_ERROR:
-        console.log('Сетевая ошибка:', error.message);
-        break;
-      default:
-        console.log('Неизвестная ошибка:', error.message);
-    }
+    console.error('SDK error:', error.message);
   }
 }
 ```
 
-### Retry логика
+Маппинг HTTP → UX: [docs/AI_ERROR_ACTION_MATRIX.md](../../docs/AI_ERROR_ACTION_MATRIX.md).
+
+### Retry
 
 ```typescript
-// Автоматический retry для сетевых ошибок
-const sdk = new AgentStackSDK({
-  apiBase: 'https://agentstack.tech/api',
-  retryAttempts: 3,
-  retryDelay: 1000,
-  retry: {
-    attempts: 3,
-    delay: 1000,
-    backoff: 'exponential', // exponential, linear
-  },
-});
+import { AgentStackSDK, resolveAgentStackApiBase } from '@agentstack/sdk';
 
-// Ручной retry
-try {
-  await sdk.auth.getCurrentUser();
-} catch (error) {
-  if (error.type === ErrorType.NETWORK_ERROR) {
-    // Повторная попытка через 2 секунды
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    await sdk.auth.getCurrentUser();
-  }
-}
+const sdk = new AgentStackSDK({
+  apiBase: resolveAgentStackApiBase(),
+  retryAttempts: 3,
+  retry: { attempts: 3, delay: 1000, backoff: 'exponential' },
+});
 ```
 
 ## 📊 Метрики и мониторинг
@@ -1053,21 +980,14 @@ describe('Integration Tests', () => {
       projectId: 1,
     });
 
-    // 1. Регистрация
-    await sdk.auth.register({
+    // 1. Вход
+    await sdk.platform.auth.login({
       email: 'test@example.com',
       password: 'password',
       project_id: 1,
     });
 
-    // 2. Вход
-    await sdk.auth.login({
-      email: 'test@example.com',
-      password: 'password',
-      project_id: 1,
-    });
-
-    // 3. Обновление профиля
+    // 2. Обновление профиля
     await sdk.auth.updateProfileData({
       display_name: 'Test User',
     });

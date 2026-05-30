@@ -54,9 +54,10 @@ Russian mirrors: same filenames with `_ru.md` — see [DOC_HUB_ru.md](./DOC_HUB_
 | Monorepo [SDK_AI_SURFACE.md](../../docs/SDK_AI_SURFACE.md) | [SDK_AI_SURFACE_ru.md](../../docs/SDK_AI_SURFACE_ru.md) |
 | [SDK_SUBMODULE_INTEGRATION.md](../../docs/sdk/SDK_SUBMODULE_INTEGRATION.md) | [_ru](../../docs/sdk/SDK_SUBMODULE_INTEGRATION_ru.md) |
 
-## Archived (EN only, low i18n priority)
+## Archived (historical — not API truth)
 
-`ROADMAP.md`, `PROJECT_COMPLETE.md`, `VERSION_UPDATE_REPORT.md`, `packages/core/src/**/README.md`
+See [archive/README.md](./archive/README.md): `ROADMAP.md`, `PROJECT_COMPLETE.md`, `VERSION_UPDATE_REPORT.md`.  
+Implementation notes under `packages/core/src/**/README.md` are maintainer-only.
 
 ## Maintenance
 

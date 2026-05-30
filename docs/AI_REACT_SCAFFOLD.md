@@ -25,11 +25,11 @@ export function App() {
 function WalletsList({ projectId }: { projectId: number }) {
   const { data, isLoading } = useEntityData('wallets', {
     projectId,
-    fetchList: (sdk, signal) => sdk.wallets.list({ projectId }, { signal }),
+    fetchList: (sdk, signal) => sdk.wallets.getWallets({ projectId }, { signal }),
   });
   const create = useSDKMutationWithInvalidation({
     invalidateEntity: 'wallets',
-    mutationFn: (sdk, body) => sdk.wallets.create(body),
+    mutationFn: (sdk, body) => sdk.wallets.createWallet(body),
   });
   if (isLoading) return null;
   return <pre>{JSON.stringify(data, null, 2)}</pre>;

@@ -6,6 +6,8 @@
 **Status:** Production Ready  
 **Last Updated:** 2026-04-09
 
+> **Maintainer note:** этот индекс для навигации по репозиторию. **API-truth для интеграторов:** [AGENTS.md](AGENTS.md), [README.en.md](README.en.md), [docs/DOC_HUB.md](docs/DOC_HUB.md). Псевдокод ниже может отставать от `packages/core/src` — сверяйтесь с исходниками.
+
 ---
 
 ## 🎯 PURPOSE
@@ -211,11 +213,6 @@ export class AgentAuth {
   
   async login(credentials: LoginCredentials): Promise<AuthTokens> {
     // Login user
-    // Returns: {access_token, refresh_token, user}
-  }
-  
-  async register(data: RegisterData): Promise<AuthTokens> {
-    // Register new user
     // Returns: {access_token, refresh_token, user}
   }
   

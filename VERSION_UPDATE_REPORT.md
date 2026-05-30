@@ -1,5 +1,7 @@
 # 📋 Отчет об обновлении версии SDK на 1.0.0
 
+> **ARCHIVED:** разовый отчёт (версии 1.0.0). Актуально: [CHANGELOG.md](CHANGELOG.md), `AGENTSTACK_CORE_VERSION`. См. [docs/archive/README.md](docs/archive/README.md).
+
 ## 🎯 Выполненные задачи
 
 ### ✅ Обновление версий во всех пакетах

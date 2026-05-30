@@ -1,5 +1,7 @@
 # 🎉 AgentStack-SDK - ПРОЕКТ ПОЛНОСТЬЮ ЗАВЕРШЕН
 
+> **ARCHIVED (meta, 2025-01-15):** исторический отчёт. Не использовать для API или релизов. См. [docs/archive/README.md](docs/archive/README.md), [CHANGELOG.md](CHANGELOG.md), [README.en.md](README.en.md).
+
 ## 📋 Итоговый статус
 
 **Статус**: ✅ ПОЛНОСТЬЮ ЗАВЕРШЕН  

@@ -2,6 +2,8 @@
 
 **EN:** [MODULAR_ARCHITECTURE.md](./MODULAR_ARCHITECTURE.md)
 
+> **Интеграторы:** `sdk.platform.auth` / `sdk.platform.api` / `sdk.platform.protocol` — канон. `sdk.admin` — только platform operator (monorepo). Примеры с `sdk.auth.*` — legacy-алиас того же модуля.
+
 ## 🎯 Обзор
 
 AgentStack-SDK построен на модульной архитектуре, где каждый модуль отвечает за определенную область функциональности. Все модули имеют префикс `Agent` для легкой идентификации и использования.

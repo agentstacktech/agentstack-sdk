@@ -38,6 +38,38 @@ const matrix = sdk.getCapabilityMatrix();
 
 Deep dive: [docs/quick-start.md](docs/quick-start.md) · AI: [AGENTS.md](AGENTS.md)
 
+### Documentation locales
+
+| Audience | Canonical EN | Russian extended |
+|----------|--------------|------------------|
+| npm / `llms.txt` | `README.en.md`, `*.en.md`, `DOC_HUB.md` | — |
+| Legacy depth | Same APIs | `README.md`, package `README.md`, `*_ru.md` |
+
+Run `npm run check:docs-i18n:all` before publishing doc changes.
+
+See [docs/DOC_SYNC_MATRIX.md](docs/DOC_SYNC_MATRIX.md) for paired EN/RU files.
+
+---
+
+## How to add the SDK to your project
+
+| Flow | When | Install |
+|------|------|---------|
+| **A — npm** (default) | Production apps | `npm install @agentstack/sdk` |
+| **B — git submodule** | Pin SDK commit in git | [docs/SUBMODULE_CONSUMER.md](docs/SUBMODULE_CONSUMER.md) |
+| **D — monorepo sibling** | Inside [AgentStack](https://github.com/agentstacktech/AgentStack) | `file:../agentstack-unified-sdk/packages/core` |
+| **E — `file:` / `npm link`** | SDK + app development | [PUBLISHING.md](PUBLISHING.md) |
+| **F — Python** | Python backends | `pip install agentstack-sdk` |
+
+Full tree: [docs/SDK_INTEGRATION_FLOWS.md](docs/SDK_INTEGRATION_FLOWS.md)
+
+```bash
+git submodule add https://github.com/agentstacktech/agentstack-sdk.git vendor/agentstack-sdk
+node vendor/agentstack-sdk/scripts/bootstrap-submodule-consumer.mjs --target . --tag v0.4.13
+```
+
+Then `npm install` and set `projectId` — [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md).
+
 ---
 
 ## 🎯 Project goals
@@ -50,6 +82,26 @@ Deep dive: [docs/quick-start.md](docs/quick-start.md) · AI: [AGENTS.md](AGENTS.
 - **Multilingual** — TypeScript, Python, React
 - **AI-ready** — `getModuleCatalog()`, capability matrix, [llms.txt](llms.txt)
 - **Project scope** — tenant RBAC, DNA, economy without ecosystem `/api/admin/*` ([INTEGRATOR_SCOPE](docs/INTEGRATOR_SCOPE.md))
+
+### Package README index (English canonical)
+
+| Package | EN readme |
+|---------|-----------|
+| Core | [packages/core/README.en.md](packages/core/README.en.md) |
+| React | [packages/react/README.en.md](packages/react/README.en.md) |
+| Hooks | [packages/hooks/README.en.md](packages/hooks/README.en.md) |
+| Python | [packages/python/README.en.md](packages/python/README.en.md) |
+
+Architecture guides: [docs/MODULAR_ARCHITECTURE.md](docs/MODULAR_ARCHITECTURE.md) · [docs/PROTEIN_SYSTEM_GUIDE.md](docs/PROTEIN_SYSTEM_GUIDE.md)
+
+### Versioning
+
+- npm: `@agentstack/sdk` — see [CHANGELOG.md](CHANGELOG.md)  
+- Mirror repo: [agentstack-sdk](https://github.com/agentstacktech/agentstack-sdk) — [PUBLISHING.md](PUBLISHING.md)  
+- Doc parity CI: `npm run check:docs-i18n:all` in `agentstack-unified-sdk/`
+- Style audit: [docs/DOC_STYLE_GAP.md](docs/DOC_STYLE_GAP.md) (EN vs RU depth targets)
+
+Russian extended narrative for the same topics: [README.md](README.md).
 
 ---
 
@@ -183,7 +235,7 @@ from agentstack_sdk import AgentStackSDK, SDKConfig
 
 sdk = AgentStackSDK(SDKConfig(api_base="https://agentstack.tech/api", api_key="key"))
 await sdk.auth.login("user@example.com", "password")
-projects = await sdk.platform.api.get_projects()
+projects = await sdk.platform.api.getProjects()
 ```
 
 ### React
@@ -218,7 +270,9 @@ function ProjectList() {
 
 ## 🔧 API reference (overview)
 
-### Auth (`sdk.platform.auth`)
+Use **`sdk.platform.*`** for new code. Legacy `sdk.auth` aliases exist but prefer the platform facade.
+
+### Auth service (`sdk.platform.auth`)
 
 ```typescript
 const tokens = await sdk.platform.auth.login({
@@ -226,21 +280,34 @@ const tokens = await sdk.platform.auth.login({
   password: 'password',
   project_id: 1,
 });
+
+const refreshed = await sdk.platform.auth.refresh(tokens.refresh_token);
 const profile = await sdk.platform.auth.getProfile();
 await sdk.platform.auth.logout();
 ```
 
-### Projects & users (`sdk.platform.api`)
+### Projects service (`sdk.platform.api`)
 
 ```typescript
 const projects = await sdk.platform.api.getProjects();
-const project = await sdk.platform.api.getProject(1);
+const project = await sdk.platform.api.getProject(projectId);
+
+const rows = await sdk.platform.dna.list('data_projects_8dna', { project_id: 1 });
 ```
 
-### DNA (`sdk.platform.dna`)
+### Payments service (`sdk.payments`)
 
 ```typescript
-const rows = await sdk.platform.dna.list('data_projects_8dna', { project_id: 1 });
+const payment = await sdk.payments.createPayment({
+  amount: 1000,
+  currency: 'USD',
+  description: 'Test payment',
+  project_id: 1,
+});
+
+const status = await sdk.payments.getPaymentStatus(payment.id);
+const history = await sdk.payments.getTransactions({ limit: 20, offset: 0 });
+const methods = await sdk.payments.getPaymentMethods();
 ```
 
 ### Protocol (preferred)
@@ -254,25 +321,44 @@ await sdk.platform.protocol.executeCommand({
 await sdk.platform.protocol.invalidateSnapshotPrefix('projects');
 ```
 
-### Payments
+### Platform operator only
+
+Ecosystem admin (`sdk.admin`, `/api/admin/*`) is **not** for tenant npm apps. Default `sdkAudience` is `integrator`. Monorepo ops: `sdkAudience: 'platform_operator'`. See [docs/INTEGRATOR_SCOPE.md](docs/INTEGRATOR_SCOPE.md).
+
+### AgentDocs — in-SDK help
 
 ```typescript
-const payment = await sdk.payments.createPayment({
-  amount: 1000,
-  currency: 'USD',
-  description: 'Order',
-  project_id: 1,
+const help = await sdk.docs.getHelp('auth');
+const results = await sdk.docs.search('payment integration');
+const examples = await sdk.docs.getCodeExamples({
+  language: 'typescript',
+  category: 'payments',
 });
+const faq = await sdk.docs.getFAQ('payments');
 ```
 
-### Analytics
+### Neural Architecture
+
+#### Neural cache
 
 ```typescript
-await sdk.analytics.trackEvent({
-  event_type: 'button_click',
-  properties: { page: '/checkout' },
-  project_id: 1,
+await sdk.neural.cache.set('user:123:profile', userProfile, 300);
+const profile = await sdk.neural.cache.get('user:123:profile');
+
+await sdk.neural.cache.setWithTags('project:456', projectData, ['projects', 'active']);
+await sdk.neural.cache.invalidateByTag('projects');
+```
+
+#### Neural events
+
+```typescript
+await sdk.neural.emitEvent('payment_created', {
+  payment_id: '123',
+  amount: 1000,
+  currency: 'USD',
 });
+
+const { events } = await sdk.neural.getEvents({ limit: 50, type: 'payment_created' });
 ```
 
 ### Webhooks & scheduler
@@ -290,15 +376,10 @@ const task = await sdk.scheduler.createTask({
   schedule: '0 2 * * *',
   payload: { url: 'https://api.example.com/sync' },
 });
+await sdk.scheduler.executeTask(task.id);
 ```
 
-### Docs helper
-
-```typescript
-const help = await sdk.docs.getHelp('auth');
-```
-
-Full module map: [docs/MODULAR_ARCHITECTURE.md](docs/MODULAR_ARCHITECTURE.md) · Protein: [docs/PROTEIN_SYSTEM_GUIDE.md](docs/PROTEIN_SYSTEM_GUIDE.md)
+Full module map: [docs/MODULAR_ARCHITECTURE.md](docs/MODULAR_ARCHITECTURE.md) · Protein: [docs/PROTEIN_SYSTEM_GUIDE.md](docs/PROTEIN_SYSTEM_GUIDE.md) · Package depth: [packages/core/README.en.md](packages/core/README.en.md)
 
 ---
 
@@ -344,17 +425,19 @@ See [packages/react/README.en.md](packages/react/README.en.md) for `useProfile`,
 
 ## ⚙️ Configuration
 
+### TypeScript / JavaScript
+
 ```typescript
 const sdk = new AgentStackSDK({
   apiBase: resolveAgentStackApiBase(),
   apiKey: process.env.AGENTSTACK_API_KEY,
   projectId: 1,
-  timeout: 30000,
-  retry: { attempts: 3, delay: 1000, backoff: 'exponential' },
   neural: {
     cache: { enabled: true, ttl: 300, maxSize: 1000 },
-    events: { enabled: true },
+    events: { enabled: true, bufferSize: 10000 },
   },
+  retry: { attempts: 3, delay: 1000, backoff: 'exponential' },
+  cache: { enabled: true, ttl: 300 },
   logging: { level: 'info', enabled: true },
 });
 ```
@@ -397,21 +480,51 @@ npm run test
 npm run check:docs-i18n:all
 ```
 
-### Unit test sketch
+### Unit & integration sketches
 
 ```typescript
 import { AgentStackSDK, resolveAgentStackApiBase } from '@agentstack/sdk';
 
-const sdk = new AgentStackSDK({
-  apiBase: resolveAgentStackApiBase(),
-  apiKey: 'test_key',
+describe('integrator SDK', () => {
+  const sdk = new AgentStackSDK({
+    apiBase: resolveAgentStackApiBase(),
+    apiKey: 'test_key',
+    projectId: 1,
+  });
+
+  it('lists projects via platform.api', async () => {
+    const projects = await sdk.platform.api.getProjects();
+    expect(Array.isArray(projects)).toBe(true);
+  });
+
+  it('module catalog excludes admin', () => {
+    const ids = sdk.getModuleCatalog().modules.map((m) => m.id);
+    expect(ids).not.toContain('admin');
+  });
 });
+```
 
-const projects = await sdk.platform.api.getProjects();
-expect(Array.isArray(projects)).toBe(true);
+### Integration flow (sketch)
 
-const ids = sdk.getModuleCatalog().modules.map((m) => m.id);
-expect(ids).not.toContain('admin'); // integrator catalog
+```typescript
+describe('auth + payments', () => {
+  it('logs in and creates a payment', async () => {
+    const tokens = await sdk.platform.auth.login({
+      email: 'test@example.com',
+      password: 'password',
+      project_id: 1,
+    });
+    expect(tokens.access_token).toBeDefined();
+
+    const payment = await sdk.payments.createPayment({
+      amount: 1000,
+      currency: 'USD',
+      description: 'Test',
+      project_id: 1,
+    });
+    expect(payment.id).toBeDefined();
+  });
+});
 ```
 
 ---
@@ -445,7 +558,8 @@ async getUserProfile(userId: string) {
   const key = `user:${userId}:profile`;
   const cached = await this.sdk.neural.cache.get(key);
   if (cached) return cached;
-  const profile = await this.sdk.platform.api.getUser(userId);
+  const { users } = await this.sdk.platform.api.getProjectUsers(1, { limit: 1 });
+  const profile = users.find((u) => String(u.id) === userId) ?? users[0];
   await this.sdk.neural.cache.set(key, profile, 300);
   return profile;
 }
@@ -525,8 +639,25 @@ const neuralMetrics = await sdk.neural.getMetrics?.();
 
 - Issues: https://github.com/agentstacktech/agentstack-sdk/issues
 - Swagger: https://agentstack.tech/swagger
+- FAQ (monorepo): [docs/FAQ_DETAILED.md](https://github.com/agentstacktech/AgentStack/blob/master/docs/FAQ_DETAILED.md)
 
 Doc maintenance: `npm run generate:docs-i18n` · `npm run check:docs-i18n:all`
+
+Russian extended narrative (same topics, more API prose): [README.md](README.md).
+
+Style gap audit (RU vs EN depth): [docs/DOC_STYLE_GAP.md](docs/DOC_STYLE_GAP.md).
+
+---
+
+## 📞 Support
+
+1. [FAQ](https://github.com/agentstacktech/AgentStack/blob/master/docs/FAQ_DETAILED.md)
+2. [GitHub Issues](https://github.com/agentstacktech/agentstack-sdk/issues)
+3. https://agentstack.tech · https://agentstack.tech/swagger
+
+## 📄 License
+
+MIT — see [LICENSE](LICENSE).
 
 ---
 

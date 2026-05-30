@@ -33,7 +33,7 @@ async def main():
     try:
         # Использование модулей SDK
         await sdk.auth.login("user@example.com", "password")
-        projects = await sdk.platform.api.get_projects()
+        projects = await sdk.api.get("/projects")
         payment = await sdk.payments.create_payment({
             "amount": 1000, 
             "currency": "RUB"
@@ -82,12 +82,15 @@ await sdk.auth.login("user@example.com", "password")
 # Получение профиля
 profile = await sdk.auth.get_profile()
 
-# Создание API ключа
+# API ключи (предпочитайте ключи уровня проекта в панели; TS: createApiKey deprecated)
 api_key = await sdk.auth.create_api_key(
     name="My API Key",
     project_id=1,
-    scopes=["read", "write"]
+    scopes=["read", "write"],
 )
+```
+
+Канон Python: [README.en.md](README.en.md).
 ```
 
 #### 🧠 AgentNeural

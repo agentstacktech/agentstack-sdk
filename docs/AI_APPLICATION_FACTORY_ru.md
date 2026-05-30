@@ -67,7 +67,7 @@ const offers = await sdk.commerce.discovery.listOffers({ projectId: 1 });
 ## R4 — Support channel
 
 ```typescript
-const inbox = await sdk.support.listInbox({ projectId: 1 });
+const inbox = await sdk.support.getInbox({ project_id: 1 });
 ```
 
 Gene: `sdk.support.gen2`.

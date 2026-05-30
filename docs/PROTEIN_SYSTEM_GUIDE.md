@@ -1,15 +1,28 @@
-# AgentStack Protein System Guide
+# 🧬 AgentStack Protein System Guide
 
 **Genetic tag:** `repo.platform.sdk.agent_protocol.gen1`  
 **RU:** [PROTEIN_SYSTEM_GUIDE_ru.md](./PROTEIN_SYSTEM_GUIDE_ru.md)
 
 > **Protocol-first:** For new integrator code use `sdk.platform.protocol.executeCommand` and snapshot invalidation — not ad-hoc `fetch` to `/commands/*`. Legacy `sdk.protein.*` remains for compatibility; see [AGENT_PROTOCOL_QUICKSTART.md](https://github.com/agentstacktech/AgentStack/blob/master/docs/AGENT_PROTOCOL_QUICKSTART.md).
 
-Protein commands compose complex read models (pages, game data, dashboards) through the platform command channel.
+---
+
+## 🎯 Overview
+
+Protein commands compose complex read models (pages, game data, dashboards) through the platform command channel. The system supports page composition, game entities, multi-level caching, events, and performance metrics.
+
+### Key features
+
+- **Protein commands** — unified command channel for composed data
+- **Page composition** — templates for profile, shop, dashboard UIs
+- **Game data** — characters, inventory, quests
+- **Advanced caching** — TTL + snapshot reads via protocol
+- **Event system** — cross-module notifications
+- **Performance metrics** — command timing and cache stats
 
 ---
 
-## Architecture
+## 🏗️ Architecture
 
 | Component | Role |
 |-----------|------|
@@ -104,7 +117,7 @@ await sdk.platform.protocol.executeCommand({
 
 ---
 
-## Page composition
+## 🎨 Page composition
 
 Built-in templates: `user_profile_3d`, `game_dashboard_3d`, `shop_3d`.
 
@@ -124,29 +137,161 @@ await sdk.pageComposition.registerTemplate('custom_dashboard', {
 });
 ```
 
+### Component slot types
+
+| Slot | Use |
+|------|-----|
+| `profile` | User profile block |
+| `stats` | Metrics tiles |
+| `achievements` | Badges / progress |
+| `activity` | Feed |
+| `products` / `cart` | Commerce UI |
+| `character` / `inventory` / `quests` | Game UI |
+| `world` | World map / regions |
+
 ---
 
-## Game data
+## 🎮 Game data
+
+### Sessions
+
+```typescript
+const session = await sdk.gameData.createGameSession(
+  projectId,
+  userId,
+  'rpg_game',
+  'char_001',
+  'world_001',
+);
+
+await sdk.gameData.updateGameSession(session.id, {
+  state: 'paused',
+  metadata: { checkpoint: 'cp_001' },
+});
+
+await sdk.gameData.endGameSession(session.id, 'completed');
+```
+
+### Character & inventory
 
 ```typescript
 const character = await sdk.gameData.getCharacterData(
   projectId,
   userId,
   'char_001',
+  true, // inventory
+  true, // quests
+  true, // achievements
 );
 
-const session = await sdk.gameData.createGameSession(
+await sdk.gameData.updateCharacterData(projectId, userId, 'char_001', {
+  level: 10,
+  experience: 1500,
+});
+
+await sdk.gameData.addItemToInventory(projectId, userId, 'char_001', {
+  id: 'sword_001',
+  name: 'Iron Sword',
+  type: 'weapon',
+  quantity: 1,
+}, 1);
+```
+
+### Quests
+
+```typescript
+const quest = await sdk.gameData.getQuestData(projectId, userId, 'quest_001');
+await sdk.gameData.startQuest(projectId, userId, 'char_001', 'quest_001');
+await sdk.gameData.updateQuestProgress(
   projectId,
   userId,
-  'rpg_game',
   'char_001',
+  'quest_001',
+  'objective_1',
+  50,
 );
-await sdk.gameData.endGameSession(session.id, 'completed');
+await sdk.gameData.completeQuest(projectId, userId, 'char_001', 'quest_001');
 ```
 
 ---
 
-## Caching and events
+## ⚡ Advanced features
+
+### Batch protein requests
+
+```typescript
+const results = await sdk.protein.executeBatchRequests(1, 123, [
+  {
+    type: 'get_character_data',
+    name: 'Load character',
+    payload: { character_id: 'char_001' },
+  },
+  {
+    type: 'get_inventory_data',
+    name: 'Load inventory',
+    payload: { character_id: 'char_001' },
+  },
+]);
+```
+
+### Complex structures
+
+```typescript
+const bundle = await sdk.protein.getComplexDataStructure(1, 123, {
+  profile: true,
+  inventory: true,
+  quests: true,
+  world: true,
+  stats: true,
+  achievements: true,
+});
+```
+
+### Game script execution
+
+```typescript
+const scriptResult = await sdk.gameData.executeGameScript(1, 123, 'combat_script_001', {
+  target: 'goblin',
+  skill: 'fireball',
+  character_id: 'char_001',
+});
+```
+
+---
+
+## 🔄 Event system
+
+| Event family | Examples |
+|--------------|----------|
+| Protein | `protein:request:start`, `protein:request:success`, `protein:cache:hit` |
+| Composition | `composition:start`, `composition:success`, `component:render:start` |
+| Game data | `session:created`, `character:loaded`, `quest:completed` |
+
+```typescript
+sdk.on('protein:request:start', (data) => {
+  console.debug('protein', data.command_type);
+});
+
+sdk.on('composition:success', (data) => {
+  console.debug('composed in ms', data.compositionTime);
+});
+```
+
+---
+
+## 💾 Cache management
+
+| Cache layer | Clear helper |
+|-------------|--------------|
+| Protein | `sdk.protein.clearProteinCache()` |
+| Page composition | `sdk.pageComposition.clearCompositionCache()` |
+| Game data | `sdk.gameData.clearGameCache()` |
+
+After mutations, prefer **`sdk.platform.protocol.invalidateSnapshotPrefix`**.
+
+---
+
+### Caching and events
 
 Enable neural cache in SDK config. After writes, invalidate snapshots:
 
@@ -166,7 +311,7 @@ await sdk.neural.emitEvent('page_viewed', {
 
 ---
 
-## Performance
+### Performance
 
 - Use `readThroughSnapshot` for stable reads in UI loops  
 - Batch protein commands where the server supports composition  
@@ -174,7 +319,7 @@ await sdk.neural.emitEvent('page_viewed', {
 
 ---
 
-## Response processing
+### Response processing
 
 Server responses may include composed payloads (page slots, game entities). The SDK normalizes them for React Query and snapshot caches:
 
@@ -191,7 +336,7 @@ Prefer invalidating the matching snapshot prefix after mutations that change das
 
 ---
 
-## Error handling
+### Error handling
 
 | Symptom | Action |
 |---------|--------|
@@ -204,7 +349,7 @@ See [AI_ERROR_ACTION_MATRIX.md](./AI_ERROR_ACTION_MATRIX.md).
 
 ---
 
-## Events and metrics
+### Events and metrics
 
 ```typescript
 sdk.neural.on('protein:executed', (payload) => {
@@ -216,7 +361,7 @@ Use events for diagnostics only — business logic should not depend on client-o
 
 ---
 
-## Testing protein flows
+### Testing protein flows
 
 1. Login with `project_id` set  
 2. `getCapabilityMatrix()` — enable game/page modules if needed  
@@ -249,7 +394,20 @@ Migrate incrementally: new features use protocol only; leave legacy calls until 
 
 ---
 
-## Configuration flags
+## Related docs
+
+- [AI_APPLICATION_FACTORY.md](./AI_APPLICATION_FACTORY.md) — deploy recipes R1–R6  
+- [MODULAR_ARCHITECTURE.md](./MODULAR_ARCHITECTURE.md) — module map  
+- [SDK_AI_SURFACE.md](https://github.com/agentstacktech/AgentStack/blob/master/docs/SDK_AI_SURFACE.md) — `sdk.platform` map  
+- Russian deep dive: [PROTEIN_SYSTEM_GUIDE_ru.md](./PROTEIN_SYSTEM_GUIDE_ru.md)
+
+**Version:** 0.3.6 · **Philosophy:** AgentProtocol + 8DNA + protein command bus
+
+**Examples:** [examples/typescript/modular-usage.ts](../examples/typescript/modular-usage.ts) · [examples/protein-system-examples.ts](../examples/protein-system-examples.ts)
+
+---
+
+## 🛠️ Protein configuration
 
 ```typescript
 const sdk = new AgentStackSDK({
@@ -260,15 +418,75 @@ const sdk = new AgentStackSDK({
 });
 ```
 
-`enableCaching` affects client-side neural cache; server-side snapshot TTL is controlled by protocol invalidation.
+`enableCaching` affects client-side neural cache; server snapshot TTL is controlled via protocol invalidation.
+
+```typescript
+const stats = sdk.protein.getCacheStats?.();
+sdk.protein.clearProteinCache();
+```
 
 ---
 
-## Related docs
+## 🔍 Troubleshooting
 
-- [AI_APPLICATION_FACTORY.md](./AI_APPLICATION_FACTORY.md) — deploy recipes R1–R6  
-- [MODULAR_ARCHITECTURE.md](./MODULAR_ARCHITECTURE.md) — module map  
-- [SDK_AI_SURFACE.md](https://github.com/agentstacktech/AgentStack/blob/master/docs/SDK_AI_SURFACE.md) — `sdk.platform` map  
-- Russian deep dive: [PROTEIN_SYSTEM_GUIDE_ru.md](./PROTEIN_SYSTEM_GUIDE_ru.md)
+| Symptom | Likely cause | Fix |
+|---------|----------------|-----|
+| Stale page data | Snapshot not invalidated | `invalidateSnapshotPrefix` after `executeCommand` |
+| 403 on command | Wrong project scope | Pass `project_id` in command payload |
+| Empty protein cache | `enableCaching: false` | Enable client neural cache in SDK config |
+| Type errors on payload | Schema drift | Regenerate types from OpenAPI / capability matrix |
 
-**Version:** 0.3.6 · **Philosophy:** AgentProtocol + 8DNA + protein command bus
+**Debug tip:** log `command` + `project_id` on every `executeCommand` during development; compare responses before/after `invalidateSnapshotPrefix`.
+
+See also [docs/AI_ERROR_ACTION_MATRIX.md](./AI_ERROR_ACTION_MATRIX.md) for HTTP → UX mapping in SPAs.
+
+### Debug events (development)
+
+```typescript
+sdk.on('protein:request:start', (data) => {
+  console.debug('protein start', JSON.stringify(data, null, 2));
+});
+```
+
+---
+
+## 🚀 Best practices
+
+### Performance
+
+1. Enable client neural cache for hot read paths  
+2. Batch independent commands when the server supports batch execute  
+3. Keep page templates small — compose only fields the UI needs  
+4. Monitor `sdk.getMetrics()` and neural cache stats in staging  
+
+### Development
+
+1. Invalidate snapshot prefixes after every successful write command  
+2. Handle command errors with [AI_ERROR_ACTION_MATRIX.md](./AI_ERROR_ACTION_MATRIX.md)  
+3. Use TypeScript types from `@agentstack/sdk` for payloads  
+4. Add integration tests that login → command → snapshot read  
+
+### Architecture
+
+1. Prefer `sdk.platform.protocol` over legacy `sdk.protein` for new features  
+2. Keep game/page logic in command handlers, not in client-only caches  
+3. Scope all commands with `project_id`  
+4. Document command names in your app’s ADR or 8DNA manifest  
+
+---
+
+## 📖 API reference (source)
+
+- `packages/core/src/modules/AgentProtein.ts`  
+- `packages/core/src/modules/ProteinResponseProcessor.ts`  
+- `packages/core/src/protocol/` — AgentProtocol implementation  
+
+**Examples:** [examples/protein-system-examples.ts](../examples/protein-system-examples.ts) — profile composition, game data, shop page, batch requests, cache management.
+
+---
+
+## 🤝 Support
+
+Issues: https://github.com/agentstacktech/agentstack-sdk/issues · Protocol ADR: monorepo `docs/AGENT_PROTOCOL.md`
+
+Russian deep dive: [PROTEIN_SYSTEM_GUIDE_ru.md](./PROTEIN_SYSTEM_GUIDE_ru.md)

@@ -52,9 +52,10 @@
 | [SDK_AI_SURFACE_ru.md](../../docs/SDK_AI_SURFACE_ru.md) | [SDK_AI_SURFACE.md](../../docs/SDK_AI_SURFACE.md) |
 | [SDK_SUBMODULE_INTEGRATION_ru.md](../../docs/sdk/SDK_SUBMODULE_INTEGRATION_ru.md) | [SDK_SUBMODULE_INTEGRATION.md](../../docs/sdk/SDK_SUBMODULE_INTEGRATION.md) |
 
-## Архив (низкий i18n)
+## Архив (исторические, не API-truth)
 
-`ROADMAP.md`, `PROJECT_COMPLETE.md`, `VERSION_UPDATE_REPORT.md`, `packages/core/src/**/README.md`
+[archive/README.md](./archive/README.md) — `ROADMAP.md`, `PROJECT_COMPLETE.md`, `VERSION_UPDATE_REPORT.md`.  
+Заметки в `packages/core/src/**/README.md` — только для мейнтейнеров.
 
 ## Поддержка
 

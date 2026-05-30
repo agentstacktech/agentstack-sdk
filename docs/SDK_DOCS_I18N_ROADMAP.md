@@ -18,7 +18,8 @@
 
 ## Optional later
 
-- [ ] `check-docs-code-samples.mjs` — fenced TS in P0 ⊆ `examples/`
+- [x] `check-docs-code-samples.mjs` — P0 EN fenced TS / examples links
+- [x] `check-docs-legacy-ru-api.mjs` — block removed APIs in `packages/*/README.md`
 - [ ] Auto-run `mirror-readme-for-github.mjs` in mirror publish workflow (mirror repo only)
 
 ---

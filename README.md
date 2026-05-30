@@ -5,7 +5,11 @@
 
 **Languages:** [English (canonical)](README.en.md) · **Русский** (this file)
 
-**English README (GitHub / npm / AI default):** [README.en.md](README.en.md) — полный narrative на русском в этом файле; сверка стиля: [docs/DOC_STYLE_GAP_ru.md](docs/DOC_STYLE_GAP_ru.md) · **Doc hub:** [docs/DOC_HUB_ru.md](docs/DOC_HUB_ru.md)
+**English README (GitHub / npm / AI default):** [README.en.md](README.en.md) — **канон API и интеграции**.
+
+**Этот файл (`README.md`)** — расширенный русский narrative (история, примеры). Не дублируйте устаревшие API: сверяйтесь с EN.
+
+Сверка стиля: [docs/DOC_STYLE_GAP_ru.md](docs/DOC_STYLE_GAP_ru.md) · **Doc hub:** [docs/DOC_HUB_ru.md](docs/DOC_HUB_ru.md)
 
 Универсальный TypeScript/JavaScript SDK для экосистемы AgentStack. Модульный API: auth, projects, payments, DNA, protocol, Neural Architecture.
 
@@ -222,7 +226,7 @@ sdk = AgentStackSDK(
 )
 
 # Tenant APIs (no ecosystem admin — see docs/INTEGRATOR_SCOPE.md)
-projects = await sdk.platform.api.get_projects()
+projects = await sdk.api.get("/projects")
 
 # Использование Neural Cache
 await sdk.neural.cache.set('key', 'value')
@@ -261,18 +265,15 @@ Ecosystem admin hooks (`useAdminUsers`, …) require `sdkAudience: 'platform_ope
 
 #### Auth Service
 ```typescript
-// Аутентификация
-const tokens = await sdk.auth.login({
+// Предпочитайте sdk.platform.auth (sdk.auth — тот же модуль)
+const tokens = await sdk.platform.auth.login({
   email: 'user@example.com',
   password: 'password',
-  project_id: 1
+  project_id: 1,
 });
 
-// Обновление токена
-const newTokens = await sdk.auth.refresh(tokens.refresh_token);
-
-// Получение профиля
-const profile = await sdk.auth.getProfile();
+const newTokens = await sdk.platform.auth.refresh(tokens.refresh_token);
+const profile = await sdk.platform.auth.getProfile();
 ```
 
 #### Projects Service
@@ -339,45 +340,38 @@ await sdk.neural.cache.set('user:123:profile', userProfile, 300);
 const profile = await sdk.neural.cache.get('user:123:profile');
 
 // Кэширование с тегами
-await sdk.neural.cache.setWithTags('project:456', projectData, ['projects', 'active']);
-const projects = await sdk.neural.cache.getByTag('projects');
+await sdk.neural.cache.setWithTags('project:456', projectData, ['projects', 'active'], 600);
 
 // Инвалидация кэша
-await sdk.neural.cache.invalidate('user:123:*');
+await sdk.neural.cache.invalidateByPattern('user:123:*');
 await sdk.neural.cache.invalidateByTag('projects');
 ```
 
 #### Neural Events
 ```typescript
-// Отправка событий
-await sdk.neural.events.emit('payment_created', {
+await sdk.neural.emitEvent('payment_created', {
   payment_id: '123',
   amount: 1000,
-  currency: 'RUB'
+  currency: 'RUB',
 });
 
-// Подписка на события
-sdk.neural.events.on('payment_created', (data) => {
-  console.log('Payment created:', data);
-});
+await sdk.neural.emitEvent('payment_created', { payment_id: 'pay_1' });
 
-// Отписка от событий
-sdk.neural.events.off('payment_created', handler);
+sdk.on('neural:cache:hit', (key) => console.debug('cache hit', key));
 ```
 
 #### Pattern Analysis
 ```typescript
-// Анализ паттернов
 const patterns = await sdk.neural.patterns.analyze('user_behavior', {
   user_id: 123,
-  period: '30d'
+  project_id: 1,
+  period: '30d',
 });
 
-// Предсказания
 const predictions = await sdk.neural.patterns.predict('payment_success', {
-  amount: 1000,
-  currency: 'RUB',
-  user_id: 123
+  user_id: 123,
+  project_id: 1,
+  input_data: { amount: 1000, currency: 'RUB' },
 });
 ```
 
@@ -538,16 +532,16 @@ describe('Integrator SDK', () => {
 ```typescript
 describe('SDK Integration', () => {
   it('should handle authentication flow', async () => {
-    const tokens = await sdk.auth.login({
+    const tokens = await sdk.platform.auth.login({
       email: 'test@example.com',
       password: 'password',
-      project_id: 1
+      project_id: 1,
     });
 
     expect(tokens.access_token).toBeDefined();
     expect(tokens.refresh_token).toBeDefined();
 
-    const profile = await sdk.auth.getProfile();
+    const profile = await sdk.platform.auth.getProfile();
     expect(profile.email).toBe('test@example.com');
   });
 });
@@ -578,59 +572,38 @@ class UserService {
     this.sdk = sdk;
   }
 
-  async getUserProfile(userId: string) {
-    // Проверяем кэш
-    const cached = await this.sdk.neural.cache.get(`user:${userId}:profile`);
-    if (cached) {
-      return cached;
-    }
+  async getMemberProfile(projectId: number, userId: number) {
+    const key = `user:${userId}:profile`;
+    const cached = await this.sdk.neural.cache.get(key);
+    if (cached) return cached;
 
-    // Получаем данные
-    const profile = await this.sdk.platform.api.getUser(userId);
-    
-    // Кэшируем с предсказанием TTL
-    await this.sdk.neural.cache.set(`user:${userId}:profile`, profile, 300);
-    
-    return profile;
+    const { users } = await this.sdk.platform.api.getProjectUsers(projectId, { limit: 100 });
+    const member = users.find((u) => u.id === userId);
+    if (member) await this.sdk.neural.cache.set(key, member, 300);
+    return member;
   }
 
-  async updateUserProfile(userId: string, updates: any) {
-    // Обновляем данные
-    const updated = await this.sdk.platform.api.updateUser(userId, updates);
-    
-    // Инвалидируем кэш
-    await this.sdk.neural.cache.invalidate(`user:${userId}:*`);
-    
-    return updated;
+  async updateMyProfile(updates: { display_name?: string }) {
+    await this.sdk.platform.auth.updateProfileData(updates);
+    await this.sdk.neural.cache.invalidateByPattern('user:*');
   }
 }
 ```
 
 ## 🔒 Безопасность
 
-### API Key Management
-```typescript
-// Создание API ключа с ограничениями
-const apiKey = await sdk.auth.createApiKey({
-  name: 'Admin Dashboard Key',
-  scopes: ['admin:read', 'admin:write'],
-  rate_limit_per_minute: 1000,
-  expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 дней
-});
-```
+- Не коммитьте API keys; используйте `AGENTSTACK_API_KEY` / `VITE_AGENTSTACK_API_KEY`.
+- Tenant-приложения: **без** `sdk.admin` — [docs/INTEGRATOR_SCOPE.md](docs/INTEGRATOR_SCOPE.md).
+- Ключи проекта — через панель проекта / `sdk.platform.api`, не устаревший `sdk.auth.createApiKey` (deprecated).
 
-### Secure Configuration
 ```typescript
+import { AgentStackSDK, resolveAgentStackApiBase } from '@agentstack/sdk';
+
 const sdk = new AgentStackSDK({
-  apiBase: process.env.AGENTSTACK_API_BASE,
+  apiBase: process.env.AGENTSTACK_API_BASE ?? resolveAgentStackApiBase(),
   apiKey: process.env.AGENTSTACK_API_KEY,
-  
-  // Безопасные настройки
-  security: {
-    validateSSL: true,
-    timeout: 30000,
-    retryOnFailure: true
-  }
+  projectId: Number(process.env.AGENTSTACK_PROJECT_ID),
+  timeout: 30000,
 });
 ```
 

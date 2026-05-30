@@ -21,13 +21,15 @@ const FENCE_TOLERANCE = 6;
 
 const LEGACY_RU_README_EN = LEGACY_RU_EXTENDED_EN;
 
+/** ~95% of legacy RU README line counts (full 1:1 not required for 1100-line core RU) */
 const MIN_EN_LINES = {
-  'README.en.md': 450,
-  'packages/core/README.en.md': 320,
-  'packages/react/README.en.md': 280,
-  'packages/hooks/README.en.md': 140,
-  'packages/python/README.en.md': 85,
-  'docs/PROTEIN_SYSTEM_GUIDE.md': 260,
+  'README.en.md': 669,
+  'packages/core/README.en.md': 1051,
+  'packages/react/README.en.md': 633,
+  'packages/hooks/README.en.md': 280,
+  'packages/python/README.en.md': 256,
+  'docs/MODULAR_ARCHITECTURE.md': 312,
+  'docs/PROTEIN_SYSTEM_GUIDE.md': 470,
 };
 
 /** P0 docs where EN is canonical narrative but RU legacy is much longer */
@@ -54,9 +56,9 @@ function main() {
     seen.add(key);
 
     if (e.pairRole === 'pair-stub') {
-      if (isP0EnPath(enPath)) {
-        warns.push(`${enPath}: P0 doc still pair-stub`);
-      }
+      const msg = `${enPath}: P0 doc still pair-stub`;
+      if (isP0EnPath(enPath)) errors.push(msg);
+      else warns.push(msg);
       continue;
     }
 

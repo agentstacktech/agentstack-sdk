@@ -161,6 +161,7 @@
     "check:docs-urls": "node ./scripts/check-docs-urls.mjs",
     "check:package-exports": "node ./scripts/check-package-exports.mjs",
     "check:docs-api-symbols": "node ./scripts/check-docs-api-symbols.mjs",
+    "check:docs-sdk-method-calls": "node ./scripts/check-docs-sdk-method-calls.mjs",
     "check:openapi-sdk-sample": "node ./scripts/check-openapi-sdk-sample.mjs",
     "clean": "rimraf dist",
     "prepublishOnly": "npm run clean && npm run build"

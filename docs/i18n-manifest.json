@@ -1,13 +1,39 @@
 {
-  "generatedAt": "2026-05-30T02:41:17.905Z",
+  "generatedAt": "2026-05-30T09:58:06.050Z",
   "entries": [
     {
       "path": "README.en.md",
       "lang": "en",
       "mirror": "README.md",
       "pairRole": "paired",
-      "lineCount": 539,
-      "codeFences": 48,
+      "lineCount": 670,
+      "h2Count": 23,
+      "h2Slugs": [
+        "tutorial-first-call-15-min",
+        "how-to-add-the-sdk-to-your-project",
+        "project-goals",
+        "repository-layout",
+        "key-features",
+        "how-to-install-flows-a-h",
+        "quick-start-by-runtime",
+        "api-reference-overview",
+        "react-hooks",
+        "configuration",
+        "environment-variables",
+        "testing",
+        "examples",
+        "security",
+        "monitoring-metrics",
+        "production-api",
+        "troubleshooting",
+        "integrator-vs-operator",
+        "publishing-mirror",
+        "contributing-support",
+        "support",
+        "license",
+        "links"
+      ],
+      "codeFences": 52,
       "syncStatus": "legacy-ru-path",
       "diataxis": null
     },
@@ -16,8 +42,27 @@
       "lang": "ru",
       "mirror": "README.en.md",
       "pairRole": "paired",
-      "lineCount": 704,
-      "codeFences": 56,
+      "lineCount": 677,
+      "h2Count": 16,
+      "h2Slugs": [
+        "how-to-add-the-sdk-to-your-project",
+        "цели-проекта",
+        "архитектура",
+        "ключевые-особенности",
+        "установка",
+        "быстрый-старт",
+        "api-reference",
+        "react-hooks",
+        "конфигурация",
+        "тестирование",
+        "примеры-использования",
+        "безопасность",
+        "мониторинг-и-метрики",
+        "production-api-base",
+        "contributing",
+        "поддержка"
+      ],
+      "codeFences": 54,
       "syncStatus": "legacy-ru-path",
       "diataxis": null
     },
@@ -26,7 +71,20 @@
       "lang": "en",
       "mirror": "docs/DOCS_I18N_ru.md",
       "pairRole": "paired",
-      "lineCount": 97,
+      "lineCount": 101,
+      "h2Count": 10,
+      "h2Slugs": [
+        "priority",
+        "file-naming",
+        "what-to-translate",
+        "maintainer-workflow",
+        "di-taxis-navigation",
+        "naming-exceptions",
+        "sync-statuses-manifest",
+        "pr-checklist",
+        "ci",
+        "registry"
+      ],
       "codeFences": 0,
       "syncStatus": "balanced",
       "diataxis": null
@@ -37,6 +95,19 @@
       "mirror": "docs/DOCS_I18N.md",
       "pairRole": "paired",
       "lineCount": 93,
+      "h2Count": 10,
+      "h2Slugs": [
+        "приоритет",
+        "имена-файлов",
+        "что-переводить",
+        "workflow",
+        "di-taxis",
+        "исключения-имён",
+        "статусы-sync",
+        "pr-checklist",
+        "ci",
+        "реестр"
+      ],
       "codeFences": 0,
       "syncStatus": "balanced",
       "diataxis": null
@@ -46,7 +117,18 @@
       "lang": "en",
       "mirror": "docs/DOC_HUB_ru.md",
       "pairRole": "paired",
-      "lineCount": 69,
+      "lineCount": 70,
+      "h2Count": 8,
+      "h2Slugs": [
+        "di-taxis-lanes",
+        "start-here-p0",
+        "ai-integrators",
+        "react-packages",
+        "repo-platform",
+        "archived-historical-not-api-truth",
+        "maintenance",
+        "examples"
+      ],
       "codeFences": 0,
       "syncStatus": "balanced",
       "diataxis": null
@@ -56,7 +138,18 @@
       "lang": "ru",
       "mirror": "docs/DOC_HUB.md",
       "pairRole": "paired",
-      "lineCount": 68,
+      "lineCount": 69,
+      "h2Count": 8,
+      "h2Slugs": [
+        "полосы-di-taxis",
+        "старт-p0",
+        "ai-и-интеграторы",
+        "react-и-пакеты",
+        "репозиторий-и-платформа",
+        "архив-исторические-не-api-truth",
+        "поддержка",
+        "примеры"
+      ],
       "codeFences": 0,
       "syncStatus": "balanced",
       "diataxis": null
@@ -67,6 +160,8 @@
       "mirror": "docs/GLOSSARY_ru.md",
       "pairRole": "paired",
       "lineCount": 44,
+      "h2Count": 0,
+      "h2Slugs": [],
       "codeFences": 0,
       "syncStatus": "balanced",
       "diataxis": "reference"
@@ -77,6 +172,8 @@
       "mirror": "docs/GLOSSARY.md",
       "pairRole": "paired",
       "lineCount": 44,
+      "h2Count": 0,
+      "h2Slugs": [],
       "codeFences": 0,
       "syncStatus": "balanced",
       "diataxis": "reference"
@@ -87,6 +184,14 @@
       "mirror": "docs/README_ru.md",
       "pairRole": "paired",
       "lineCount": 54,
+      "h2Count": 5,
+      "h2Slugs": [
+        "start-here",
+        "deep-dives",
+        "platform-monorepo",
+        "examples",
+        "support"
+      ],
       "codeFences": 0,
       "syncStatus": "balanced",
       "diataxis": null
@@ -97,6 +202,14 @@
       "mirror": "docs/README.md",
       "pairRole": "paired",
       "lineCount": 51,
+      "h2Count": 5,
+      "h2Slugs": [
+        "с-чего-начать",
+        "углублённо",
+        "платформа",
+        "примеры",
+        "поддержка"
+      ],
       "codeFences": 0,
       "syncStatus": "balanced",
       "diataxis": null
@@ -107,6 +220,20 @@
       "mirror": "docs/SDK_INTEGRATION_FLOWS_ru.md",
       "pairRole": "paired",
       "lineCount": 234,
+      "h2Count": 11,
+      "h2Slugs": [
+        "decision-tree",
+        "flow-a-npm-default-for-apps",
+        "flow-b-git-submodule-vendored-source",
+        "flow-c-platform-submodule-full-agentstack",
+        "flow-d-agentstack-monorepo-sibling-this-repo",
+        "flow-e-local-sdk-development-npm-link",
+        "flow-f-maintain-publish-sdk-agentstack-team",
+        "flow-g-python-agentstack-sdk",
+        "flow-h-ai-automation-no-app-install",
+        "runtime-checklist-any-flow",
+        "compare-at-a-glance"
+      ],
       "codeFences": 22,
       "syncStatus": "balanced",
       "diataxis": "how-to"
@@ -117,6 +244,20 @@
       "mirror": "docs/SDK_INTEGRATION_FLOWS.md",
       "pairRole": "paired",
       "lineCount": 184,
+      "h2Count": 11,
+      "h2Slugs": [
+        "дерево-решений",
+        "поток-a-npm-по-умолчанию",
+        "поток-b-git-submodule",
+        "поток-c-submodule-всей-платформы",
+        "поток-d-sibling-в-monorepo-agentstack",
+        "поток-e-локальная-разработка-npm-link",
+        "поток-f-publish-sdk-команда-agentstack",
+        "поток-g-python",
+        "поток-h-ai-automation",
+        "чеклист-после-установки-любой-поток",
+        "сравнение"
+      ],
       "codeFences": 16,
       "syncStatus": "balanced",
       "diataxis": "how-to"
@@ -127,6 +268,11 @@
       "mirror": "docs/quick-start_ru.md",
       "pairRole": "paired",
       "lineCount": 40,
+      "h2Count": 2,
+      "h2Slugs": [
+        "environment-variables",
+        "local-development"
+      ],
       "codeFences": 4,
       "syncStatus": "balanced",
       "diataxis": "tutorial"
@@ -137,6 +283,11 @@
       "mirror": "docs/quick-start.md",
       "pairRole": "paired",
       "lineCount": 42,
+      "h2Count": 2,
+      "h2Slugs": [
+        "переменные-окружения",
+        "локальная-разработка"
+      ],
       "codeFences": 4,
       "syncStatus": "balanced",
       "diataxis": "tutorial"
@@ -147,6 +298,14 @@
       "mirror": "docs/INTEGRATOR_SCOPE_ru.md",
       "pairRole": "paired",
       "lineCount": 82,
+      "h2Count": 5,
+      "h2Slugs": [
+        "what-integrators-should-use-instead",
+        "runtime-guards-typescript",
+        "api-base-url",
+        "configuration",
+        "discovery-for-ai-agents"
+      ],
       "codeFences": 2,
       "syncStatus": "balanced",
       "diataxis": "reference"
@@ -157,6 +316,14 @@
       "mirror": "docs/INTEGRATOR_SCOPE.md",
       "pairRole": "paired",
       "lineCount": 81,
+      "h2Count": 5,
+      "h2Slugs": [
+        "чем-пользоваться-интеграторам",
+        "защита-в-рантайме-typescript",
+        "базовый-url-api",
+        "конфигурация",
+        "discovery-для-ai"
+      ],
       "codeFences": 2,
       "syncStatus": "balanced",
       "diataxis": "reference"
@@ -167,6 +334,15 @@
       "mirror": "docs/PROJECT_CONTEXT_ru.md",
       "pairRole": "paired",
       "lineCount": 93,
+      "h2Count": 6,
+      "h2Slugs": [
+        "where-it-is-set",
+        "http-behavior-httpclient",
+        "recommended-integrator-flow",
+        "messenger-embed",
+        "platform-operator-note",
+        "helpers-package-exports"
+      ],
       "codeFences": 4,
       "syncStatus": "balanced",
       "diataxis": "how-to"
@@ -177,6 +353,15 @@
       "mirror": "docs/PROJECT_CONTEXT.md",
       "pairRole": "paired",
       "lineCount": 84,
+      "h2Count": 6,
+      "h2Slugs": [
+        "где-задаётся",
+        "http-httpclient",
+        "рекомендуемый-flow-интегратора",
+        "messenger-embed",
+        "оператор-платформы",
+        "хелперы-экспорт-пакета"
+      ],
       "codeFences": 4,
       "syncStatus": "balanced",
       "diataxis": "how-to"
@@ -187,6 +372,12 @@
       "mirror": "docs/SUBMODULE_CONSUMER_ru.md",
       "pairRole": "paired",
       "lineCount": 34,
+      "h2Count": 3,
+      "h2Slugs": [
+        "scripts-in-this-repo",
+        "default-layout",
+        "example-gitmodules"
+      ],
       "codeFences": 2,
       "syncStatus": "balanced",
       "diataxis": "how-to"
@@ -197,6 +388,12 @@
       "mirror": "docs/SUBMODULE_CONSUMER.md",
       "pairRole": "paired",
       "lineCount": 34,
+      "h2Count": 3,
+      "h2Slugs": [
+        "скрипты-в-этом-репозитории",
+        "типовая-структура",
+        "пример-gitmodules"
+      ],
       "codeFences": 2,
       "syncStatus": "balanced",
       "diataxis": "how-to"
@@ -207,6 +404,15 @@
       "mirror": "AGENTS_ru.md",
       "pairRole": "paired",
       "lineCount": 102,
+      "h2Count": 6,
+      "h2Slugs": [
+        "60-second-bootstrap",
+        "discover-validate-execute",
+        "decision-tree",
+        "genetic-routing-hot-paths",
+        "anti-patterns",
+        "links"
+      ],
       "codeFences": 2,
       "syncStatus": "balanced",
       "diataxis": null
@@ -217,6 +423,15 @@
       "mirror": "AGENTS.md",
       "pairRole": "paired",
       "lineCount": 85,
+      "h2Count": 6,
+      "h2Slugs": [
+        "bootstrap-за-60-секунд",
+        "discover-validate-execute",
+        "дерево-решений",
+        "анти-паттерны",
+        "genetic-routing",
+        "ссылки"
+      ],
       "codeFences": 2,
       "syncStatus": "balanced",
       "diataxis": null
@@ -227,6 +442,19 @@
       "mirror": "docs/AI_INTEGRATOR_GUIDE_ru.md",
       "pairRole": "paired",
       "lineCount": 104,
+      "h2Count": 10,
+      "h2Slugs": [
+        "1-install-and-environment",
+        "2-self-description-call-first",
+        "3-agentprotocol-patterns",
+        "4-commerce-economy-support-integrations",
+        "5-messenger-high-level",
+        "6-media-offload",
+        "7-optrace-and-errors",
+        "8-mcp-rest-parity",
+        "9-application-factory-recipes",
+        "10-python-parity"
+      ],
       "codeFences": 8,
       "syncStatus": "balanced",
       "diataxis": null
@@ -237,6 +465,19 @@
       "mirror": "docs/AI_INTEGRATOR_GUIDE.md",
       "pairRole": "paired",
       "lineCount": 105,
+      "h2Count": 10,
+      "h2Slugs": [
+        "1-установка-и-окружение",
+        "2-self-description-вызывать-первым",
+        "3-паттерны-agentprotocol",
+        "4-commerce-economy-support-integrations",
+        "5-messenger-кратко",
+        "6-media-offload",
+        "7-optrace-и-ошибки",
+        "8-mcp-rest-parity",
+        "9-рецепты-application-factory",
+        "10-python-parity"
+      ],
       "codeFences": 8,
       "syncStatus": "balanced",
       "diataxis": null
@@ -247,6 +488,15 @@
       "mirror": "docs/AI_APPLICATION_FACTORY_ru.md",
       "pairRole": "paired",
       "lineCount": 105,
+      "h2Count": 6,
+      "h2Slugs": [
+        "r1-static-site-hosting",
+        "r2-crud-mini-app-rest-dna",
+        "r3-shop-commerce",
+        "r4-support-channel",
+        "r5-logic-blueprint",
+        "r6-comfort-task-headless"
+      ],
       "codeFences": 12,
       "syncStatus": "balanced",
       "diataxis": "how-to"
@@ -257,6 +507,15 @@
       "mirror": "docs/AI_APPLICATION_FACTORY.md",
       "pairRole": "paired",
       "lineCount": 103,
+      "h2Count": 6,
+      "h2Slugs": [
+        "r1-статический-сайт-hosting",
+        "r2-crud-mini-app-rest-dna",
+        "r3-магазин-commerce",
+        "r4-support-channel",
+        "r5-logic-blueprint",
+        "r6-comfort-task-headless"
+      ],
       "codeFences": 12,
       "syncStatus": "balanced",
       "diataxis": "how-to"
@@ -267,6 +526,8 @@
       "mirror": "docs/AI_ERROR_ACTION_MATRIX_ru.md",
       "pairRole": "paired",
       "lineCount": 17,
+      "h2Count": 0,
+      "h2Slugs": [],
       "codeFences": 0,
       "syncStatus": "balanced",
       "diataxis": "reference"
@@ -277,6 +538,8 @@
       "mirror": "docs/AI_ERROR_ACTION_MATRIX.md",
       "pairRole": "paired",
       "lineCount": 17,
+      "h2Count": 0,
+      "h2Slugs": [],
       "codeFences": 0,
       "syncStatus": "balanced",
       "diataxis": "reference"
@@ -286,7 +549,13 @@
       "lang": "en",
       "mirror": "docs/SDK_DOCS_I18N_ROADMAP_ru.md",
       "pairRole": "paired",
-      "lineCount": 39,
+      "lineCount": 40,
+      "h2Count": 3,
+      "h2Slugs": [
+        "done-v2-sync",
+        "optional-later",
+        "maintainer-checklist"
+      ],
       "codeFences": 2,
       "syncStatus": "balanced",
       "diataxis": null
@@ -297,6 +566,12 @@
       "mirror": "docs/SDK_DOCS_I18N_ROADMAP.md",
       "pairRole": "paired",
       "lineCount": 41,
+      "h2Count": 3,
+      "h2Slugs": [
+        "сделано-v2",
+        "опционально-позже",
+        "чеклист-maintainer"
+      ],
       "codeFences": 2,
       "syncStatus": "balanced",
       "diataxis": null
@@ -307,6 +582,14 @@
       "mirror": "docs/ARCHITECTURE_ru.md",
       "pairRole": "paired",
       "lineCount": 73,
+      "h2Count": 5,
+      "h2Slugs": [
+        "layers",
+        "patterns",
+        "package-layout",
+        "discovery-workflow",
+        "related"
+      ],
       "codeFences": 2,
       "syncStatus": "balanced",
       "diataxis": "explanation"
@@ -317,6 +600,14 @@
       "mirror": "docs/ARCHITECTURE.md",
       "pairRole": "paired",
       "lineCount": 53,
+      "h2Count": 5,
+      "h2Slugs": [
+        "слои",
+        "паттерны",
+        "пакеты",
+        "discovery",
+        "связанные-документы"
+      ],
       "codeFences": 0,
       "syncStatus": "balanced",
       "diataxis": "explanation"
@@ -327,6 +618,15 @@
       "mirror": "docs/REACT_QUERY_INTEGRATION_ru.md",
       "pairRole": "paired",
       "lineCount": 102,
+      "h2Count": 6,
+      "h2Slugs": [
+        "provider-canonical",
+        "hooks",
+        "example-query",
+        "invalidation",
+        "admin-hooks",
+        "related"
+      ],
       "codeFences": 6,
       "syncStatus": "balanced",
       "diataxis": null
@@ -337,6 +637,15 @@
       "mirror": "docs/REACT_QUERY_INTEGRATION.md",
       "pairRole": "paired",
       "lineCount": 102,
+      "h2Count": 6,
+      "h2Slugs": [
+        "provider-канон",
+        "хуки",
+        "пример-query",
+        "инвалидация",
+        "admin-hooks",
+        "связанные-документы"
+      ],
       "codeFences": 6,
       "syncStatus": "balanced",
       "diataxis": null
@@ -346,8 +655,43 @@
       "lang": "en",
       "mirror": "packages/core/README.md",
       "pairRole": "paired",
-      "lineCount": 339,
-      "codeFences": 44,
+      "lineCount": 1090,
+      "h2Count": 32,
+      "h2Slugs": [
+        "quick-start",
+        "entity-snapshot-repository",
+        "agenti18n-zero-config",
+        "architecture",
+        "authentication-sdk-platform-auth",
+        "payments-sdk-payments",
+        "analytics-sdk-analytics",
+        "projects-sdk-platform-api",
+        "rbac-sdk-platform-rbac",
+        "webhooks-sdk-webhooks",
+        "wallets-sdk-wallets",
+        "notifications-sdk-notifications",
+        "scheduler-sdk-scheduler",
+        "agentdocs-sdk-docs",
+        "agentprotocol-sdk-platform-protocol",
+        "commerce-dna",
+        "neural-architecture-sdk-neural",
+        "platform-operator-not-for-npm-integrators",
+        "configuration",
+        "error-handling",
+        "metrics-monitoring",
+        "testing",
+        "ai-discovery",
+        "subpath-exports",
+        "entity-snapshots-advanced",
+        "agenti18n-extended",
+        "integrations-support-when-enabled",
+        "choosing-an-api-style",
+        "license",
+        "additional-resources",
+        "support",
+        "resources"
+      ],
+      "codeFences": 120,
       "syncStatus": "legacy-ru-path",
       "diataxis": null
     },
@@ -356,8 +700,32 @@
       "lang": "ru",
       "mirror": "packages/core/README.en.md",
       "pairRole": "paired",
-      "lineCount": 1106,
-      "codeFences": 83,
+      "lineCount": 1026,
+      "h2Count": 21,
+      "h2Slugs": [
+        "быстрый-старт",
+        "entity-snapshot-repository-structural-cache",
+        "new-agenti18n-ai-first-translations",
+        "архитектура",
+        "аутентификация-agentauth",
+        "платежи-agentpayments",
+        "аналитика-agentanalytics",
+        "api-ключи-и-проекты-agentapi",
+        "webhooks-agentwebhooks",
+        "кошельки-agentwallets",
+        "уведомления-agentnotifications",
+        "планировщик-agentscheduler",
+        "platform-operator-not-for-npm-integrators",
+        "neural-архитектура-sdk-neural",
+        "конфигурация",
+        "обработка-ошибок",
+        "метрики-и-мониторинг",
+        "тестирование",
+        "дополнительные-ресурсы",
+        "поддержка",
+        "лицензия"
+      ],
+      "codeFences": 81,
       "syncStatus": "legacy-ru-path",
       "diataxis": null
     },
@@ -366,8 +734,33 @@
       "lang": "en",
       "mirror": "packages/react/README.md",
       "pairRole": "paired",
-      "lineCount": 302,
-      "codeFences": 18,
+      "lineCount": 656,
+      "h2Count": 22,
+      "h2Slugs": [
+        "quick-start",
+        "hooks-overview",
+        "useauth",
+        "useprofile",
+        "usesettings",
+        "usepayments",
+        "useanalytics",
+        "useprojects",
+        "usesdkquery-mutations",
+        "components",
+        "invalidation",
+        "admin-hooks-operator-only",
+        "configuration",
+        "styling",
+        "state-management",
+        "ssr",
+        "error-handling",
+        "testing",
+        "resources",
+        "support",
+        "changelog",
+        "license"
+      ],
+      "codeFences": 44,
       "syncStatus": "legacy-ru-path",
       "diataxis": null
     },
@@ -377,6 +770,21 @@
       "mirror": "packages/react/README.en.md",
       "pairRole": "paired",
       "lineCount": 666,
+      "h2Count": 12,
+      "h2Slugs": [
+        "быстрый-старт",
+        "react-hooks",
+        "компоненты",
+        "конфигурация",
+        "стилизация",
+        "управление-состоянием",
+        "обработка-ошибок",
+        "ssr-поддержка",
+        "тестирование",
+        "дополнительные-ресурсы",
+        "поддержка",
+        "лицензия"
+      ],
       "codeFences": 36,
       "syncStatus": "legacy-ru-path",
       "diataxis": null
@@ -386,8 +794,28 @@
       "lang": "en",
       "mirror": "packages/python/README.md",
       "pairRole": "paired",
-      "lineCount": 93,
-      "codeFences": 10,
+      "lineCount": 271,
+      "h2Count": 17,
+      "h2Slugs": [
+        "install",
+        "quick-start",
+        "modular-architecture",
+        "agentauth",
+        "agentpayments",
+        "agentanalytics",
+        "agentwebhooks",
+        "agentscheduler",
+        "agentneural",
+        "agentdocs-subset",
+        "configuration",
+        "error-handling",
+        "utilities",
+        "requirements",
+        "parity-docs",
+        "support",
+        "license"
+      ],
+      "codeFences": 28,
       "syncStatus": "legacy-ru-path",
       "diataxis": null
     },
@@ -396,8 +824,20 @@
       "lang": "ru",
       "mirror": "packages/python/README.en.md",
       "pairRole": "paired",
-      "lineCount": 269,
-      "codeFences": 24,
+      "lineCount": 272,
+      "h2Count": 9,
+      "h2Slugs": [
+        "установка",
+        "быстрый-старт",
+        "модульная-архитектура",
+        "конфигурация",
+        "утилиты",
+        "требования",
+        "обработка-ошибок",
+        "дополнительные-ресурсы",
+        "лицензия"
+      ],
+      "codeFences": 25,
       "syncStatus": "legacy-ru-path",
       "diataxis": null
     },
@@ -406,8 +846,26 @@
       "lang": "en",
       "mirror": "packages/hooks/README.md",
       "pairRole": "paired",
-      "lineCount": 156,
-      "codeFences": 18,
+      "lineCount": 289,
+      "h2Count": 15,
+      "h2Slugs": [
+        "ai-first-design",
+        "install",
+        "quick-start",
+        "domain-hooks",
+        "usesdkquery",
+        "usesdkmutation",
+        "hook-pattern",
+        "options",
+        "example-ops-dashboard",
+        "type-definitions",
+        "advanced-custom-ui",
+        "ai-usage-guide",
+        "react-query-integration",
+        "related",
+        "license"
+      ],
+      "codeFences": 32,
       "syncStatus": "legacy-ru-path",
       "diataxis": null
     },
@@ -417,6 +875,22 @@
       "mirror": "packages/hooks/README.en.md",
       "pairRole": "paired",
       "lineCount": 295,
+      "h2Count": 13,
+      "h2Slugs": [
+        "ai-first-philosophy",
+        "installation",
+        "quick-start",
+        "available-hooks",
+        "hook-pattern",
+        "options",
+        "type-definitions",
+        "example-custom-dashboard",
+        "advanced-custom-ui",
+        "ai-usage-guide",
+        "react-query-integration",
+        "links",
+        "license"
+      ],
       "codeFences": 36,
       "syncStatus": "legacy-ru-path",
       "diataxis": null
@@ -426,8 +900,19 @@
       "lang": "en",
       "mirror": "docs/MODULAR_ARCHITECTURE_ru.md",
       "pairRole": "paired",
-      "lineCount": 220,
-      "codeFences": 20,
+      "lineCount": 309,
+      "h2Count": 8,
+      "h2Slugs": [
+        "overview",
+        "module-map",
+        "module-reference",
+        "benefits-of-modular-architecture",
+        "configuration",
+        "benefits-of-modular-architecture",
+        "quick-start",
+        "resources"
+      ],
+      "codeFences": 24,
       "syncStatus": "balanced",
       "diataxis": "explanation"
     },
@@ -436,7 +921,16 @@
       "lang": "ru",
       "mirror": "docs/MODULAR_ARCHITECTURE.md",
       "pairRole": "paired",
-      "lineCount": 328,
+      "lineCount": 330,
+      "h2Count": 6,
+      "h2Slugs": [
+        "обзор",
+        "структура-модулей",
+        "преимущества-модульной-архитектуры",
+        "конфигурация-sdk",
+        "быстрый-старт",
+        "дополнительные-ресурсы"
+      ],
       "codeFences": 20,
       "syncStatus": "balanced",
       "diataxis": "explanation"
@@ -446,8 +940,28 @@
       "lang": "en",
       "mirror": "docs/PROTEIN_SYSTEM_GUIDE_ru.md",
       "pairRole": "paired",
-      "lineCount": 275,
-      "codeFences": 22,
+      "lineCount": 493,
+      "h2Count": 17,
+      "h2Slugs": [
+        "overview",
+        "architecture",
+        "quick-start",
+        "protein-commands",
+        "page-composition",
+        "game-data",
+        "advanced-features",
+        "event-system",
+        "cache-management",
+        "integrator-vs-operator",
+        "migrating-from-sdk-protein-to-protocol",
+        "related-docs",
+        "protein-configuration",
+        "troubleshooting",
+        "best-practices",
+        "api-reference-source",
+        "support"
+      ],
+      "codeFences": 38,
       "syncStatus": "balanced",
       "diataxis": "explanation"
     },
@@ -456,7 +970,27 @@
       "lang": "ru",
       "mirror": "docs/PROTEIN_SYSTEM_GUIDE.md",
       "pairRole": "paired",
-      "lineCount": 495,
+      "lineCount": 494,
+      "h2Count": 17,
+      "h2Slugs": [
+        "overview",
+        "architecture",
+        "quick-start",
+        "protein-commands",
+        "page-composition-system",
+        "game-data-system",
+        "advanced-features",
+        "event-system",
+        "cache-management",
+        "performance-metrics",
+        "configuration",
+        "troubleshooting",
+        "examples",
+        "best-practices",
+        "api-reference",
+        "contributing",
+        "license"
+      ],
       "codeFences": 34,
       "syncStatus": "balanced",
       "diataxis": "explanation"
@@ -467,6 +1001,8 @@
       "mirror": "docs/AI_REACT_SCAFFOLD_ru.md",
       "pairRole": "paired",
       "lineCount": 41,
+      "h2Count": 0,
+      "h2Slugs": [],
       "codeFences": 2,
       "syncStatus": "balanced",
       "diataxis": null
@@ -477,6 +1013,8 @@
       "mirror": "docs/AI_REACT_SCAFFOLD.md",
       "pairRole": "paired",
       "lineCount": 41,
+      "h2Count": 0,
+      "h2Slugs": [],
       "codeFences": 2,
       "syncStatus": "balanced",
       "diataxis": null
@@ -487,6 +1025,12 @@
       "mirror": "docs/SDK_MODULE_CATALOG_ru.md",
       "pairRole": "paired",
       "lineCount": 34,
+      "h2Count": 3,
+      "h2Slugs": [
+        "runtime-discovery-integrators",
+        "generated-reference",
+        "workflow-for-ai-agents"
+      ],
       "codeFences": 2,
       "syncStatus": "balanced",
       "diataxis": "reference"
@@ -497,6 +1041,12 @@
       "mirror": "docs/SDK_MODULE_CATALOG.md",
       "pairRole": "paired",
       "lineCount": 26,
+      "h2Count": 3,
+      "h2Slugs": [
+        "discovery-в-runtime",
+        "таблица-в-monorepo",
+        "workflow"
+      ],
       "codeFences": 2,
       "syncStatus": "balanced",
       "diataxis": "reference"
@@ -507,6 +1057,14 @@
       "mirror": "CONTRIBUTING_ru.md",
       "pairRole": "paired",
       "lineCount": 76,
+      "h2Count": 5,
+      "h2Slugs": [
+        "getting-started",
+        "development-workflow",
+        "code-style",
+        "pull-request-guidelines",
+        "questions"
+      ],
       "codeFences": 6,
       "syncStatus": "balanced",
       "diataxis": null
@@ -517,6 +1075,14 @@
       "mirror": "CONTRIBUTING.md",
       "pairRole": "paired",
       "lineCount": 75,
+      "h2Count": 5,
+      "h2Slugs": [
+        "начало",
+        "workflow",
+        "стиль-кода",
+        "pull-request",
+        "вопросы"
+      ],
       "codeFences": 8,
       "syncStatus": "balanced",
       "diataxis": null
@@ -527,6 +1093,11 @@
       "mirror": "PUBLISHING_ru.md",
       "pairRole": "paired",
       "lineCount": 28,
+      "h2Count": 2,
+      "h2Slugs": [
+        "after-first-npm-publish",
+        "npm-publish-steps"
+      ],
       "codeFences": 4,
       "syncStatus": "balanced",
       "diataxis": null
@@ -537,6 +1108,12 @@
       "mirror": "PUBLISHING.md",
       "pairRole": "paired",
       "lineCount": 27,
+      "h2Count": 3,
+      "h2Slugs": [
+        "после-первого-npm-publish",
+        "шаги-npm",
+        "readme-на-github-mirror"
+      ],
       "codeFences": 2,
       "syncStatus": "balanced",
       "diataxis": null
@@ -547,6 +1124,12 @@
       "mirror": "SECURITY_ru.md",
       "pairRole": "paired",
       "lineCount": 21,
+      "h2Count": 3,
+      "h2Slugs": [
+        "supported-versions",
+        "reporting-a-vulnerability",
+        "secrets"
+      ],
       "codeFences": 0,
       "syncStatus": "balanced",
       "diataxis": null
@@ -557,6 +1140,12 @@
       "mirror": "SECURITY.md",
       "pairRole": "paired",
       "lineCount": 19,
+      "h2Count": 3,
+      "h2Slugs": [
+        "поддерживаемые-версии",
+        "сообщить-об-уязвимости",
+        "секреты"
+      ],
       "codeFences": 0,
       "syncStatus": "balanced",
       "diataxis": null
@@ -567,6 +1156,11 @@
       "mirror": "examples/ai/README_ru.md",
       "pairRole": "paired",
       "lineCount": 28,
+      "h2Count": 2,
+      "h2Slugs": [
+        "environments",
+        "local-development"
+      ],
       "codeFences": 2,
       "syncStatus": "balanced",
       "diataxis": "tutorial"
@@ -577,6 +1171,11 @@
       "mirror": "examples/ai/README.md",
       "pairRole": "paired",
       "lineCount": 30,
+      "h2Count": 2,
+      "h2Slugs": [
+        "окружение",
+        "локально"
+      ],
       "codeFences": 2,
       "syncStatus": "balanced",
       "diataxis": "tutorial"
@@ -587,6 +1186,11 @@
       "mirror": "examples/typescript/economy/README_ru.md",
       "pairRole": "paired",
       "lineCount": 17,
+      "h2Count": 2,
+      "h2Slugs": [
+        "environments",
+        "local-development"
+      ],
       "codeFences": 0,
       "syncStatus": "balanced",
       "diataxis": null
@@ -597,6 +1201,12 @@
       "mirror": "examples/typescript/economy/README.md",
       "pairRole": "paired",
       "lineCount": 22,
+      "h2Count": 3,
+      "h2Slugs": [
+        "окружения",
+        "локальная-разработка",
+        "документация"
+      ],
       "codeFences": 0,
       "syncStatus": "balanced",
       "diataxis": null

@@ -50,7 +50,7 @@ async def main():
         # --- Platform API (integrator; no ecosystem admin) ---
         print("\n--- Platform API ---")
         try:
-            projects = await sdk.platform.api.get_projects()
+            projects = await sdk.api.get("/projects")
             print(f"Projects count: {len(projects) if isinstance(projects, list) else 'n/a'}")
         except Exception as e:
             print(f"API error: {e}")

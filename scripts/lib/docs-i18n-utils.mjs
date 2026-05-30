@@ -11,6 +11,17 @@ export function h2Count(text) {
   return [...text.matchAll(/^## (.+)$/gm)].length;
 }
 
+/** Stable section ids from ## headings (for parity tooling, not anchor links). */
+export function extractH2Slugs(text) {
+  return [...text.matchAll(/^## (.+)$/gm)].map((m) =>
+    m[1]
+      .trim()
+      .toLowerCase()
+      .replace(/[^\w\u0400-\u04FF]+/gu, '-')
+      .replace(/^-+|-+$/g, ''),
+  );
+}
+
 export function codeFenceCount(text) {
   const matches = text.match(/```[\w-]*/g);
   return matches ? matches.length : 0;

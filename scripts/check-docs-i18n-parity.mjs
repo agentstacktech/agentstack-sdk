@@ -20,18 +20,12 @@ const H2_PARITY_SKIP_EN = new Set([
   'packages/python/README.en.md',
 ]);
 
-/** Monorepo pairs — keep in sync with generate-docs-i18n-manifest discoverMonorepoRuPairs(). */
-const MONOREPO_PAIRS = [
-  ['docs/SDK_AI_SURFACE.md', 'docs/SDK_AI_SURFACE_ru.md'],
-  ['docs/sdk/SDK_SUBMODULE_INTEGRATION.md', 'docs/sdk/SDK_SUBMODULE_INTEGRATION_ru.md'],
-  ['docs/sdk/SDK_MIRROR_PUBLISH_RUNBOOK.md', 'docs/sdk/SDK_MIRROR_PUBLISH_RUNBOOK_ru.md'],
-  ['docs/SDK_FEATURE_QUICKSTART.md', 'docs/SDK_FEATURE_QUICKSTART_ru.md'],
-  ['docs/AGENT_PROTOCOL_QUICKSTART.md', 'docs/AGENT_PROTOCOL_QUICKSTART_ru.md'],
-  ['docs/sdk/GENETIC_STARTER_SDK_SLICE.md', 'docs/sdk/GENETIC_STARTER_SDK_SLICE_ru.md'],
-  ['docs/sdk/COMMERCE_SHOP_SDK.md', 'docs/sdk/COMMERCE_SHOP_SDK_ru.md'],
-  ['docs/ecosystem/PYTHON_SDK_PARITY.md', 'docs/ecosystem/PYTHON_SDK_PARITY_ru.md'],
-  ['docs/ecosystem/REST_MCP_SDK_PARITY.md', 'docs/ecosystem/REST_MCP_SDK_PARITY_ru.md'],
-];
+function loadMonorepoPairs() {
+  const manifestPath = path.join(REPO_ROOT, 'docs', 'sdk', 'i18n-manifest.json');
+  if (!fs.existsSync(manifestPath)) return [];
+  const { pairs } = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  return (pairs ?? []).map((p) => [p.enPath, p.ruPath]);
+}
 
 function h2Count(text) {
   return [...text.matchAll(/^## (.+)$/gm)].length;
@@ -77,7 +71,7 @@ function main() {
       }
     }
 
-    for (const [enPath, ruPath] of MONOREPO_PAIRS) {
+    for (const [enPath, ruPath] of loadMonorepoPairs()) {
       const aPath = path.join(REPO_ROOT, enPath);
       const bPath = path.join(REPO_ROOT, ruPath);
       if (!fs.existsSync(aPath)) {

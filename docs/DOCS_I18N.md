@@ -19,7 +19,11 @@
 | `FOO.md` | English canonical (under `docs/` or repo root) |
 | `FOO_ru.md` | Russian mirror |
 | `README.en.md` | English repo README (GitHub default for international) |
-| `README.md` | Russian README + link to `README.en.md` |
+| `README.md` | Russian extended narrative + link to `README.en.md` (API-truth = EN) |
+| `README.md` | Russian extended repo README (API-truth = `README.en.md`) |
+| `packages/*/README.md` | Russian package docs |
+
+CI: `check:docs-legacy-ru-api` blocks removed APIs in all paths above.
 
 **npm package pages:** `packages/*/package.json` sets `"readme": "README.en.md"` so npmjs.com shows English. Russian package docs stay in `README.md` per package.
 
@@ -38,7 +42,7 @@ Exception: `AGENTS.md` stays English-only in `llms.txt`; optional `AGENTS_ru.md`
 
 1. Edit **English** file first.
 2. Update **`_ru.md`** in the same PR (or add `pair-stub` note in manifest if RU lags — max one release).
-3. Run `npm run generate:docs-i18n` then `npm run check:docs-i18n`.
+3. Run `npm run generate:docs-i18n` then `npm run check:docs-i18n:all` (parity, depth, URLs, API symbols, code samples).
 4. Update [DOC_HUB.md](./DOC_HUB.md) if you add a new paired doc.
 
 ## Diátaxis (navigation)

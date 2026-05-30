@@ -39,9 +39,12 @@ Each `Agent*` module owns one domain. Integrators start with **`sdk.platform.*`*
 
 ### 🔐 AgentAuth — authentication
 
+**Integrator:** yes · **Operator:** N/A (use monorepo admin for ecosystem users)
+
 - Login / logout, access & refresh tokens
-- Sessions and API keys
-- User profile
+- Profile, settings, theme, notifications
+- Sessions, password change, OAuth providers
+- Prefer `sdk.platform.auth` over legacy `sdk.auth`
 
 ```typescript
 const tokens = await sdk.platform.auth.login({
@@ -97,23 +100,33 @@ const examples = await sdk.docs.getCodeExamples({
 
 ### 💳 AgentPayments — payments
 
+Payments, refunds, provider configuration, and payment webhooks.
+
+**Capabilities:** create/cancel payments, list transactions, configure providers, payment webhook logs.
+
 ```typescript
 const payment = await sdk.payments.createPayment({
   amount: 1000,
-  currency: 'RUB',
+  currency: 'USD',
   description: 'Test payment',
+  project_id: 1,
 });
 const status = await sdk.payments.getPaymentStatus(payment.id);
+const stats = await sdk.payments.getPaymentStats({ project_id: 1 });
 ```
 
 ---
 
 ### 📊 AgentAnalytics — metrics
 
+Analytics events, dashboards, custom reports, alerts, and export.
+
+**Capabilities:** `trackEvent`, dashboard/usage stats, funnels, custom reports, metrics CRUD.
+
 ```typescript
 await sdk.analytics.trackEvent({
   event_type: 'user_login',
-  user_id: 123,
+  project_id: 1,
   metadata: { source: 'web' },
 });
 const metrics = await sdk.analytics.getDashboardMetrics();
@@ -123,6 +136,8 @@ const metrics = await sdk.analytics.getDashboardMetrics();
 
 ### 🔗 AgentWebhooks — webhooks
 
+Register outbound webhooks, rotate secrets, inspect delivery logs.
+
 ```typescript
 const webhook = await sdk.webhooks.createWebhook({
   url: 'https://example.com/webhook',
@@ -130,20 +145,25 @@ const webhook = await sdk.webhooks.createWebhook({
   secret: 'webhook_secret',
 });
 await sdk.webhooks.testWebhook(webhook.id);
+await sdk.webhooks.getWebhookEvents(webhook.id, { limit: 20 });
 ```
 
 ---
 
 ### ⏰ AgentScheduler — scheduled tasks
 
+Cron-style tasks and manual execution for integrator automation.
+
 ```typescript
 const task = await sdk.scheduler.createTask({
-  name: 'Daily Sync',
+  name: 'Weekly report',
   task_type: 'http_request',
-  schedule: '0 2 * * *',
-  payload: { url: 'https://api.example.com/sync' },
+  schedule: '0 0 * * 1',
+  payload: { url: 'https://api.example.com/report' },
+  project_id: 1,
 });
 await sdk.scheduler.executeTask(task.id);
+await sdk.scheduler.getTaskExecutions(task.id);
 ```
 
 ---
@@ -154,8 +174,75 @@ Prefer `sdk.platform.api` for integrators.
 
 ```typescript
 const projects = await sdk.platform.api.getProjects();
+const project = await sdk.platform.api.createProject({
+  name: 'My Project',
+  description: 'Integrator app',
+});
+await sdk.platform.api.addUserToProject(project.id, {
+  user_email: 'member@example.com',
+  role: 'member',
+});
 const health = await sdk.healthCheck();
 ```
+
+---
+
+### 💰 AgentWallets — balances & transfers
+
+Project-scoped wallets for holds, deposits, and transfers (when enabled in the capability matrix).
+
+```typescript
+const { wallet } = await sdk.wallets.createWallet({
+  name: 'Main',
+  type: 'business',
+  initial_currency: 'USD',
+});
+await sdk.wallets.deposit(wallet.id, 'USD', '100.00', 'Top-up');
+const balance = await sdk.wallets.getWalletBalance(wallet.id);
+```
+
+---
+
+### 🔔 AgentNotifications — inbox & templates
+
+Transactional and bulk notifications across channels.
+
+```typescript
+await sdk.notifications.createNotification({
+  project_id: 1,
+  user_id: 123,
+  title: 'Welcome',
+  message: 'Thanks for joining',
+  channel: 'in_app',
+});
+const template = await sdk.notifications.createNotificationTemplate(1, {
+  name: 'Welcome Email',
+  type: 'transactional',
+  channel: 'email',
+  subject: 'Hello',
+  title: 'Welcome',
+  message: 'Thanks!',
+  variables: ['user.name'],
+});
+```
+
+---
+
+## 🎨 Benefits of modular architecture
+
+1. **Separation of concerns** — each `Agent*` module owns one domain  
+2. **Selective adoption** — enable only modules your app needs via the capability matrix  
+3. **Predictable naming** — `Agent*` prefix on SDK modules; `sdk.platform.*` for integrators  
+4. **Extensibility** — add domains without breaking existing `sdk.platform` facades  
+5. **TypeScript-first** — typed requests/responses and DNA table helpers  
+6. **Tree-shakeable subpaths** — `@agentstack/sdk/commerce/*`, economy, assets when published  
+
+### Design principles (from platform genes)
+
+- **Integrator-safe defaults** — no ecosystem `/api/admin/*` on npm; see [INTEGRATOR_SCOPE.md](./INTEGRATOR_SCOPE.md)  
+- **Protocol-first writes** — prefer `executeCommand` + snapshot invalidation over ad-hoc REST when the command exists  
+- **Capability matrix** — call `getCapabilityMatrix()` before optional modules (`commerce`, `support`, `integrations`)  
+- **AI discovery** — `getModuleCatalog()` returns module ids, hints, and doc links for agents  
 
 ---
 
@@ -217,3 +304,5 @@ const catalog = sdk.getModuleCatalog();
 - [OpenAPI](https://agentstack.tech/swagger)
 
 **Doc version:** 2.0 · **SDK:** modular architecture
+
+**Maintainers:** when adding a new `Agent*` module, update this file, [SDK_MODULE_CATALOG.md](./SDK_MODULE_CATALOG.md), and `packages/core/src/module-catalog.ts` in the same PR.
