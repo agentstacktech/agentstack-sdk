@@ -8,10 +8,15 @@ export class CartClient {
     return response.data ?? response;
   }
 
-  async addLine(listingUuid: string, quantity = 1) {
+  async addLine(
+    listingUuid: string,
+    quantity = 1,
+    variant?: Record<string, unknown>,
+  ) {
     const response = await this.http.post('/commerce/cart/lines', {
       listing_uuid: listingUuid,
       quantity,
+      ...(variant && Object.keys(variant).length ? { variant } : {}),
     });
     return response.data ?? response;
   }
@@ -21,8 +26,19 @@ export class CartClient {
     return response.data ?? response;
   }
 
-  async mergeGuestLines(lines: { listing_uuid: string; quantity: number }[]) {
-    const response = await this.http.post('/commerce/cart/merge', { lines });
+  async setLineQuantity(lineId: string, quantity: number) {
+    const response = await this.http.patch(`/commerce/cart/lines/${lineId}`, { quantity });
+    return response.data ?? response;
+  }
+
+  async mergeGuestLines(
+    lines: { listing_uuid: string; quantity: number; variant?: Record<string, string> }[],
+    couponCode?: string,
+  ) {
+    const response = await this.http.post('/commerce/cart/merge', {
+      lines,
+      ...(couponCode?.trim() ? { coupon_code: couponCode.trim() } : {}),
+    });
     return response.data ?? response;
   }
 
@@ -35,6 +51,29 @@ export class CartClient {
       {},
       { params: { rail }, headers },
     );
+    return response.data ?? response;
+  }
+
+  async applyCoupon(coupon: Record<string, unknown> | null, code?: string) {
+    const response = await this.http.post('/commerce/cart/apply-coupon', {
+      coupon: coupon ?? undefined,
+      code: code ?? undefined,
+    });
+    return response.data ?? response;
+  }
+
+  async previewCoupon(
+    code: string,
+    subtotalMinor: number,
+    sellerProjectId?: number,
+    listingUuids?: string[],
+  ) {
+    const response = await this.http.post('/commerce/coupons/preview', {
+      code,
+      subtotal_minor: subtotalMinor,
+      ...(sellerProjectId != null ? { seller_project_id: sellerProjectId } : {}),
+      ...(listingUuids?.length ? { listing_uuids: listingUuids } : {}),
+    });
     return response.data ?? response;
   }
 }

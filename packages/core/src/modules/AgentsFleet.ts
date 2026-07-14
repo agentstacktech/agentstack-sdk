@@ -24,6 +24,12 @@ export interface AgentPolicyPreviewDTO {
   effective_actions: string[];
   denied: { action: string; reasons: string }[];
   approval_required: string[];
+  rbac_preview?: {
+    owner_or_writer_allowed: string[];
+    read_only_allowed: string[];
+    read_only_denied: string[];
+    approval_required: string[];
+  };
 }
 
 /** Body for ``POST .../agents/policy/preview``. */
@@ -48,7 +54,216 @@ export interface AgentRunEventDTO {
   ts: string;
   kind: string;
   stage?: string;
+  hlc?: number;
+  seq?: number;
   data?: Record<string, unknown>;
+}
+
+export type AgentRunStatusDTO =
+  | 'queued'
+  | 'running'
+  | 'waiting_for_approval'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
+
+export interface AgentPendingToolCallDTO {
+  action?: string;
+  tool?: string;
+  params?: Record<string, unknown>;
+  args?: Record<string, unknown>;
+  reason?: string;
+}
+
+export interface AgentApprovalReviewDTO {
+  reviewer_user_id?: number;
+  reviewer_note?: string;
+  reviewed_params?: Record<string, unknown> | null;
+  approval_artifact_hash?: string;
+  approval_review_hash?: string;
+  reviewed_at?: string;
+}
+
+export interface AgentRunSpecDTO {
+  run_id: string;
+  agent_id: string;
+  project_id: number;
+  user_id: number;
+  input?: Record<string, unknown>;
+  parent_run_id?: string | null;
+  root_run_id?: string | null;
+  handoff_to_agent_id?: string | null;
+  handoff_reason?: string | null;
+  status: AgentRunStatusDTO;
+  output?: Record<string, unknown>;
+  events?: AgentRunEventDTO[];
+  error?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+  pending_tool_call?: AgentPendingToolCallDTO | null;
+  approval_granted?: boolean;
+  approval_review?: AgentApprovalReviewDTO | null;
+}
+
+export interface AgentRunRowDTO {
+  uuid: string;
+  project_id: number;
+  agent_run_spec?: AgentRunSpecDTO;
+}
+
+export interface AgentRunDetailDTO {
+  run_id: string;
+  agent_id: string;
+  project_id: number;
+  status: AgentRunStatusDTO;
+  stage?: string | null;
+  input: Record<string, unknown>;
+  output: Record<string, unknown>;
+  error?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+  hlc?: number | null;
+  parent_run_id?: string | null;
+  root_run_id?: string | null;
+  handoff_to_agent_id?: string | null;
+  handoff_reason?: string | null;
+  pending_approval?: AgentPendingToolCallDTO | null;
+  approval_review?: AgentApprovalReviewDTO | null;
+  approval_artifact_hash?: string | null;
+  approval_requested_at?: string | null;
+  approval_expires_at?: string | null;
+  timeline: AgentRunEventDTO[];
+  summary: {
+    event_count: number;
+    has_output: boolean;
+    has_error: boolean;
+    waiting_for_approval: boolean;
+  };
+}
+
+export interface AgentPendingApprovalDTO {
+  agent_id: string;
+  agent_name?: string | null;
+  run_id: string;
+  approval_artifact_hash?: string | null;
+  approval_requested_at?: string | null;
+  approval_expires_at?: string | null;
+  stale: boolean;
+  pending_approval?: AgentPendingToolCallDTO | null;
+  run_detail?: AgentRunDetailDTO;
+}
+
+export interface AgentPendingApprovalListOptions {
+  limit?: number;
+  stale_only?: boolean;
+  staleOnly?: boolean;
+}
+
+export interface AgentRunListFilters {
+  status?: AgentRunStatusDTO;
+  since?: string;
+  with_agc_purchase?: boolean;
+  limit?: number;
+}
+
+export interface AgentStartRunOptions {
+  input?: Record<string, unknown>;
+  idempotency_key?: string;
+  idempotencyKey?: string;
+  wait?: boolean;
+  wait_timeout_s?: number;
+  waitTimeoutS?: number;
+  parent_run_id?: string;
+  parentRunId?: string;
+  root_run_id?: string;
+  rootRunId?: string;
+  handoff_to_agent_id?: string;
+  handoffToAgentId?: string;
+  handoff_reason?: string;
+  handoffReason?: string;
+}
+
+export interface AgentApproveRunOptions {
+  reviewed_params?: Record<string, unknown>;
+  reviewer_note?: string;
+  approval_artifact_hash?: string;
+  reviewedParams?: Record<string, unknown>;
+  reviewerNote?: string;
+  approvalArtifactHash?: string;
+}
+
+export interface AgentStopRunOptions {
+  reason?: string;
+  reviewer_note?: string;
+  reviewerNote?: string;
+}
+
+export interface AgentRunTracesDTO {
+  success?: boolean;
+  run_uuid?: string;
+  status?: AgentRunStatusDTO;
+  events?: AgentRunEventDTO[];
+  traces?: unknown[];
+  [key: string]: unknown;
+}
+
+export interface AgentRunStreamFrameDTO {
+  events?: AgentRunEventDTO[];
+  terminal?: AgentRunStatusDTO | string;
+  heartbeat?: boolean;
+  waiting_approval?: boolean;
+  [key: string]: unknown;
+}
+
+export async function* parseAgentRunSSE(
+  source: Response | ReadableStream<Uint8Array>,
+): AsyncGenerator<AgentRunEventDTO, void, unknown> {
+  async function* parseFrame(frame: string): AsyncGenerator<AgentRunEventDTO, void, unknown> {
+    const dataLine = frame
+      .split('\n')
+      .find((line) => line.startsWith('data:'));
+    if (!dataLine) return;
+    const raw = dataLine.slice(5).trim();
+    if (!raw || raw === '[DONE]') return;
+    try {
+      const parsed = JSON.parse(raw) as AgentRunEventDTO | AgentRunStreamFrameDTO;
+      if ('events' in parsed && Array.isArray(parsed.events)) {
+        for (const event of parsed.events) yield event;
+        if (parsed.terminal) {
+          yield {
+            ts: new Date().toISOString(),
+            kind: 'terminal',
+            data: { status: parsed.terminal },
+          };
+        }
+      } else {
+        yield parsed as AgentRunEventDTO;
+      }
+    } catch {
+      yield { ts: new Date().toISOString(), kind: 'raw', data: { raw } };
+    }
+  }
+
+  const stream = (
+    typeof Response !== 'undefined' && source instanceof Response ? source.body : source
+  ) as ReadableStream<Uint8Array> | null;
+  if (!stream) return;
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const frames = buffer.split('\n\n');
+    buffer = frames.pop() ?? '';
+    for (const frame of frames) {
+      yield* parseFrame(frame);
+    }
+  }
+  if (buffer.trim()) {
+    yield* parseFrame(buffer);
+  }
 }
 
 /** FAP template entry (``GET /api/agents/fap-templates``). */
@@ -72,6 +287,14 @@ export interface AgentTemplateDTO {
   input_schema?: Record<string, unknown>;
   preview?: Record<string, unknown>;
   recommended_bindings?: Record<string, unknown>;
+  quick_actions?: Array<Record<string, unknown>>;
+  required_resources?: Array<Record<string, unknown>>;
+  recommended_tools?: string[];
+  example_inputs?: Record<string, unknown>[];
+  activation_checklist?: string[];
+  output_schema?: Record<string, unknown>;
+  requires_approval_for?: string[];
+  approval_mode?: 'never' | 'dangerous_tools' | 'all_writes';
   tags?: string[];
 }
 
@@ -223,8 +446,13 @@ export class AgentsFleet {
     projectId: number,
     agentId: string,
     runId: string,
+    options: AgentApproveRunOptions = {},
   ): Promise<{ success: boolean; run_uuid?: string; work_item_id?: string }> {
-    const res = await this.client.post(`${this.base(projectId)}/${agentId}/runs/${runId}/approve`, {});
+    const res = await this.client.post(`${this.base(projectId)}/${agentId}/runs/${runId}/approve`, {
+      reviewed_params: options.reviewed_params ?? options.reviewedParams,
+      reviewer_note: options.reviewer_note ?? options.reviewerNote,
+      approval_artifact_hash: options.approval_artifact_hash ?? options.approvalArtifactHash,
+    });
     return res.data;
   }
 
@@ -245,9 +473,27 @@ export class AgentsFleet {
   async startRun(
     projectId: number,
     agentId: string,
-    input: Record<string, unknown> = {},
-  ): Promise<{ success: boolean; run_uuid: string; work_item_id: string }> {
-    const res = await this.client.post(`${this.base(projectId)}/${agentId}/runs/start`, { input });
+    inputOrOptions: Record<string, unknown> | AgentStartRunOptions = {},
+  ): Promise<{ success: boolean; run_uuid: string; work_item_id: string; run?: AgentRunRowDTO; duplicate?: boolean }> {
+    const hasOptionsShape =
+      'idempotency_key' in inputOrOptions ||
+      'idempotencyKey' in inputOrOptions ||
+      'wait' in inputOrOptions ||
+      'wait_timeout_s' in inputOrOptions ||
+      'waitTimeoutS' in inputOrOptions;
+    const body = hasOptionsShape
+      ? (inputOrOptions as AgentStartRunOptions)
+      : { input: inputOrOptions as Record<string, unknown> };
+    const res = await this.client.post(`${this.base(projectId)}/${agentId}/runs/start`, {
+      input: body.input ?? {},
+      idempotency_key: body.idempotency_key ?? body.idempotencyKey,
+      wait: body.wait,
+      wait_timeout_s: body.wait_timeout_s ?? body.waitTimeoutS,
+      parent_run_id: body.parent_run_id ?? body.parentRunId,
+      root_run_id: body.root_run_id ?? body.rootRunId,
+      handoff_to_agent_id: body.handoff_to_agent_id ?? body.handoffToAgentId,
+      handoff_reason: body.handoff_reason ?? body.handoffReason,
+    });
     return res.data;
   }
 
@@ -279,15 +525,51 @@ export class AgentsFleet {
   async listRuns(
     projectId: number,
     agentId: string,
-    params?: { with_agc_purchase?: boolean },
-  ): Promise<{ success: boolean; runs: unknown[] }> {
+    params?: AgentRunListFilters,
+  ): Promise<{ success: boolean; runs: AgentRunRowDTO[] }> {
     const res = await this.client.get(`${this.base(projectId)}/${agentId}/runs`, {
-      params:
-        params?.with_agc_purchase != null
-          ? { with_agc_purchase: params.with_agc_purchase ? 'true' : 'false' }
-          : undefined,
+      params: {
+        status: params?.status,
+        since: params?.since,
+        with_agc_purchase:
+          params?.with_agc_purchase != null ? (params.with_agc_purchase ? 'true' : 'false') : undefined,
+        limit: params?.limit,
+      },
     });
-    return res.data as { success: boolean; runs: unknown[] };
+    return res.data as { success: boolean; runs: AgentRunRowDTO[] };
+  }
+
+  async listPendingApprovals(
+    projectId: number,
+    options: AgentPendingApprovalListOptions = {},
+  ): Promise<{ success: boolean; project_id: number; items: AgentPendingApprovalDTO[]; next_cursor?: string | null }> {
+    const res = await this.client.get(`${this.base(projectId)}/approvals/pending`, {
+      params: {
+        limit: options.limit,
+        stale_only: options.stale_only ?? options.staleOnly,
+      },
+    });
+    return res.data as {
+      success: boolean;
+      project_id: number;
+      items: AgentPendingApprovalDTO[];
+      next_cursor?: string | null;
+    };
+  }
+
+  async getRun(
+    projectId: number,
+    agentId: string,
+    runId: string,
+  ): Promise<{ success: boolean; run: AgentRunRowDTO; run_detail?: AgentRunDetailDTO }> {
+    const res = await this.client.get(`${this.base(projectId)}/${agentId}/runs/${runId}`);
+    return res.data as { success: boolean; run: AgentRunRowDTO; run_detail?: AgentRunDetailDTO };
+  }
+
+  async getRunDetail(projectId: number, agentId: string, runId: string): Promise<AgentRunDetailDTO> {
+    const res = await this.getRun(projectId, agentId, runId);
+    if (!res.run_detail) throw new Error('run_detail_unavailable');
+    return res.run_detail;
   }
 
   async fork(projectId: number, agentId: string): Promise<{ success: boolean; agent: AgentRowDTO }> {
@@ -295,8 +577,16 @@ export class AgentsFleet {
     return res.data as { success: boolean; agent: AgentRowDTO };
   }
 
-  async stopRun(projectId: number, agentId: string, runId: string): Promise<{ success: boolean }> {
-    const res = await this.client.post(`${this.base(projectId)}/${agentId}/runs/${runId}/stop`, {});
+  async stopRun(
+    projectId: number,
+    agentId: string,
+    runId: string,
+    options: AgentStopRunOptions = {},
+  ): Promise<{ success: boolean }> {
+    const res = await this.client.post(`${this.base(projectId)}/${agentId}/runs/${runId}/stop`, {
+      reason: options.reason,
+      reviewer_note: options.reviewer_note ?? options.reviewerNote,
+    });
     return res.data as { success: boolean };
   }
 
@@ -330,9 +620,22 @@ export class AgentsFleet {
     return res.data as Record<string, unknown>;
   }
 
-  async traces(projectId: number, agentId: string, runId: string): Promise<Record<string, unknown>> {
+  async timeline(projectId: number, agentId: string): Promise<{ success: boolean; versions: AgentRowDTO[] }> {
+    const res = await this.client.get(`${this.base(projectId)}/${agentId}/timeline`);
+    return res.data as { success: boolean; versions: AgentRowDTO[] };
+  }
+
+  async traces(projectId: number, agentId: string, runId: string): Promise<AgentRunTracesDTO> {
     const res = await this.client.get(`${this.base(projectId)}/${agentId}/runs/${runId}/traces`);
-    return res.data as Record<string, unknown>;
+    return res.data as AgentRunTracesDTO;
+  }
+
+  runStreamPath(projectId: number, agentId: string, runId: string): string {
+    return `${this.base(projectId)}/${agentId}/runs/${runId}/stream`;
+  }
+
+  parseRunEventStream(source: Response | ReadableStream<Uint8Array>) {
+    return parseAgentRunSSE(source);
   }
 
   /** Personal agents (``GET /api/users/me/agents``). */
@@ -361,8 +664,27 @@ export class AgentsFleet {
     return res.data as { success: boolean };
   }
 
-  async startRunMine(agentId: string, input: Record<string, unknown> = {}): Promise<{ success: boolean; run_uuid: string; work_item_id: string }> {
-    const res = await this.client.post(`/users/me/agents/${agentId}/runs/start`, { input });
+  async startRunMine(
+    agentId: string,
+    inputOrOptions: Record<string, unknown> | AgentStartRunOptions = {},
+  ): Promise<{ success: boolean; run_uuid: string; work_item_id: string; run?: AgentRunRowDTO; duplicate?: boolean }> {
+    const hasOptionsShape =
+      'idempotency_key' in inputOrOptions ||
+      'wait' in inputOrOptions ||
+      'wait_timeout_s' in inputOrOptions;
+    const body = hasOptionsShape
+      ? (inputOrOptions as AgentStartRunOptions)
+      : { input: inputOrOptions as Record<string, unknown> };
+    const res = await this.client.post(`/users/me/agents/${agentId}/runs/start`, {
+      input: body.input ?? {},
+      idempotency_key: body.idempotency_key,
+      wait: body.wait,
+      wait_timeout_s: body.wait_timeout_s,
+      parent_run_id: body.parent_run_id,
+      root_run_id: body.root_run_id,
+      handoff_to_agent_id: body.handoff_to_agent_id,
+      handoff_reason: body.handoff_reason,
+    });
     return res.data;
   }
 
@@ -371,13 +693,58 @@ export class AgentsFleet {
     return res.data as { success: boolean; agent: AgentRowDTO };
   }
 
-  async listRunsMine(agentId: string): Promise<{ success: boolean; runs: unknown[] }> {
-    const res = await this.client.get(`/users/me/agents/${agentId}/runs`);
-    return res.data as { success: boolean; runs: unknown[] };
+  async listRunsMine(
+    agentId: string,
+    params?: AgentRunListFilters,
+  ): Promise<{ success: boolean; runs: AgentRunRowDTO[] }> {
+    const res = await this.client.get(`/users/me/agents/${agentId}/runs`, {
+      params: {
+        status: params?.status,
+        since: params?.since,
+        with_agc_purchase:
+          params?.with_agc_purchase != null ? (params.with_agc_purchase ? 'true' : 'false') : undefined,
+      },
+    });
+    return res.data as { success: boolean; runs: AgentRunRowDTO[] };
   }
 
-  async stopRunMine(agentId: string, runId: string): Promise<{ success: boolean }> {
-    const res = await this.client.post(`/users/me/agents/${agentId}/runs/${runId}/stop`, {});
+  async listPendingApprovalsMine(
+    options: AgentPendingApprovalListOptions = {},
+  ): Promise<{ success: boolean; project_id: number; items: AgentPendingApprovalDTO[]; next_cursor?: string | null }> {
+    const res = await this.client.get('/users/me/agents/approvals/pending', {
+      params: {
+        limit: options.limit,
+        stale_only: options.stale_only ?? options.staleOnly,
+      },
+    });
+    return res.data as {
+      success: boolean;
+      project_id: number;
+      items: AgentPendingApprovalDTO[];
+      next_cursor?: string | null;
+    };
+  }
+
+  async getRunMine(agentId: string, runId: string): Promise<{ success: boolean; run: AgentRunRowDTO; run_detail?: AgentRunDetailDTO }> {
+    const res = await this.client.get(`/users/me/agents/${agentId}/runs/${runId}`);
+    return res.data as { success: boolean; run: AgentRunRowDTO; run_detail?: AgentRunDetailDTO };
+  }
+
+  async getRunDetailMine(agentId: string, runId: string): Promise<AgentRunDetailDTO> {
+    const res = await this.getRunMine(agentId, runId);
+    if (!res.run_detail) throw new Error('run_detail_unavailable');
+    return res.run_detail;
+  }
+
+  async stopRunMine(
+    agentId: string,
+    runId: string,
+    options: AgentStopRunOptions = {},
+  ): Promise<{ success: boolean }> {
+    const res = await this.client.post(`/users/me/agents/${agentId}/runs/${runId}/stop`, {
+      reason: options.reason,
+      reviewer_note: options.reviewer_note ?? options.reviewerNote,
+    });
     return res.data as { success: boolean };
   }
 
@@ -406,9 +773,14 @@ export class AgentsFleet {
     return res.data as Record<string, unknown>;
   }
 
-  async tracesMine(agentId: string, runId: string): Promise<Record<string, unknown>> {
+  async timelineMine(agentId: string): Promise<{ success: boolean; versions: AgentRowDTO[] }> {
+    const res = await this.client.get(`/users/me/agents/${agentId}/timeline`);
+    return res.data as { success: boolean; versions: AgentRowDTO[] };
+  }
+
+  async tracesMine(agentId: string, runId: string): Promise<AgentRunTracesDTO> {
     const res = await this.client.get(`/users/me/agents/${agentId}/runs/${runId}/traces`);
-    return res.data as Record<string, unknown>;
+    return res.data as AgentRunTracesDTO;
   }
 
   async listTemplatesMine(): Promise<{ success: boolean; templates: AgentTemplateDTO[] }> {
@@ -431,8 +803,20 @@ export class AgentsFleet {
     return res.data as { success: boolean; agent: AgentRowDTO };
   }
 
-  async approveRunMine(agentId: string, runId: string): Promise<{ success: boolean; work_item_id?: string }> {
-    const res = await this.client.post(`/users/me/agents/${agentId}/runs/${runId}/approve`, {});
+  runStreamPathMine(agentId: string, runId: string): string {
+    return `/users/me/agents/${agentId}/runs/${runId}/stream`;
+  }
+
+  async approveRunMine(
+    agentId: string,
+    runId: string,
+    options: AgentApproveRunOptions = {},
+  ): Promise<{ success: boolean; work_item_id?: string }> {
+    const res = await this.client.post(`/users/me/agents/${agentId}/runs/${runId}/approve`, {
+      reviewed_params: options.reviewed_params ?? options.reviewedParams,
+      reviewer_note: options.reviewer_note ?? options.reviewerNote,
+      approval_artifact_hash: options.approval_artifact_hash ?? options.approvalArtifactHash,
+    });
     return res.data;
   }
 
@@ -456,22 +840,33 @@ export class AgentsFleet {
         new AgentsFleet(c).createFromTemplate(projectId, body),
       update: (agentId: string, spec: Record<string, unknown>) => new AgentsFleet(c).update(projectId, agentId, spec),
       delete: (agentId: string) => new AgentsFleet(c).delete(projectId, agentId),
-      startRun: (agentId: string, input?: Record<string, unknown>) =>
-        new AgentsFleet(c).startRun(projectId, agentId, input),
+      startRun: (agentId: string, inputOrOptions?: Record<string, unknown> | AgentStartRunOptions) =>
+        new AgentsFleet(c).startRun(projectId, agentId, inputOrOptions),
       runWithAgntCredits: (agentId: string, body: Parameters<AgentsFleet['runWithAgntCredits']>[2]) =>
         new AgentsFleet(c).runWithAgntCredits(projectId, agentId, body),
       listRuns: (agentId: string, opts?: Parameters<AgentsFleet['listRuns']>[2]) =>
         new AgentsFleet(c).listRuns(projectId, agentId, opts),
+      listPendingApprovals: (options?: AgentPendingApprovalListOptions) =>
+        new AgentsFleet(c).listPendingApprovals(projectId, options),
+      getRun: (agentId: string, runId: string) => new AgentsFleet(c).getRun(projectId, agentId, runId),
+      getRunDetail: (agentId: string, runId: string) => new AgentsFleet(c).getRunDetail(projectId, agentId, runId),
       fork: (agentId: string) => new AgentsFleet(c).fork(projectId, agentId),
-      stopRun: (agentId: string, runId: string) => new AgentsFleet(c).stopRun(projectId, agentId, runId),
-      approveRun: (agentId: string, runId: string) => new AgentsFleet(c).approveRun(projectId, agentId, runId),
+      stopRun: (agentId: string, runId: string, options?: AgentStopRunOptions) =>
+        new AgentsFleet(c).stopRun(projectId, agentId, runId, options),
+      approveRun: (agentId: string, runId: string, options?: AgentApproveRunOptions) =>
+        new AgentsFleet(c).approveRun(projectId, agentId, runId, options),
       promote: (agentId: string) => new AgentsFleet(c).promote(projectId, agentId),
       kill: (agentId: string) => new AgentsFleet(c).kill(projectId, agentId),
       advanceRollout: (agentId: string) => new AgentsFleet(c).advanceRollout(projectId, agentId),
       metrics: (agentId: string) => new AgentsFleet(c).metrics(projectId, agentId),
       trustSurface: (agentId: string) => new AgentsFleet(c).trustSurface(projectId, agentId),
       gates: (agentId: string) => new AgentsFleet(c).gates(projectId, agentId),
+      timeline: (agentId: string) => new AgentsFleet(c).timeline(projectId, agentId),
       traces: (agentId: string, runId: string) => new AgentsFleet(c).traces(projectId, agentId, runId),
+      runStreamPath: (agentId: string, runId: string) =>
+        new AgentsFleet(c).runStreamPath(projectId, agentId, runId),
+      parseRunEventStream: (source: Response | ReadableStream<Uint8Array>) =>
+        new AgentsFleet(c).parseRunEventStream(source),
       attachSupportAiAgent: (p: Record<string, unknown>) => new AgentsFleet(c).attachSupportAiAgent(projectId, p),
       previewPolicy: (body: AgentPolicyPreviewBody) => new AgentsFleet(c).previewPolicy(projectId, body),
       previewTemplate: (body: AgentTemplatePreviewBody) => new AgentsFleet(c).previewTemplate(projectId, body),

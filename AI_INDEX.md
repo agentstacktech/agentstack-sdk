@@ -14,7 +14,7 @@
 
 Универсальный SDK для экосистемы AgentStack с модульной архитектурой: TypeScript core, Python SDK, React hooks/components - единый API для всех платформ с Neural Architecture integration, i18n support, admin modules, и полной типизацией.
 
-**Docs i18n (EN canonical + `*_ru.md`):** [docs/DOCS_I18N.md](docs/DOCS_I18N.md) · [docs/DOC_HUB.md](docs/DOC_HUB.md) (`repo.platform.sdk.docs_i18n.gen1`)  
+**Docs i18n (EN canonical + `*_ru.md`):** [docs/DOCS_I18N.md](docs/DOCS_I18N.md) · [docs/DOC_HUB.md](docs/DOC_HUB.md) (`repo.platform.sdk.docs_i18n.gen1`) · sync matrix [docs/DOC_SYNC_MATRIX.md](docs/DOC_SYNC_MATRIX.md) (regen via `npm run generate:docs-i18n` / `check:docs-i18n:all`)  
 **Integration flows (npm / submodule / monorepo / …):** [docs/SDK_INTEGRATION_FLOWS.md](docs/SDK_INTEGRATION_FLOWS.md) · RU: [docs/SDK_INTEGRATION_FLOWS_ru.md](docs/SDK_INTEGRATION_FLOWS_ru.md) (`repo.platform.sdk.integration_flows.gen1`)  
 **Submodule consumer (git vendoring):** [docs/SUBMODULE_CONSUMER.md](docs/SUBMODULE_CONSUMER.md) · monorepo [docs/sdk/SDK_SUBMODULE_INTEGRATION.md](../docs/sdk/SDK_SUBMODULE_INTEGRATION.md) · scripts `submodule-add-sdk.mjs`, `bootstrap-submodule-consumer.mjs`
 
@@ -45,6 +45,7 @@
 11. **Project support** — `packages/core/src/supportRest.ts` + **`modules/AgentSupport.ts`** (`sdk.support`) · **`packages/react/src/hooks/useSupport.ts`** (`useSupport`, `useSupportInbox`, …) — genes `sdk.support.gen1` / `sdk.support.gen2`; ADR [`docs/adr/PROJECT_SUPPORT_MESSENGER.md`](../docs/adr/PROJECT_SUPPORT_MESSENGER.md).
 12. **Integration Hub** — **`packages/core/src/modules/AgentIntegrations.ts`** + **`packages/core/src/modules/integrationQueries.ts`** (`sdk.integrations`) — REST `/api/integrations/*` parity, flat GET query transport (`skipBatching` on integration reads), Zod-validated responses, typed recipe quick setup metadata, and webhook curl helpers; **`normalizeGetQueryArg`** in `packages/core/src/client/http-client.ts` normalizes Axios-style `{ params }` for `HTTPClient.get`; gene `core.integrations.hub.gen1`. MCP tools `integrations.*` restored in core [`tools_integrations.py`](../agentstack-core/mcp/tools_integrations.py) (registry test: `tests/mcp/test_tools_integrations_registry.py`).
 13. **Commerce assets** — **`@agentstack/sdk/commerce/assets`** (`sdk.commerce.assets.gen1`) — `buildAssetsWizardHref`, Zod `AssetDraft`, `duplicateAsset`, `sdk.assets.listAssetPresets`; doc [`docs/sdk/ASSETS_WIZARD_SDK.md`](../docs/sdk/ASSETS_WIZARD_SDK.md); CI `check:commerce-assets-parity`.
+14. **Agents Fleet** — **`packages/core/src/modules/AgentsFleet.ts`** + Python [`packages/python/src/modules/agent_agents_fleet.py`](packages/python/src/modules/agent_agents_fleet.py) — create from template, typed runs, `RunDetailDTO`, SSE frame parsing, approval artifact hashes, metrics/gates, timeline/traces, idempotent run starts; examples [`docs/api/AGENTS_FLEET_EXAMPLES.md`](../docs/api/AGENTS_FLEET_EXAMPLES.md); parity docs [`REST_MCP_SDK_PARITY.md`](../docs/ecosystem/REST_MCP_SDK_PARITY.md) and [`PYTHON_SDK_PARITY.md`](../docs/ecosystem/PYTHON_SDK_PARITY.md).
 
 ### **Dependencies:**
 - Internal: None (this IS the SDK!)

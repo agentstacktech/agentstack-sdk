@@ -132,7 +132,7 @@ describe('HTTPClient.get', () => {
 
     const url = (global.fetch as jest.Mock).mock.calls[0][0] as string;
     expect(url).toContain('account_key=acct');
-    expect(url).toContain('asset_code=AGC');
+    expect(url).toContain('asset_code=AGNT');
   });
 
   it('maps 422 FastAPI validation to BadRequestError', async () => {

@@ -3,7 +3,7 @@
  * Главный класс SDK с модульной архитектурой
  */
 
-import { SimpleEventEmitter } from './utils/event-emitter';
+import { isChunkLikeErrorMessage } from './pwa/chunkErrors';
 import { HTTPClient } from './client/http-client';
 import { AgentAuth } from './modules/AgentAuth';
 // AgentAdmin removed - use AgentAPI methods instead (Universal Naming)
@@ -11,14 +11,18 @@ import { AgentNeural } from './modules/AgentNeural';
 import { AgentDocs } from './modules/AgentDocs';
 import { AgentPayments } from './modules/AgentPayments';
 import { AgentEconomyFacade } from './economy/AgentEconomyFacade';
+import { AgentPublicSurface } from './public';
 import { AgentFinanceFacade } from './finance/AgentFinanceFacade';
 import { AgentNetBnb } from './modules/AgentNetBnb';
+import { AgentNetSolana } from './modules/AgentNetSolana';
 import { AgentAdmin } from './modules/AgentAdmin';
 import { AgentAdminData } from './modules/AgentAdminData';
 import { AgentAnalytics } from './modules/AgentAnalytics';
 import { AgentsFleet } from './modules/AgentsFleet';
 import { AgentWebhooks } from './modules/AgentWebhooks';
 import { AgentIntegrations } from './modules/AgentIntegrations';
+import { AgentBots } from './modules/AgentBots';
+import { AgentCrm } from './modules/AgentCrm';
 import { AgentHosting } from './modules/AgentHosting';
 import { AgentScheduler } from './modules/AgentScheduler';
 import { AgentAPI } from './modules/AgentAPI';
@@ -47,6 +51,9 @@ import { AgentAssets } from './modules/AgentAssets';
 import { AgentGlobalAssets } from './modules/AgentGlobalAssets';
 import { AgentBuffs } from './modules/AgentBuffs';
 import { AgentEcosystem } from './modules/AgentEcosystem';
+import { AgentDiagnostics } from './modules/AgentDiagnostics';
+import { AgentCommerceAdmin } from './modules/AgentCommerceAdmin';
+import { AgentSeo } from './seo/index';
 import { AgentStorage } from './modules/AgentStorage';
 import { createAgentStackMedia, type AgentStackMediaSurface } from './media';
 import { createMobileSurface, type MobileSurface } from './mobile';
@@ -55,6 +62,7 @@ import { PageCompositionSystem } from './modules/PageCompositionSystem';
 import { GameDataSystem } from './modules/GameDataSystem';
 import { SDKConfig, AgentStackError } from './types';
 import { AuthStateStore } from './utils/auth-state';
+import { SimpleEventEmitter } from './utils/event-emitter';
 
 /** Wrapper for a single DNA table (projects or users) - no table name needed */
 export interface DNATableWrapper {
@@ -142,6 +150,11 @@ import { assertPlatformOperatorSurface } from './config/integratorScope';
 import { normalizeProjectId, resolveEffectiveProjectId } from './config/projectContext';
 
 export class AgentStackSDK extends SimpleEventEmitter {
+  /** Explicit for rolled-up .d.ts — @agentstack/react telemetry hooks call `sdk.emit`. */
+  override emit(event: string, ...args: any[]): void {
+    super.emit(event, ...args);
+  }
+
   public httpClient: HTTPClient;
   private config: SDKConfig;
   
@@ -176,16 +189,24 @@ export class AgentStackSDK extends SimpleEventEmitter {
   public payments: AgentPayments;
   /** AgentNet economy facade (AGNT L0, credits, bridge, vault, funding). Prefer `sdk.platform.economy`. */
   public economy: AgentEconomyFacade;
+  /** Public read-only surfaces (`/api/public/*`). `sdk.public.grants` for grant reviewers. */
+  public public: AgentPublicSurface;
   /** Finance Hub BFF (portfolio, project fund, swap). Prefer `sdk.finance` / `sdk.platform.finance`. */
   public finance: AgentFinanceFacade;
   /** BNB Chain BSC testnet rail (`/api/projects/{id}/agentnet/bnb/*`). */
   public agentnetBnb: AgentNetBnb;
+  /** Solana devnet PTR attestation rail (`/api/projects/{id}/agentnet/sol/*`). */
+  public agentnetSolana: AgentNetSolana;
   public analytics: AgentAnalytics;
   /** Agents Fleet — scoped REST `/api/projects/{id}/agents/*` and personal `/api/users/me/agents/*` (8DNA agents + runs). */
   public agentsFleet: AgentsFleet;
   public webhooks: AgentWebhooks;
   /** Integration Hub — connections, recipes, deliveries (`/api/integrations/*`). */
   public integrations: AgentIntegrations;
+  /** Bots Fleet — Telegram / WhatsApp / Instagram bots (`/api/projects/{id}/bots/*`). */
+  public bots: AgentBots;
+  /** CRM tissue — project-scoped contacts/deals (`/api/projects/{id}/crm/*`). */
+  public crm: AgentCrm;
   /** Static bucket hosting (`/api/hosting/*`). */
   public hosting: AgentHosting;
   public scheduler: AgentScheduler;
@@ -218,6 +239,11 @@ export class AgentStackSDK extends SimpleEventEmitter {
   public buffs: AgentBuffs;  // NEW! Buffs System (v0.4.9)
   /** Ecosystem channel manifest, grants, connections */
   public ecosystem: AgentEcosystem;
+  public diagnostics: AgentDiagnostics;
+  /** Ecosystem admin commerce settlement (`/api/admin/commerce/*`). */
+  public commerceAdmin: AgentCommerceAdmin;
+  /** Public marketing SEO meta (`GET /api/seo/meta`). Gene: sdk.seo.gen1 */
+  public seo: AgentSeo;
   /** Project-scoped file storage (`/api/storage/*`, 8DNA row per project + user or project slice). */
   public storage: AgentStorage;
   /**
@@ -358,6 +384,15 @@ export class AgentStackSDK extends SimpleEventEmitter {
           event.preventDefault();
           return;
         }
+        if (
+          isChunkLikeErrorMessage(message) ||
+          (typeof window !== 'undefined' &&
+            !!(window as unknown as { __agentstack_chunk_recovery_active?: boolean })
+              .__agentstack_chunk_recovery_active)
+        ) {
+          event.preventDefault();
+          return;
+        }
         logger.error(`Unhandled promise rejection: ${name}: ${message}`, { reason });
       });
     }
@@ -372,11 +407,15 @@ export class AgentStackSDK extends SimpleEventEmitter {
     this.payments = new AgentPayments(this.httpClient);
     this.agentsFleet = new AgentsFleet(this.httpClient);
     this.economy = new AgentEconomyFacade(this.httpClient, this.agentsFleet);
+    this.public = new AgentPublicSurface(this.httpClient);
     this.finance = new AgentFinanceFacade(this.httpClient);
     this.agentnetBnb = new AgentNetBnb(this.httpClient);
+    this.agentnetSolana = new AgentNetSolana(this.httpClient);
     this.analytics = new AgentAnalytics(this.httpClient);
     this.webhooks = new AgentWebhooks(this.httpClient);
     this.integrations = new AgentIntegrations(this.httpClient);
+    this.bots = new AgentBots(this.httpClient);
+    this.crm = new AgentCrm(this.httpClient);
     this.hosting = new AgentHosting(this.httpClient);
     this.scheduler = new AgentScheduler(this.httpClient);
     this.webPush = new AgentWebPush(this.httpClient);
@@ -405,6 +444,9 @@ export class AgentStackSDK extends SimpleEventEmitter {
     this.globalAssets = new AgentGlobalAssets(this.httpClient);  // ← NEW! Global Assets Registry (v0.4.1)
     this.buffs = new AgentBuffs(this.httpClient, this);  // ← NEW! Buffs System (v0.4.9)
     this.ecosystem = new AgentEcosystem(this.httpClient);
+    this.diagnostics = new AgentDiagnostics(this.httpClient);
+    this.commerceAdmin = new AgentCommerceAdmin(this.httpClient);
+    this.seo = new AgentSeo(this.httpClient);
     this.storage = new AgentStorage(this.httpClient);
     // Client-side media primitives — browser-only surfaces are feature-detected
     // at call site, so this constructor is safe in Node / SSR.

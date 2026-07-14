@@ -60,8 +60,35 @@ export function runPathReducer(
   switch (event.type) {
     case 'RESET':
       return initialPlaybookStateV2(state.playbookId, state.projectId, playbook.entryNodeId);
-    case 'SET_PROJECT':
-      return { ...state, projectId: event.projectId, updatedAt: nowIso() };
+    case 'SET_PROJECT': {
+      let next: PlaybookStateV2 = {
+        ...state,
+        projectId: event.projectId,
+        updatedAt: nowIso(),
+      };
+      const node = playbook.nodes[state.currentNodeId];
+      if (node?.kind === 'question' && node.input === 'project_picker') {
+        const visible = filterQuestionOptions(node, _ctx);
+        const option = visible[0];
+        if (option) {
+          const completed = state.completedNodeIds.includes(state.currentNodeId)
+            ? state.completedNodeIds
+            : [...state.completedNodeIds, state.currentNodeId];
+          next = {
+            ...next,
+            completedNodeIds: completed,
+            currentNodeId: option.next,
+          };
+          next = patchStep(next, state.currentNodeId, {
+            status: 'done',
+            completedAt: nowIso(),
+          });
+          const plan = compilePathPlan(playbook, next);
+          next = { ...next, currentNodeId: syncCurrentNodeId(plan, next) };
+        }
+      }
+      return next;
+    }
     case 'ANSWER': {
       const node = playbook.nodes[event.nodeId];
       if (!node || node.kind !== 'question') return state;
@@ -103,13 +130,23 @@ export function runPathReducer(
       const completed = state.completedNodeIds.includes(event.nodeId)
         ? state.completedNodeIds
         : [...state.completedNodeIds, event.nodeId];
+      const artifact =
+        event.type === 'VERIFY_OK'
+          ? event.artifact
+          : event.type === 'TASK_COMPLETE'
+            ? event.artifact
+            : undefined;
+      const answers =
+        event.type === 'TASK_COMPLETE' && artifact && typeof artifact === 'object'
+          ? { ...state.answers, ...artifact }
+          : state.answers;
       let next = patchStep(
-        { ...state, completedNodeIds: completed },
+        { ...state, completedNodeIds: completed, answers },
         event.nodeId,
         {
           status: 'done',
           completedAt: nowIso(),
-          artifact: event.type === 'VERIFY_OK' ? event.artifact : undefined,
+          artifact,
         },
       );
       const plan = compilePathPlan(playbook, next);

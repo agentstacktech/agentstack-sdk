@@ -49,6 +49,7 @@ export function normalizeBatchSubUrl(url: string): string {
     '/generations',
     '/support',
     '/discovery',
+    '/fabric',
   ];
   for (const prefix of prefixes) {
     if (url === prefix || url.startsWith(`${prefix}/`)) {

@@ -105,6 +105,16 @@ export class EntitySnapshotRepository {
     return this.cache.has(key);
   }
 
+  /**
+   * True when a snapshot exists and `meta.fetchedAt` is within `maxAgeMs`.
+   * Mirrors freshness checks used by {@link AgentProtocol.readThroughSnapshot}.
+   */
+  isFresh(key: string, maxAgeMs: number): boolean {
+    const snap = this.getSnapshot(key);
+    if (!snap) return false;
+    return Date.now() - snap.meta.fetchedAt <= maxAgeMs;
+  }
+
   /** All snapshot keys (for AgentProtocol search / introspection). */
   listSnapshotKeys(): string[] {
     return this.cache.keys();

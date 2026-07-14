@@ -30,6 +30,13 @@ describe('AgentAuth', () => {
       post: jest.fn(),
       put: jest.fn(),
       delete: jest.fn(),
+      getAuthToken: jest.fn().mockReturnValue(null),
+      getApiKey: jest.fn().mockReturnValue(null),
+      setAuthToken: jest.fn(),
+      setApiKey: jest.fn(),
+      updateConfig: jest.fn(),
+      evictCacheByUrl: jest.fn().mockResolvedValue(undefined),
+      markRecentLoginSuccess: jest.fn(),
     } as any;
 
     auth = new AgentAuth(mockHttpClient);
@@ -44,19 +51,33 @@ describe('AgentAuth', () => {
       };
 
       const expectedResponse = {
-        access_token: 'access_token_123',
-        refresh_token: 'refresh_token_123',
+        access_token: 'aaa.bbb.ccc',
+        refresh_token: 'api.key.token',
         token_type: 'Bearer',
-        expires_in: 3600,
+        expires_in: 86400,
+        user_id: '1',
+        project_id: '1',
+        permissions: [],
       };
 
       mockHttpClient.post.mockResolvedValueOnce({
-        data: expectedResponse,
+        data: {
+          success: true,
+          session: {
+            user_token: 'aaa.bbb.ccc',
+            api_key: 'api.key.token',
+            user_id: 1,
+            project_id: 1,
+            permissions: [],
+          },
+        },
       });
 
       const result = await auth.login(loginData);
 
-      expect(mockHttpClient.post).toHaveBeenCalledWith('/auth/login', loginData);
+      expect(mockHttpClient.post).toHaveBeenCalledWith('/auth/login', loginData, {
+        skipAuthStateCheck: true,
+      });
       expect(result).toEqual(expectedResponse);
     });
 
@@ -67,9 +88,10 @@ describe('AgentAuth', () => {
         project_id: 1,
       };
 
-      mockHttpClient.post.mockRejectedValueOnce(new Error('Invalid credentials'));
+      const { UnauthorizedError } = await import('../../src/types/shared/HTTPTypes');
+      mockHttpClient.post.mockRejectedValueOnce(new UnauthorizedError('Invalid credentials'));
 
-      await expect(auth.login(loginData)).rejects.toThrow('Invalid credentials');
+      await expect(auth.login(loginData)).rejects.toThrow(UnauthorizedError);
     });
 
     it('should logout successfully', async () => {
@@ -81,19 +103,76 @@ describe('AgentAuth', () => {
 
       const result = await auth.logout();
 
-      expect(mockHttpClient.post).toHaveBeenCalledWith('/auth/logout');
-      expect(result).toEqual(expectedResponse);
+      expect(mockHttpClient.post).toHaveBeenCalledWith('/auth/logout', undefined, {
+        skipAuthStateCheck: true,
+      });
+      expect(result).toBeUndefined();
     });
 
     it('should get current user', async () => {
       mockHttpClient.get.mockResolvedValueOnce({
-        data: testUser,
+        data: { success: true, data: testUser },
       });
 
       const result = await auth.getCurrentUser();
 
-      expect(mockHttpClient.get).toHaveBeenCalledWith('/auth/me');
-      expect(result).toEqual(testUser);
+      expect(mockHttpClient.get).toHaveBeenCalledWith(
+        '/auth/me',
+        undefined,
+        expect.objectContaining({ skipBatching: true, skipCache: true }),
+      );
+      expect(result.user_id).toBe(1);
+      expect(result.email).toBe('test@example.com');
+    });
+
+    it('should get session bootstrap payload with settings_summary', async () => {
+      mockHttpClient.get.mockResolvedValueOnce({
+        data: {
+          success: true,
+          data: testUser,
+          settings_summary: { theme: 'dark', language: 'ru', timezone: 'UTC' },
+          accessible_project_ids: [1, 2],
+        },
+      });
+
+      const result = await auth.getSessionBootstrapPayload();
+
+      expect(mockHttpClient.get).toHaveBeenCalledWith(
+        '/auth/me/bootstrap',
+        undefined,
+        expect.objectContaining({ skipBatching: true, skipCache: true }),
+      );
+      expect(result.user.user_id).toBe(1);
+      expect(result.settings_summary?.language).toBe('ru');
+      expect(result.accessible_project_ids).toEqual([1, 2]);
+      expect(auth.getLastSessionBootstrap()?.user.user_id).toBe(1);
+    });
+
+    it('reuses cached session bootstrap without a second HTTP call', async () => {
+      mockHttpClient.get.mockResolvedValueOnce({
+        data: {
+          success: true,
+          data: testUser,
+          settings_summary: { theme: 'dark', language: 'ru', timezone: 'UTC' },
+        },
+      });
+
+      await auth.getSessionBootstrapPayload();
+      mockHttpClient.get.mockClear();
+
+      const cached = await auth.getSessionBootstrapPayload();
+      expect(mockHttpClient.get).not.toHaveBeenCalled();
+      expect(cached.user.user_id).toBe(1);
+
+      mockHttpClient.get.mockResolvedValueOnce({
+        data: {
+          success: true,
+          data: testUser,
+          settings_summary: { theme: 'light', language: 'en', timezone: 'UTC' },
+        },
+      });
+      await auth.getSessionBootstrapPayload({ force: true });
+      expect(mockHttpClient.get).toHaveBeenCalledTimes(1);
     });
 
     it('should refresh token', async () => {
@@ -111,7 +190,9 @@ describe('AgentAuth', () => {
 
       const result = await auth.refreshToken(refreshData);
 
-      expect(mockHttpClient.post).toHaveBeenCalledWith('/auth/refresh', refreshData);
+      expect(mockHttpClient.post).toHaveBeenCalledWith('/auth/refresh', refreshData, {
+        skipAuthStateCheck: true,
+      });
       expect(result).toEqual(expectedResponse);
     });
   });
@@ -146,16 +227,13 @@ describe('AgentAuth', () => {
       const username = 'newusername';
       const expectedResponse = { ...testProfileData, username };
 
-      mockHttpClient.post.mockResolvedValueOnce({
+      mockHttpClient.put.mockResolvedValueOnce({
         data: expectedResponse,
       });
 
       const result = await auth.setUsername(username);
 
-      expect(mockHttpClient.post).toHaveBeenCalledWith('/auth/profile-data/set', {
-        path: 'username',
-        value: username,
-      });
+      expect(mockHttpClient.put).toHaveBeenCalledWith('/profile/username', { username });
       expect(result).toEqual(expectedResponse);
     });
 
@@ -163,15 +241,14 @@ describe('AgentAuth', () => {
       const displayName = 'New Display Name';
       const expectedResponse = { ...testProfileData, display_name: displayName };
 
-      mockHttpClient.post.mockResolvedValueOnce({
+      mockHttpClient.put.mockResolvedValueOnce({
         data: expectedResponse,
       });
 
       const result = await auth.setDisplayName(displayName);
 
-      expect(mockHttpClient.post).toHaveBeenCalledWith('/auth/profile-data/set', {
-        path: 'display_name',
-        value: displayName,
+      expect(mockHttpClient.put).toHaveBeenCalledWith('/profile/display-name', {
+        display_name: displayName,
       });
       expect(result).toEqual(expectedResponse);
     });
@@ -180,16 +257,13 @@ describe('AgentAuth', () => {
       const bio = 'New bio text';
       const expectedResponse = { ...testProfileData, bio };
 
-      mockHttpClient.post.mockResolvedValueOnce({
+      mockHttpClient.put.mockResolvedValueOnce({
         data: expectedResponse,
       });
 
       const result = await auth.setBio(bio);
 
-      expect(mockHttpClient.post).toHaveBeenCalledWith('/auth/profile-data/set', {
-        path: 'bio',
-        value: bio,
-      });
+      expect(mockHttpClient.put).toHaveBeenCalledWith('/profile/bio', { bio });
       expect(result).toEqual(expectedResponse);
     });
 
@@ -211,7 +285,7 @@ describe('AgentAuth', () => {
         path: `social_links.${platform}`,
         value: url,
       });
-      expect(result).toEqual(expectedResponse);
+      expect(result).toBeUndefined();
     });
 
     it('should set avatar', async () => {
@@ -228,7 +302,7 @@ describe('AgentAuth', () => {
         path: 'avatar',
         value: avatarData,
       });
-      expect(result).toEqual(expectedResponse);
+      expect(result).toBeUndefined();
     });
   });
 
@@ -240,7 +314,7 @@ describe('AgentAuth', () => {
 
       const result = await auth.getSettings();
 
-      expect(mockHttpClient.get).toHaveBeenCalledWith('/auth/settings');
+      expect(mockHttpClient.get).toHaveBeenCalledWith('/auth/settings', undefined, undefined);
       expect(result).toEqual(testSettings);
     });
 
@@ -254,7 +328,7 @@ describe('AgentAuth', () => {
 
       const result = await auth.updateSettings(updateData);
 
-      expect(mockHttpClient.put).toHaveBeenCalledWith('/auth/settings', updateData);
+      expect(mockHttpClient.put).toHaveBeenCalledWith('/auth/settings', updateData, undefined);
       expect(result).toEqual(expectedResponse);
     });
 
@@ -272,7 +346,7 @@ describe('AgentAuth', () => {
         path: 'theme',
         value: theme,
       });
-      expect(result).toEqual(expectedResponse);
+      expect(result).toBeUndefined();
     });
 
     it('should set notification', async () => {
@@ -293,7 +367,7 @@ describe('AgentAuth', () => {
         path: `notifications.${type}`,
         value: enabled,
       });
-      expect(result).toEqual(expectedResponse);
+      expect(result).toBeUndefined();
     });
 
     it('should set privacy setting', async () => {
@@ -314,7 +388,7 @@ describe('AgentAuth', () => {
         path: `privacy.${setting}`,
         value,
       });
-      expect(result).toEqual(expectedResponse);
+      expect(result).toBeUndefined();
     });
 
     it('should set dashboard layout', async () => {
@@ -334,7 +408,7 @@ describe('AgentAuth', () => {
         path: 'dashboard.layout',
         value: layout,
       });
-      expect(result).toEqual(expectedResponse);
+      expect(result).toBeUndefined();
     });
   });
 
@@ -352,7 +426,10 @@ describe('AgentAuth', () => {
 
       const result = await auth.changePassword(passwordData);
 
-      expect(mockHttpClient.post).toHaveBeenCalledWith('/auth/change-password', passwordData);
+      expect(mockHttpClient.post).toHaveBeenCalledWith('/auth/change-password', {
+        current_password: passwordData.currentPassword,
+        new_password: passwordData.newPassword,
+      });
       expect(result).toEqual(expectedResponse);
     });
   });
@@ -368,7 +445,7 @@ describe('AgentAuth', () => {
 
       const result = await auth.toggle2FA(enabled);
 
-      expect(mockHttpClient.post).toHaveBeenCalledWith('/auth/2fa/toggle', { enabled });
+      expect(mockHttpClient.post).toHaveBeenCalledWith('/profile/toggle-2fa', { enabled });
       expect(result).toEqual(expectedResponse);
     });
 
@@ -381,7 +458,7 @@ describe('AgentAuth', () => {
 
       const result = await auth.get2FAStatus();
 
-      expect(mockHttpClient.get).toHaveBeenCalledWith('/auth/2fa/status');
+      expect(mockHttpClient.get).toHaveBeenCalledWith('/auth/2fa-status');
       expect(result).toEqual(expectedResponse);
     });
   });
@@ -408,7 +485,7 @@ describe('AgentAuth', () => {
 
       const result = await auth.getActiveSessions();
 
-      expect(mockHttpClient.get).toHaveBeenCalledWith('/auth/sessions');
+      expect(mockHttpClient.get).toHaveBeenCalledWith('/sessions');
       expect(result).toEqual(expectedResponse);
     });
 
@@ -422,7 +499,9 @@ describe('AgentAuth', () => {
 
       const result = await auth.revokeSession(sessionId);
 
-      expect(mockHttpClient.delete).toHaveBeenCalledWith(`/auth/sessions/${sessionId}`);
+      expect(mockHttpClient.delete).toHaveBeenCalledWith(`/sessions/${sessionId}`, {
+        body: undefined,
+      });
       expect(result).toEqual(expectedResponse);
     });
   });
@@ -475,15 +554,20 @@ describe('AgentAuth', () => {
 
     it('should connect OAuth provider', async () => {
       const provider = 'google';
+      const oauthData = {
+        provider,
+        access_token: 'token',
+        project_id: 1,
+      };
       const expectedResponse = { redirect_url: 'https://oauth.google.com/...' };
 
       mockHttpClient.post.mockResolvedValueOnce({
         data: expectedResponse,
       });
 
-      const result = await auth.connectOAuthProvider(provider);
+      const result = await auth.connectOAuthProvider(oauthData);
 
-      expect(mockHttpClient.post).toHaveBeenCalledWith('/auth/oauth/connect', { provider });
+      expect(mockHttpClient.post).toHaveBeenCalledWith('/auth/oauth/connect', oauthData);
       expect(result).toEqual(expectedResponse);
     });
 
@@ -497,7 +581,7 @@ describe('AgentAuth', () => {
 
       const result = await auth.disconnectOAuthProvider(provider);
 
-      expect(mockHttpClient.delete).toHaveBeenCalledWith(`/auth/oauth/disconnect/${provider}`);
+      expect(mockHttpClient.delete).toHaveBeenCalledWith(`/auth/oauth/providers/${provider}`);
       expect(result).toEqual(expectedResponse);
     });
   });

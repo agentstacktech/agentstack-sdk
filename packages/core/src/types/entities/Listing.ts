@@ -54,6 +54,11 @@ export interface ListingAsset {
    * Base price in USDT
    */
   price_usdt: string;
+
+  /**
+   * Fulfillment source for catalog-driven listings.
+   */
+  fulfillment_mode?: 'catalog_definition' | 'inventory_backed';
 }
 
 /**

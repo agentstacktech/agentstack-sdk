@@ -2,7 +2,7 @@ import type { HTTPClient } from '../../client/http-client';
 
 export type BulkListingItem = {
   type?: string;
-  asset: Record<string, unknown>;
+  asset: unknown;
   whitelist?: Record<string, unknown>;
   auto_accept?: Record<string, unknown>;
 };

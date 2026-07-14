@@ -26,5 +26,32 @@ export {
   economyPurchaseCreditsRecipe,
   economyEnsureAgntBalanceRecipe,
   economyVerifyRunReceiptRecipe,
+  testnetGrantDemoRecipe,
+  testnetThreeRailSmokeRecipe,
 } from './recipes';
-export type { PaidAgentRunRecipeParams } from './recipes';
+export type {
+  PaidAgentRunRecipeParams,
+  TestnetGrantDemoRecipeParams,
+  TestnetGrantDemoRecipeResult,
+  TestnetThreeRailSmokeRecipeParams,
+  TestnetThreeRailSmokeRecipeResult,
+} from './recipes';
+export { TestnetClient } from './clients/TestnetClient';
+export { ChainSurfaceClient } from './clients/ChainSurfaceClient';
+export type { ChainIntentRecord, ChainRailStatus, DelegationCaps } from './agentnet/chainControl';
+export type {
+  ChainProfile,
+  FaucetMintBody,
+  FaucetMintResult,
+  RunScenarioBody,
+  ScenarioRunResult,
+  TestnetScenarioId,
+  ProofTier,
+} from './clients/testnetTypes';
+export {
+  buildExplorerUrl,
+  buildExplorerTxUrl,
+  buildExplorerUrlFromCaip2,
+  AGENTNET_TESTNET_EXPLORER_CHAIN_IDS,
+} from './agentnetExplorer';
+export type { ExplorerLinkKind } from './agentnetExplorer';

@@ -2,10 +2,10 @@
  * Path-based project assets URLs (`/dev|user/projects/:id/assets?...`).
  * Preferred over legacy `buildAssetsWizardHref` (`?module=assets&project_id=`).
  */
-import type { AssetsUrlState, CommerceHubTab } from './assetsUrlState';
+import type { AssetsUrlState, CommerceHubTab, StudioTab } from './assetsUrlState';
 import { writeAssetsSearchParams } from './assetsUrlState';
 
-export type AssetsProjectShell = 'dev' | 'user';
+export type AssetsProjectShell = 'dev' | 'user' | 'platform' | 'legacy';
 
 export function buildAssetsProjectPath(
   projectId: number,
@@ -78,4 +78,21 @@ export function buildProjectAssetsCommerceHref(
     commerceTab: tab,
     commerceAssetId: extra?.assetId ?? null,
   });
+}
+
+export function buildProjectStorefrontStudioHref(
+  projectId: number,
+  shell: AssetsProjectShell,
+  tab: StudioTab = 'quick',
+  extra?: Partial<AssetsUrlState> & { action?: string },
+): string {
+  const { action, ...urlExtra } = extra ?? {};
+  const href = buildProjectAssetsSurfaceHref(projectId, shell, {
+    mode: 'studio',
+    studioTab: tab,
+    ...urlExtra,
+  });
+  if (!action) return href;
+  const sep = href.includes('?') ? '&' : '?';
+  return `${href}${sep}action=${encodeURIComponent(action)}`;
 }

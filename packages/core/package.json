@@ -1,6 +1,6 @@
 {
   "name": "@agentstack/sdk",
-  "version": "0.4.13",
+  "version": "0.4.14",
   "description": "AgentStack-SDK - Universal API client with modular architecture and Neural integration",
   "readme": "README.en.md",
   "type": "module",
@@ -28,10 +28,21 @@
       "import": "./dist/economy/index.js",
       "require": "./dist/economy/index.js"
     },
+    "./public/grants": {
+      "types": "./dist/public/grants/index.d.ts",
+      "import": "./dist/public/grants/index.js",
+      "require": "./dist/public/grants/index.js"
+    },
     "./finance": {
       "types": "./dist/finance/index.d.ts",
       "import": "./dist/finance/index.js",
       "require": "./dist/finance/index.js"
+    },
+    "./fabric": {
+      "types": "./dist/fabric/index.d.ts",
+      "import": "./dist/fabric/index.esm.js",
+      "require": "./dist/fabric/index.js",
+      "default": "./dist/fabric/index.esm.js"
     },
     "./guidance": {
       "types": "./dist/guidance/index.d.ts",
@@ -97,6 +108,54 @@
       "require": "./dist/commerce/participant/index.js",
       "default": "./dist/commerce/participant/index.esm.js"
     },
+    "./commerce/money": {
+      "types": "./dist/commerce/money/index.d.ts",
+      "import": "./dist/commerce/money/index.esm.js",
+      "require": "./dist/commerce/money/index.js",
+      "default": "./dist/commerce/money/index.esm.js"
+    },
+    "./commerce/topup": {
+      "types": "./dist/commerce/topup/index.d.ts",
+      "import": "./dist/commerce/topup/index.esm.js",
+      "require": "./dist/commerce/topup/index.js",
+      "default": "./dist/commerce/topup/index.esm.js"
+    },
+    "./commerce/storefront": {
+      "types": "./dist/commerce/storefront/index.d.ts",
+      "import": "./dist/commerce/storefront/index.esm.js",
+      "require": "./dist/commerce/storefront/index.js",
+      "default": "./dist/commerce/storefront/index.esm.js"
+    },
+    "./commerce/errors": {
+      "types": "./dist/commerce/errors/index.d.ts",
+      "import": "./dist/commerce/errors/index.esm.js",
+      "require": "./dist/commerce/errors/index.js",
+      "default": "./dist/commerce/errors/index.esm.js"
+    },
+    "./commerce/entitlements": {
+      "types": "./dist/commerce/entitlements/index.d.ts",
+      "import": "./dist/commerce/entitlements/index.esm.js",
+      "require": "./dist/commerce/entitlements/index.js",
+      "default": "./dist/commerce/entitlements/index.esm.js"
+    },
+    "./commerce/sell": {
+      "types": "./dist/commerce/sell/index.d.ts",
+      "import": "./dist/commerce/sell/index.esm.js",
+      "require": "./dist/commerce/sell/index.js",
+      "default": "./dist/commerce/sell/index.esm.js"
+    },
+    "./commerce/subscription": {
+      "types": "./dist/commerce/subscription/index.d.ts",
+      "import": "./dist/commerce/subscription/index.esm.js",
+      "require": "./dist/commerce/subscription/index.js",
+      "default": "./dist/commerce/subscription/index.esm.js"
+    },
+    "./commerce/refund": {
+      "types": "./dist/commerce/refund/index.d.ts",
+      "import": "./dist/commerce/refund/index.esm.js",
+      "require": "./dist/commerce/refund/index.js",
+      "default": "./dist/commerce/refund/index.esm.js"
+    },
     "./commerce": {
       "types": "./dist/commerce/index.d.ts",
       "import": "./dist/commerce/index.esm.js",
@@ -107,6 +166,11 @@
       "types": "./dist/pwa/index.d.ts",
       "import": "./dist/pwa/index.js",
       "require": "./dist/pwa/index.js"
+    },
+    "./seo": {
+      "types": "./dist/seo/index.d.ts",
+      "import": "./dist/seo/index.js",
+      "require": "./dist/seo/index.js"
     },
     "./mobile": {
       "types": "./dist/mobile/index.d.ts",
@@ -142,7 +206,8 @@
     "bundle:rnnoise-worklet": "node ./scripts/bundle-rnnoise-worklet.mjs",
     "pretest": "npm run sync:agentstack-version",
     "pretype-check": "npm run sync:agentstack-version",
-    "build": "rollup -c",
+    "build": "node ./scripts/rollup-build.mjs",
+    "check:pwa-subpath-size": "node ./scripts/check-pwa-subpath-size.mjs",
     "dev": "rollup -c -w",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -198,6 +263,7 @@
     "@jsquash/jpeg": "^1.6.0",
     "@jsquash/webp": "^1.5.0",
     "@rollup/plugin-commonjs": "^28.0.0",
+    "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.0",
     "@rollup/plugin-typescript": "^12.1.0",
     "@types/jest": "^29.5.14",

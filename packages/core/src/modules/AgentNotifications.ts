@@ -130,6 +130,16 @@ export class AgentNotifications {
     return response.data;
   }
 
+  /** Mark project inbox row read (B50). */
+  async markProjectNotificationAsRead(
+    projectId: number,
+    notificationId: string,
+  ): Promise<Notification> {
+    const id = encodeURIComponent(String(notificationId));
+    const response = await this.client.patch(`/notifications/${projectId}/${id}/read`, {});
+    return response.data;
+  }
+
   /**
    * Отметить все уведомления как прочитанные
    */
@@ -137,11 +147,12 @@ export class AgentNotifications {
     updated_count: number;
     message: string;
   }> {
-    const response = await this.client.put('/notifications/mark-all-read', {
-      project_id: projectId,
-      user_id: userId
-    });
-    return response.data;
+    const response = await this.client.patch(`/notifications/${projectId}/read-all`, {});
+    const data = response.data as { updated_count?: number; message?: string };
+    return {
+      updated_count: Number(data.updated_count ?? 0),
+      message: data.message ?? 'Marked notifications as read',
+    };
   }
 
   /**

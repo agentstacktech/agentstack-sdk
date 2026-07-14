@@ -1,5 +1,3 @@
-import { describe, expect, it } from 'vitest';
-
 import { buildCapabilityMatrix, flattenCapabilityMatrix } from '../../platform-surface';
 
 describe('flattenCapabilityMatrix', () => {

@@ -17,6 +17,11 @@ import { RequestBatcher } from '../utils/request-batcher';
 import { ProteinCache } from '../storage/protein-cache';
 import { getStorageItem, setStorageItem, removeStorageItem } from '../utils/storage-utils';
 import { AGENTSTACK_DEV_API_BASE } from '../config/agentstackEndpoints';
+import {
+  isTransientBrowserNetworkError,
+  noteTransientNetworkError,
+} from './networkErrors';
+import { applyCsrfHeader, shouldIncludeCredentials } from '../security/csrf';
 import { assertIntegratorMayCallAdminApi } from '../config/integratorScope';
 import {
   normalizeProjectId,
@@ -108,6 +113,9 @@ export function normalizeGetQueryArg(
 
 export class HTTPClient extends SimpleEventEmitter {
   private config: Required<SDKConfig>;
+  /** Max age for stale ETag entries kept for conditional GET (ms). */
+  private static readonly STALE_ETAG_MAX_MS = 24 * 60 * 60 * 1000;
+
   private cache = new Map<string, CacheEntry<any>>();
   private metrics: SDKMetrics;
   private requestQueue = new Map<string, Promise<any>>();
@@ -138,6 +146,9 @@ export class HTTPClient extends SimpleEventEmitter {
   private cleanupInterval: NodeJS.Timeout | null = null; // Интервал для периодической очистки
   private lastRefreshTime: number = 0; // Время последнего refresh (для защиты от слишком частых попыток)
   private refreshBlockedUntil: number = 0; // Время до которого refresh заблокирован
+  /** Suppress session_expired after login while stale in-flight 401s may still land. */
+  private postLoginGraceUntil: number = 0;
+  static readonly POST_LOGIN_GRACE_MS = 15_000;
   private globalRefreshDepth: number = 0; // ✅ MEMORY LEAK FIX: Глобальная глубина рекурсии refresh
   
   // ✅ MEMORY LEAK FIX: Константы для ограничения накопления запросов
@@ -300,11 +311,12 @@ export class HTTPClient extends SimpleEventEmitter {
       maxBatchSize: config.maxBatchSize ?? 50,
       enableBatching: config.enableBatching !== false,
       shouldDeferBatchUrl: config.shouldDeferBatchUrl ?? (() => false),
+      sdkAudience: config.sdkAudience ?? 'integrator',
     };
 
     this.metrics = this.initializeMetrics();
     this.authStateStore = authStateStore || new AuthStateStore();
-    
+
     // Initialize circuit breakers (v0.1.39!) - DISABLED FOR DEBUGGING
     this.circuitBreakers = new CircuitBreakerManager({
       maxFailures: 999999, // Disable circuit breaker
@@ -765,6 +777,18 @@ export class HTTPClient extends SimpleEventEmitter {
     
     // Build headers
     const headers = this.buildHeaders(interceptedConfig.headers, url);
+
+    if (
+      interceptedConfig.method === HTTPMethod.GET &&
+      this.config.enableCaching &&
+      !interceptedConfig.skipCache
+    ) {
+      const cacheKey = this.getCacheKey(interceptedConfig);
+      const entry = this.cache.get(cacheKey);
+      if (entry?.etag) {
+        headers['If-None-Match'] = entry.etag;
+      }
+    }
     
     // Circuit breaker key (v0.1.39: Per-endpoint isolation!)
     const circuitKey = `${interceptedConfig.method}:${url}`;
@@ -865,6 +889,40 @@ export class HTTPClient extends SimpleEventEmitter {
     });
     
     this.apiKey = isValidApiKey ? cleanApiKey : null;
+
+    if (isValidApiKey) {
+      const state = this.authStateStore.getState();
+      if (
+        state === 'unauthenticated' ||
+        state === 'authenticating' ||
+        state === 'session_expired'
+      ) {
+        this.authStateStore.setState({
+          state: 'authenticated',
+          reason: 'refresh_success',
+          tokens: {
+            accessToken: this.authToken,
+            apiKey: this.apiKey,
+            projectId: this.config.projectId,
+          },
+        });
+      }
+    }
+  }
+
+  /**
+   * After successful login, ignore transient 401s that would mark session_expired.
+   * Mirrors the SPA grace window in auth.tsx refreshUser.
+   */
+  public markRecentLoginSuccess(): void {
+    this.postLoginGraceUntil = Date.now() + HTTPClient.POST_LOGIN_GRACE_MS;
+    logger.debug('Post-login grace window started', {
+      graceMs: HTTPClient.POST_LOGIN_GRACE_MS,
+    });
+  }
+
+  public isInPostLoginGrace(): boolean {
+    return Date.now() < this.postLoginGraceUntil;
   }
 
   /**
@@ -967,6 +1025,9 @@ export class HTTPClient extends SimpleEventEmitter {
         body: config.body instanceof FormData ? config.body : (config.body ? JSON.stringify(config.body) : undefined),
         signal: controller.signal,
       };
+      if (shouldIncludeCredentials(config.method, headers)) {
+        fetchInit.credentials = 'include';
+      }
       if (config.fetchPriority != null) {
         Object.assign(fetchInit, { priority: config.fetchPriority });
       }
@@ -982,7 +1043,13 @@ export class HTTPClient extends SimpleEventEmitter {
 
       // Handle 304 Not Modified (before body parse; skipCache callers rely on status + headers).
       if (response.status === 304) {
-        const cached = this.getFromCache<T>(this.getCacheKey(config));
+        const cacheKey = this.getCacheKey(config);
+        const entry = this.cache.get(cacheKey);
+        if (entry?.data) {
+          entry.timestamp = Date.now();
+          return entry.data as APIResponse<T>;
+        }
+        const cached = this.getFromCache<T>(cacheKey);
         if (cached) {
           return cached;
         }
@@ -1093,7 +1160,7 @@ export class HTTPClient extends SimpleEventEmitter {
         }
         // ✅ CRITICAL: For 401 errors on public pages, return immediately without processing
         // This prevents any redirect logic from executing
-        if (response.status === 401 && typeof window !== 'undefined') {
+        if (response.status === 401 && typeof window !== 'undefined' && config.method === HTTPMethod.GET) {
           const currentPath = window.location.pathname;
           const publicRoutes = ['/', '/login', '/register', '/pricing', '/faq', '/api-docs', '/webhook-docs', '/oauth/callback'];
           const isPublicRoute = publicRoutes.some(route => 
@@ -1203,6 +1270,14 @@ export class HTTPClient extends SimpleEventEmitter {
           }
         }
         throw error;
+      }
+
+      if (isTransientBrowserNetworkError(error)) {
+        noteTransientNetworkError();
+        logger.debug(`HTTP transient network ${config.method} ${url}`, {
+          message: (error as Error)?.message,
+        });
+        throw new ServerError('Network error');
       }
 
       logger.error(`HTTP Network Error ${config.method} ${url}`, error);
@@ -1665,7 +1740,7 @@ export class HTTPClient extends SimpleEventEmitter {
         return normalizedPath === normalizedRoute || normalizedPath.startsWith(normalizedRoute + '/');
       });
       
-      if (isPublicRoute) {
+      if (isPublicRoute && config?.method === HTTPMethod.GET) {
         const url = config?.url || 'unknown';
         const isAuthMeProbe = url.includes('/auth/me');
         // On public pages, just return the error without any redirect logic
@@ -1706,7 +1781,10 @@ export class HTTPClient extends SimpleEventEmitter {
         const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/me');
         const isSettingsFieldGet = url.includes('/auth/settings/get');
         const shouldMarkSessionExpired =
-          !config?.skipAuthStateCheck && !isAuthEndpoint && !isSettingsFieldGet;
+          !config?.skipAuthStateCheck &&
+          !isAuthEndpoint &&
+          !isSettingsFieldGet &&
+          !this.isInPostLoginGrace();
 
         if (shouldMarkSessionExpired) {
           this.authStateStore.setState({
@@ -1733,6 +1811,11 @@ export class HTTPClient extends SimpleEventEmitter {
           );
           error = new UnauthorizedError(message || 'Unauthorized');
           break;
+        }
+
+        if (this.isInPostLoginGrace() && !isAuthEndpoint) {
+          this.refreshTokensFromStorage();
+          logger.debug(`Post-login grace: refreshed tokens from storage after 401 on ${url}`);
         }
 
         if (sessionExpiredByCode) {
@@ -2126,21 +2209,29 @@ export class HTTPClient extends SimpleEventEmitter {
     const entry = this.cache.get(key);
     if (!entry) return null;
 
-    if (Date.now() - entry.timestamp > entry.ttl) {
+    const age = Date.now() - entry.timestamp;
+    const maxAge = entry.ttl + HTTPClient.STALE_ETAG_MAX_MS;
+    if (age > maxAge) {
       this.cache.delete(key);
       return null;
     }
+    if (age > entry.ttl) {
+      return null;
+    }
 
-    return entry.data;
+    return entry.data as APIResponse<T>;
   }
 
   private setCache<T>(key: string, response: APIResponse<T>): void {
-    const etag = response.headers['etag'];
+    const etag =
+      response.headers['etag'] ??
+      response.headers['ETag'] ??
+      (response.headers as Record<string, string>)['etag'];
     if (!etag) return;
 
     this.cache.set(key, {
       data: response,
-      etag,
+      etag: String(etag),
       timestamp: Date.now(),
       ttl: 5 * 60 * 1000 // 5 minutes
     });
@@ -2760,6 +2851,8 @@ export class HTTPClient extends SimpleEventEmitter {
     if (!headers['X-Trace-Id'] && !headers['x-trace-id']) {
       headers['X-Trace-Id'] = traceId;
     }
+
+    applyCsrfHeader(headers);
 
     return headers;
   }

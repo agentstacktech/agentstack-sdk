@@ -5,7 +5,5 @@ export async function grantParticipantHolding(
   projectId: number,
   body: { user_id: number; asset_id: string; quantity: number; reason?: string },
 ): Promise<void> {
-  await client.post('/commerce/participant/grant-holding', body, {
-    project_id: projectId,
-  });
+  await client.post(`/commerce/participant/grant-holding?project_id=${projectId}`, body);
 }

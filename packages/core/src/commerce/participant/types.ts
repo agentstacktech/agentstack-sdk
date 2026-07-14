@@ -12,4 +12,6 @@ export type WalletSummary = {
   holdings_count: number;
   recent_orders: unknown[];
   project_id?: number | null;
+  usdt_spendable?: string | null;
+  wallet_balance_usdt?: string | null;
 };

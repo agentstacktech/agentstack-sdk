@@ -3,7 +3,7 @@
 **Genetic tag:** `repo.platform.sdk.docs_i18n.gen1`
 **RU:** [DOC_SYNC_MATRIX_ru.md](./DOC_SYNC_MATRIX_ru.md) (summary)
 
-Generated: 2026-05-30T09:58:06.050Z · Do not edit by hand — run `npm run generate:docs-i18n`
+Generated: 2026-07-12T03:01:22.850Z · Do not edit by hand — run `npm run generate:docs-i18n`
 
 | EN | RU | Diátaxis | Lines EN | Lines RU | Fences EN/RU | H2 EN/RU | Ratio | Status |
 |----|-----|----------|----------|----------|--------------|----------|-------|--------|

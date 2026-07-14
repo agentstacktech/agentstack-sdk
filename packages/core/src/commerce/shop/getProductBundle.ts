@@ -9,6 +9,9 @@ export type ProductBundle = {
     thumbnail_url?: string;
     rarity?: string;
     type?: string;
+    attack?: number;
+    hp?: number;
+    level_requirement?: number;
   };
   seller: {
     project_id: number;
@@ -30,7 +33,10 @@ export async function getProductBundle(
   client: HTTPClient,
   listingUuid: string,
 ): Promise<ProductBundle> {
-  const response = await client.get(`/commerce/shop/products/${listingUuid}`);
+  const response = await client.get(`/commerce/shop/products/${listingUuid}`, undefined, {
+    skipAuthStateCheck: true,
+    skipBatching: true,
+  });
   const data = response.data ?? response;
   return {
     listing: data.listing,

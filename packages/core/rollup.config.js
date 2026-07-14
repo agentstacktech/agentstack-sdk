@@ -1,5 +1,6 @@
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
+import json from '@rollup/plugin-json';
 import typescript from '@rollup/plugin-typescript';
 import { terser } from 'rollup-plugin-terser';
 import dts from 'rollup-plugin-dts';
@@ -7,7 +8,23 @@ import { readFileSync } from 'fs';
 
 const packageJson = JSON.parse(readFileSync('./package.json', 'utf8'));
 
-const commerceSubpackages = ['checkout', 'cart', 'orders', 'shop', 'merchant'];
+const commerceSubpackages = [
+  'checkout',
+  'cart',
+  'orders',
+  'shop',
+  'merchant',
+  'money',
+  'topup',
+  'storefront',
+  'errors',
+  'entitlements',
+  'sell',
+  'subscription',
+  'refund',
+  'participant',
+  'guidance',
+];
 
 function commerceSubpackageRollup(name) {
   const input = `src/commerce/${name}/index.ts`;
@@ -71,6 +88,7 @@ export default [
         browser: true,
         preferBuiltins: false
       }),
+      json(),
       commonjs(),
       typescript({
         tsconfig: './tsconfig.json',
@@ -162,6 +180,20 @@ export default [
     external: ['eventemitter3', 'zod'],
   },
   {
+    input: 'src/fabric/index.ts',
+    output: [
+      { file: 'dist/fabric/index.js', format: 'cjs', sourcemap: true, inlineDynamicImports: true },
+      { file: 'dist/fabric/index.esm.js', format: 'esm', sourcemap: true, inlineDynamicImports: true },
+    ],
+    plugins: [
+      resolve({ browser: true, preferBuiltins: false }),
+      commonjs(),
+      typescript({ tsconfig: './tsconfig.json', declaration: false, declarationMap: false }),
+      terser(),
+    ],
+    external: ['eventemitter3', 'zod'],
+  },
+  {
     input: 'src/commerce/assets/index.ts',
     output: [
       { file: 'dist/commerce/assets/index.js', format: 'cjs', sourcemap: true, inlineDynamicImports: true },
@@ -169,6 +201,7 @@ export default [
     ],
     plugins: [
       resolve({ browser: true, preferBuiltins: false }),
+      json(),
       commonjs(),
       typescript({ tsconfig: './tsconfig.json', declaration: false, declarationMap: false }),
       terser(),
@@ -208,6 +241,7 @@ export default [
     ],
     plugins: [
       resolve({ browser: true, preferBuiltins: false }),
+      json(),
       commonjs(),
       typescript({ tsconfig: './tsconfig.json', declaration: false, declarationMap: false }),
       terser(),
@@ -312,6 +346,12 @@ export default [
   {
     input: 'src/finance/index.ts',
     output: [{ file: 'dist/finance/index.d.ts', format: 'esm' }],
+    plugins: [dts()],
+    external: [/\.css$/],
+  },
+  {
+    input: 'src/fabric/index.ts',
+    output: [{ file: 'dist/fabric/index.d.ts', format: 'esm' }],
     plugins: [dts()],
     external: [/\.css$/],
   },

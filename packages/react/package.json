@@ -1,6 +1,6 @@
 {
   "name": "@agentstack/react",
-  "version": "0.4.13",
+  "version": "0.4.14",
   "description": "React integration for AgentStack SDK",
   "readme": "README.en.md",
   "main": "dist/index.js",
@@ -43,7 +43,7 @@
     "react-dom": ">=18.3.0"
   },
   "dependencies": {
-    "@agentstack/sdk": "^0.4.13",
+    "@agentstack/sdk": "file:../core",
     "zod": "^3.24.1"
   },
   "devDependencies": {

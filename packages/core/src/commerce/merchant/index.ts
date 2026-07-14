@@ -1,3 +1,4 @@
+export { MerchantClient } from './MerchantClient';
 export { getMerchantShelfStats, type MerchantShelfStats } from './getShelfStats';
 export { updateMerchantPolicy, type UpdateMerchantPolicyInput } from './updateMerchantPolicy';
 export { getSellerDashboard } from './getSellerDashboard';

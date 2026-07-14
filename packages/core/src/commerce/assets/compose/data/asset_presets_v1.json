@@ -1,0 +1,249 @@
+{
+  "version": 1,
+  "branchingQuestions": [
+    {
+      "id": "primary_goal",
+      "title": "What are you building?",
+      "options": [
+        { "id": "game", "label": "Game economy", "categories": ["game"] },
+        { "id": "sell", "label": "Sell or monetize", "categories": ["sell"] },
+        { "id": "education", "label": "Courses & content", "categories": ["education"] }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "id": "game_currency",
+      "name": "In-game currency",
+      "description": "Gold, gems, credits — stackable tradeable currency",
+      "category": "game",
+      "assetType": "currency",
+      "defaultPriceUsdt": "1.00",
+      "steps": ["intent", "basics", "publish", "review"],
+      "seedComponents": {
+        "properties": { "stackable": true, "tradeable": true, "category": "currency" },
+        "game": { "game_metadata": {} },
+        "metadata": { "schema_version": "1", "custom_fields": {} }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "display_unit": {
+            "type": "string",
+            "title": "Display unit",
+            "default": "coins",
+            "enum": ["coins", "gems", "credits", "gold", "tokens"]
+          }
+        }
+      },
+      "postCreateActions": [{ "action": "logic.openTemplate", "templateId": "commerce.asset.currency_created", "optional": true }]
+    },
+    {
+      "id": "game_resource",
+      "name": "Game resource",
+      "description": "Wood, ore, food — harvestable resources",
+      "category": "game",
+      "assetType": "digital_item",
+      "defaultPriceUsdt": "0.10",
+      "steps": ["intent", "basics", "media", "publish", "review"],
+      "seedComponents": {
+        "properties": { "category": "resource", "stackable": true, "tradeable": true, "rarity": "common" },
+        "game": { "stats": {} },
+        "metadata": { "schema_version": "1", "custom_fields": {} }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "max_stack": { "type": "number", "title": "Max stack", "default": 999 }
+        }
+      },
+      "postCreateActions": []
+    },
+    {
+      "id": "game_card",
+      "name": "Game item / card",
+      "description": "RPG or TCG item with stats",
+      "category": "game",
+      "assetType": "digital_item",
+      "defaultPriceUsdt": "5.00",
+      "steps": ["intent", "basics", "media", "publish", "review"],
+      "seedComponents": {
+        "properties": { "rarity": "common", "tradeable": true, "transferable": true },
+        "game": { "stats": { "attack": 0, "hp": 0 }, "level_requirement": 0 },
+        "visual": {},
+        "metadata": { "schema_version": "1", "custom_fields": {} }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "attack": { "type": "number", "title": "Attack", "default": 10 },
+          "hp": { "type": "number", "title": "HP", "default": 50 }
+        }
+      },
+      "postCreateActions": []
+    },
+    {
+      "id": "marketplace_product",
+      "name": "Marketplace product",
+      "description": "Sell on the project marketplace",
+      "category": "sell",
+      "assetType": "digital_item",
+      "defaultPriceUsdt": "9.99",
+      "steps": ["intent", "basics", "media", "publish", "review"],
+      "seedComponents": {
+        "properties": { "tradeable": true, "transferable": true, "description": "" },
+        "visual": {},
+        "metadata": { "schema_version": "1", "lifecycle": "published", "custom_fields": {} }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listing_price": {
+            "type": "string",
+            "title": "Listing price (USDT)",
+            "enum": ["4.99", "9.99", "19.99", "49.00"]
+          }
+        }
+      },
+      "postCreateActions": [
+        { "action": "marketplace.createListing", "optional": false },
+        { "action": "logic.openTemplate", "templateId": "commerce.marketplace.product", "optional": true }
+      ]
+    },
+    {
+      "id": "course_digital",
+      "name": "Digital course",
+      "description": "Course, guide, or downloadable content",
+      "category": "education",
+      "assetType": "service",
+      "defaultPriceUsdt": "49.00",
+      "steps": ["intent", "basics", "media", "publish", "review"],
+      "seedComponents": {
+        "properties": { "category": "education", "description": "" },
+        "visual": {},
+        "metadata": {
+          "schema_version": "1",
+          "custom_fields": { "delivery_url": "" }
+        }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "delivery_url": { "type": "string", "title": "Delivery URL", "format": "uri" }
+        },
+        "required": ["delivery_url"]
+      },
+      "postCreateActions": [
+        { "action": "integrate.openSection", "section": "gallery", "optional": true }
+      ]
+    },
+    {
+      "id": "consumable",
+      "name": "Consumable",
+      "description": "Potions, boosts, one-time use items",
+      "category": "game",
+      "assetType": "digital_item",
+      "defaultPriceUsdt": "2.00",
+      "steps": ["intent", "basics", "media", "review"],
+      "seedComponents": {
+        "properties": { "stackable": true, "rarity": "common" },
+        "game": { "effects": [{ "type": "buff", "value": 10 }] },
+        "metadata": { "schema_version": "1", "custom_fields": {} }
+      },
+      "inputSchema": { "type": "object", "properties": {} },
+      "postCreateActions": []
+    },
+    {
+      "id": "subscription_entitlement",
+      "name": "Subscription access",
+      "description": "Entitlement linked to buffs",
+      "category": "sell",
+      "assetType": "service",
+      "defaultPriceUsdt": "19.00",
+      "steps": ["intent", "basics", "publish", "review"],
+      "seedComponents": {
+        "properties": { "category": "subscription" },
+        "metadata": { "schema_version": "1", "buff_template_id": "", "custom_fields": {} }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "buff_template_id": {
+            "type": "string",
+            "title": "Buff template id",
+            "enum": ["vip_monthly", "pro_tier", "founder_pass"]
+          }
+        }
+      },
+      "postCreateActions": [{ "action": "buffs.openModule", "optional": true }]
+    },
+    {
+      "id": "physical_sku",
+      "name": "Physical product",
+      "description": "Shippable SKU",
+      "category": "sell",
+      "assetType": "physical_item",
+      "defaultPriceUsdt": "29.00",
+      "steps": ["intent", "basics", "media", "publish", "review"],
+      "seedComponents": {
+        "properties": { "tradeable": false },
+        "metadata": { "schema_version": "1", "custom_fields": { "shipping_hint": "" } }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "shipping_hint": {
+            "type": "string",
+            "title": "Shipping notes",
+            "enum": ["Standard 5–7 days", "Express 2–3 days", "Digital + physical bundle"]
+          }
+        }
+      },
+      "postCreateActions": [{ "action": "marketplace.createListing", "optional": true }]
+    },
+    {
+      "id": "exchange_pair",
+      "name": "Trade pair asset",
+      "description": "Asset used in exchange (wood/gold)",
+      "category": "game",
+      "assetType": "currency",
+      "defaultPriceUsdt": "1.00",
+      "steps": ["intent", "basics", "publish", "review"],
+      "seedComponents": {
+        "properties": { "tradeable": true, "cross_project": false },
+        "metadata": { "schema_version": "1", "exchange_pair": { "quote_asset_name": "" }, "custom_fields": {} }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "quote_asset_name": {
+            "type": "string",
+            "title": "Quote asset name",
+            "enum": ["Gold", "Silver", "USDT", "Credits"]
+          }
+        }
+      },
+      "postCreateActions": [{ "action": "exchange.openHelper", "optional": true }]
+    },
+    {
+      "id": "asset_bundle",
+      "name": "Item bundle",
+      "description": "Pack of multiple asset definitions",
+      "category": "sell",
+      "assetType": "digital_item",
+      "defaultPriceUsdt": "15.00",
+      "steps": ["intent", "basics", "media", "review"],
+      "seedComponents": {
+        "properties": { "description": "Bundle" },
+        "metadata": { "schema_version": "1", "bundle_asset_ids": [], "custom_fields": {} }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bundle_asset_ids": { "type": "string", "title": "Asset IDs (comma-separated)" }
+        }
+      },
+      "postCreateActions": []
+    }
+  ]
+}

@@ -127,13 +127,88 @@ export function integrationGetDiagnostics(client: HTTPClient, projectId: number)
     connections_count: number;
     hints?: string[];
     runbook?: string;
+    workers?: Record<string, unknown>;
+    metrics?: Record<string, unknown>;
   }>('/integrations/diagnostics', { project_id: projectId }, { skipBatching: true, skipCache: true });
+}
+
+export function integrationGetPlatformDiagnostics(client: HTTPClient) {
+  return client.get<{
+    rollup_7d: Record<string, unknown>;
+    connections_total: number;
+    poll_enabled_connections: number;
+    registered_modules_total: number;
+    workers?: Record<string, unknown>;
+    top_projects?: Array<{
+      project_id: number;
+      inbox_events_7d: number;
+      delivery_events_7d: number;
+    }>;
+    hints?: string[];
+    runbook?: string;
+  }>('/integrations/diagnostics/platform', {}, { skipBatching: true, skipCache: true });
+}
+
+export function integrationHydrateTriggers(client: HTTPClient, limit = 256) {
+  return client.post<{
+    logic_rules_scanned: number;
+    hydrated_bindings: number;
+    errors?: string[];
+  }>('/integrations/triggers/hydrate', {}, { params: { limit }, skipBatching: true });
+}
+
+export function integrationRebindTriggers(
+  client: HTTPClient,
+  opts?: { project_id?: number; limit?: number },
+) {
+  return client.post<{
+    rebound_rules: number;
+    projects_scanned?: number;
+    project_id?: number;
+    per_project?: Array<{ project_id: number; rebound_rules: number }>;
+  }>('/integrations/triggers/rebind', {}, {
+    params: {
+      ...(opts?.project_id !== undefined ? { project_id: opts.project_id } : {}),
+      ...(opts?.limit !== undefined ? { limit: opts.limit } : {}),
+    },
+    skipBatching: true,
+  });
 }
 
 export function integrationGetConnectorSetupSchema(client: HTTPClient, provider: string) {
   return client.get<{ provider: string; schema: unknown }>(
     '/integrations/connectors/setup-schema',
     { provider },
+    { skipBatching: true, skipCache: true },
+  );
+}
+
+export function integrationListScenarios(
+  client: HTTPClient,
+  scope: IntegrationListScope & { limit?: number },
+) {
+  const q = compactQuery({
+    project_id: scope.project_id,
+    owner_kind: scope.owner_kind,
+    user_id: scope.user_id,
+    limit: scope.limit,
+  });
+  return client.get<{ scenarios: unknown[]; total: number }>(
+    '/integrations/scenarios',
+    q,
+    { skipBatching: true, skipCache: true },
+  );
+}
+
+export function integrationListScenarioRuns(
+  client: HTTPClient,
+  scenarioId: string,
+  projectId: number,
+  limit = 50,
+) {
+  return client.get<{ runs: unknown[]; total: number }>(
+    `/integrations/scenarios/${scenarioId}/runs`,
+    { project_id: projectId, limit },
     { skipBatching: true, skipCache: true },
   );
 }
@@ -147,4 +222,6 @@ export const integrationQueries = {
   listIssues: integrationListIssues,
   getDiagnostics: integrationGetDiagnostics,
   getConnectorSetupSchema: integrationGetConnectorSetupSchema,
+  listScenarios: integrationListScenarios,
+  listScenarioRuns: integrationListScenarioRuns,
 };

@@ -1,7 +1,15 @@
 /**
- * Static deploy probe for the Update Plane (`sdk.pwa.update_plane.gen1`).
+ * Static deploy probe for the Update Plane (`sdk.pwa.update_plane.gen2`).
  * Browser-only; pass `fetch` in tests.
  */
+
+import {
+  isHtmlContentType,
+  isValidBuildId,
+  parseBuildIdFromIndexHtml,
+  parseBuildMetaJson,
+  type BuildMetaPayload,
+} from './buildId';
 
 export type AppUpdateCoreReason = 'deploy' | 'build_id' | 'sw_waiting' | 'stale_assets';
 
@@ -19,17 +27,23 @@ export type ProbeStaticBuildInput = {
   probeTimeoutMs?: number;
 };
 
+export type ProbeStaticBuildSource =
+  | 'build-id.txt'
+  | 'build-meta.json'
+  | 'index.html'
+  | 'invalid'
+  | 'none';
+
 export type ProbeStaticBuildResult = {
   mismatch: boolean;
   remoteBuildId: string | null;
-  source: 'build-id.txt' | 'index.html' | 'none';
+  source: ProbeStaticBuildSource;
+  /** From remote build-meta.json when available. */
+  remoteBuildMeta?: BuildMetaPayload | null;
 };
 
-const BUILD_ID_HTML_RE = /VITE_APP_BUILD_ID["'\s:]+([^\s"']+)/;
+const PROBE_BODY_MAX = 256;
 
-/**
- * Compare origin `build-id.txt` (or embedded id in `index.html`) with the running bundle id.
- */
 const PROBE_CACHE_TTL_MS = 45_000;
 let probeCache: {
   localBuildId: string;
@@ -64,48 +78,124 @@ async function probeStaticBuildMismatchUncached(
   const doFetch = input.fetch ?? fetch;
   const base = normalizeBaseUrl(input.baseUrl);
   const timeout = input.probeTimeoutMs ?? 8000;
+  let sawInvalid = false;
 
-  try {
-    const res = await doFetch(`${base}build-id.txt`, {
-      cache: 'no-store',
-      credentials: 'same-origin',
-      signal: AbortSignal.timeout(timeout),
-    });
-    if (res.ok) {
-      const remote = (await res.text()).trim();
-      return {
-        mismatch: Boolean(remote && remote !== input.localBuildId),
-        remoteBuildId: remote || null,
-        source: 'build-id.txt',
-      };
-    }
-  } catch {
-    /* fall through to index.html */
+  const txtResult = await probeBuildIdFile(doFetch, `${base}build-id.txt`, timeout, 'build-id.txt');
+  if (txtResult.kind === 'ok') {
+    return finalizeProbe(input.localBuildId, txtResult.remoteId, 'build-id.txt');
   }
+  if (txtResult.kind === 'invalid') sawInvalid = true;
 
+  const metaResult = await probeBuildMetaFile(doFetch, `${base}build-meta.json`, timeout);
+  if (metaResult.kind === 'ok') {
+    return finalizeProbe(input.localBuildId, metaResult.meta.buildId, 'build-meta.json', metaResult.meta);
+  }
+  if (metaResult.kind === 'invalid') sawInvalid = true;
+
+  const htmlResult = await probeIndexHtml(doFetch, `${base}index.html`, timeout);
+  if (htmlResult.kind === 'ok') {
+    return finalizeProbe(input.localBuildId, htmlResult.remoteId, 'index.html');
+  }
+  if (htmlResult.kind === 'invalid') sawInvalid = true;
+
+  if (sawInvalid) {
+    return { mismatch: false, remoteBuildId: null, source: 'invalid' };
+  }
+  return { mismatch: false, remoteBuildId: null, source: 'none' };
+}
+
+type ProbeFileOk = { kind: 'ok'; remoteId: string };
+type ProbeFileInvalid = { kind: 'invalid' };
+type ProbeFileMiss = { kind: 'miss' };
+
+async function probeBuildIdFile(
+  doFetch: typeof fetch,
+  url: string,
+  timeout: number,
+  _label: string,
+): Promise<ProbeFileOk | ProbeFileInvalid | ProbeFileMiss> {
   try {
-    const htmlRes = await doFetch(`${base}index.html`, {
+    const res = await doFetch(url, {
       cache: 'no-store',
       credentials: 'same-origin',
       signal: AbortSignal.timeout(timeout),
     });
-    if (!htmlRes.ok) {
-      return { mismatch: false, remoteBuildId: null, source: 'none' };
+    if (!res.ok) return { kind: 'miss' };
+    if (isHtmlContentType(res.headers.get('content-type'))) {
+      return { kind: 'invalid' };
     }
-    const html = await htmlRes.text();
-    const remote = html.match(BUILD_ID_HTML_RE)?.[1]?.trim() ?? '';
-    return {
-      mismatch: Boolean(remote && remote !== input.localBuildId),
-      remoteBuildId: remote || null,
-      source: 'index.html',
-    };
+    const remote = (await res.text()).slice(0, PROBE_BODY_MAX).trim();
+    if (!isValidBuildId(remote)) return { kind: 'invalid' };
+    return { kind: 'ok', remoteId: remote };
   } catch {
-    return { mismatch: false, remoteBuildId: null, source: 'none' };
+    return { kind: 'miss' };
   }
 }
 
-export function parseBuildIdFromIndexHtml(html: string): string | null {
-  return html.match(BUILD_ID_HTML_RE)?.[1]?.trim() ?? null;
+async function probeBuildMetaFile(
+  doFetch: typeof fetch,
+  url: string,
+  timeout: number,
+): Promise<{ kind: 'ok'; meta: BuildMetaPayload } | ProbeFileInvalid | ProbeFileMiss> {
+  try {
+    const res = await doFetch(url, {
+      cache: 'no-store',
+      credentials: 'same-origin',
+      signal: AbortSignal.timeout(timeout),
+    });
+    if (!res.ok) return { kind: 'miss' };
+    if (isHtmlContentType(res.headers.get('content-type'))) {
+      return { kind: 'invalid' };
+    }
+    const text = (await res.text()).slice(0, PROBE_BODY_MAX * 4);
+    const meta = parseBuildMetaJson(text);
+    if (!meta) return { kind: 'invalid' };
+    return { kind: 'ok', meta };
+  } catch {
+    return { kind: 'miss' };
+  }
+}
+
+async function probeIndexHtml(
+  doFetch: typeof fetch,
+  url: string,
+  timeout: number,
+): Promise<ProbeFileOk | ProbeFileInvalid | ProbeFileMiss> {
+  try {
+    const res = await doFetch(url, {
+      cache: 'no-store',
+      credentials: 'same-origin',
+      signal: AbortSignal.timeout(timeout),
+    });
+    if (!res.ok) return { kind: 'miss' };
+    const html = (await res.text()).slice(0, 8192);
+    const remote = parseBuildIdFromIndexHtml(html);
+    if (!remote) return { kind: 'invalid' };
+    return { kind: 'ok', remoteId: remote };
+  } catch {
+    return { kind: 'miss' };
+  }
+}
+
+function finalizeProbe(
+  localBuildId: string,
+  remoteBuildId: string,
+  source: Exclude<ProbeStaticBuildSource, 'invalid' | 'none'>,
+  remoteBuildMeta?: BuildMetaPayload | null,
+): ProbeStaticBuildResult {
+  return {
+    mismatch: remoteBuildId !== localBuildId,
+    remoteBuildId,
+    source,
+    remoteBuildMeta: remoteBuildMeta ?? null,
+  };
+}
+
+/** @deprecated use parseBuildIdFromIndexHtml from `./buildId` */
+export { parseBuildIdFromIndexHtml } from './buildId';
+
+export function parseBuildIdFromIndexHtmlLegacy(html: string): string | null {
+  return parseBuildIdFromIndexHtml(html);
 }
 
 function normalizeBaseUrl(base: string): string {

@@ -38,6 +38,7 @@ export type {
   AssetsCatalogView,
   AssetLifecycleFilter,
   CommerceHubTab,
+  StudioTab,
 } from './assetsUrlState';
 
 export { buildAssetsWizardHref } from './buildAssetsWizardHref';
@@ -49,8 +50,31 @@ export {
   buildProjectAssetsExpertHref,
   buildProjectAssetsImportHref,
   buildProjectAssetsCommerceHref,
+  buildProjectStorefrontStudioHref,
 } from './buildProjectAssetsSurfaceHref';
 
 export type { AssetsProjectShell } from './buildProjectAssetsSurfaceHref';
 
 export { duplicateAsset } from './duplicateAsset';
+
+export {
+  deepMerge,
+  applyPresetInputsFromSchema,
+  mapAnswersToComponents,
+  applyPresetRules,
+  composeAssetFromPreset,
+  bundledPresetSource,
+  createPresetSourceFromFixture,
+  ASSET_PRESETS_VERSION,
+} from './compose';
+
+export type { PresetSource } from './compose';
+
+export { autoSku, autoSlug, autoTags, defaultPrice, defaultImagePlaceholder } from './smartDefaults';
+export { deriveTemplateFromAsset } from './deriveTemplateFromAsset';
+
+export {
+  newStudioBulkRow,
+  assetDraftToStudioBulkRow,
+  type StudioBulkProductRow,
+} from './studioBulkRow';

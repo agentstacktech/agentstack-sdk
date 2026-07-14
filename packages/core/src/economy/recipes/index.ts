@@ -89,3 +89,13 @@ export async function economyVerifyRunReceiptRecipe(
 }
 
 export { extractRunReceipt, watchRunUntilTerminal };
+export { testnetGrantDemoRecipe } from './testnetGrantDemoRecipe';
+export type {
+  TestnetGrantDemoRecipeParams,
+  TestnetGrantDemoRecipeResult,
+} from './testnetGrantDemoRecipe';
+export { testnetThreeRailSmokeRecipe } from './testnetThreeRailSmokeRecipe';
+export type {
+  TestnetThreeRailSmokeRecipeParams,
+  TestnetThreeRailSmokeRecipeResult,
+} from './testnetThreeRailSmokeRecipe';

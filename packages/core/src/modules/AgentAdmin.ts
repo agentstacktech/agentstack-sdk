@@ -8,8 +8,21 @@
  */
 
 import { HTTPClient } from '../client/http-client';
+import { ChainSurfaceClient } from '../economy/clients/ChainSurfaceClient';
+import { TestnetClient } from '../economy/clients/TestnetClient';
 import { ADMIN_AGENTNET_OPENAPI_PATHS } from '../generated/admin-agentnet-paths';
 import type { GenomeLineageRecord } from '../economy/genomeExecutionContext';
+
+export type {
+  ChainProfile,
+  FaucetMintBody,
+  FaucetMintResult,
+  RunScenarioBody,
+  ScenarioRunResult,
+  ScenarioStepResult,
+  TestnetScenarioId,
+  ProofTier,
+} from '../economy/clients/testnetTypes';
 
 /** Canonical admin prefix (must match `admin_agentcoin_endpoints` router). */
 const ADMIN_AGENTNET_PREFIX = '/admin/agentnet';
@@ -51,6 +64,7 @@ export interface AgentcoinSchemaStatusPayload {
   m_plus_core_present?: boolean;
   m_plus_missing?: string[];
   required_relations: string[];
+  relation_classes?: Record<string, string>;
   deprecated_relations: string[];
   packed_in_8dna: AgentcoinPackedIn8DnaEntry[];
   to_regclass: Record<string, boolean>;
@@ -67,6 +81,7 @@ export interface AgentcoinChainSurfacePayload {
   evm_chain_id_raw: string | null;
   explorer_base_url: string | null;
   read_only_rpc_configured: boolean;
+  read_only_rpc_via_fallback?: boolean;
   read_only_rpc_host_hint: string | null;
   read_only_rpc_ping_ok: boolean;
   checkpoint_anchor_address_masked: string | null;
@@ -75,6 +90,8 @@ export interface AgentcoinChainSurfacePayload {
   vault_address_masked?: string | null;
   usdt_address_masked?: string | null;
   validation_registry_address_masked?: string | null;
+  sepolia_artifact_live?: boolean;
+  sepolia_deploy_json_present?: boolean;
   adr_links: string[];
   cache_ttl_seconds: number;
 }
@@ -140,7 +157,13 @@ export interface AgentcoinAdminOverviewPayload {
 }
 
 export class AgentAdmin {
-  constructor(private readonly http: HTTPClient) {}
+  readonly testnet: TestnetClient;
+  readonly chainSurface: ChainSurfaceClient;
+
+  constructor(private readonly http: HTTPClient) {
+    this.testnet = new TestnetClient(http);
+    this.chainSurface = new ChainSurfaceClient(http);
+  }
 
   // --- AgentCoin ledger admin ---
 
@@ -247,17 +270,10 @@ export class AgentAdmin {
   }
 
   /**
-   * @deprecated Prefer {@link getAgentcoinAdminOverview} for read paths (single round-trip).
+   * @deprecated Prefer {@link chainSurface.getAdminChainSurface} or {@link getAgentcoinAdminOverview}.
    */
   async getAgentcoinChainSurface(opts?: { signal?: AbortSignal }): Promise<AgentcoinChainSurfacePayload> {
-    const res = await this.http.get<AgentcoinChainSurfacePayload>(
-      ADMIN_AGENTNET_OPENAPI_PATHS.chainSurface,
-      {
-      skipBatching: true,
-      signal: opts?.signal,
-      },
-    );
-    return res.data;
+    return this.chainSurface.getAdminChainSurface(opts);
   }
 
   async getAgentcoinSchemaResetMode(opts?: { signal?: AbortSignal }): Promise<AgentcoinSchemaResetModePayload> {

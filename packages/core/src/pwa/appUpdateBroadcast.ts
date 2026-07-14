@@ -11,11 +11,19 @@ export type AppUpdateChannelMsg =
       type: 'signal';
       reason: AppUpdateReason;
       serverStartedAt?: string;
+      remoteBuildId?: string;
       buildId: string;
       detectedAt: number;
     }
-  | { type: 'dismiss'; snoozeUntil: number; reason: AppUpdateReason }
-  | { type: 'applying'; reason: AppUpdateReason };
+  | {
+      type: 'dismiss';
+      snoozeUntil: number;
+      reason: AppUpdateReason;
+      serverStartedAt?: string;
+      remoteBuildId?: string;
+    }
+  | { type: 'applying'; reason: AppUpdateReason }
+  | { type: 'deep_recovery_lock'; at: number };
 
 export type AppUpdateBroadcastBridge = {
   post: (msg: AppUpdateChannelMsg) => void;

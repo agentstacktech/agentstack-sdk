@@ -17,7 +17,10 @@ export async function listStorefrontListings(
   client: HTTPClient,
   params?: ListStorefrontParams,
 ) {
-  const response = await client.get('/commerce/storefront/listings', params);
+  const response = await client.get('/commerce/storefront/listings', params, {
+    skipAuthStateCheck: true,
+    skipBatching: true,
+  });
   const data = response.data ?? response;
   const normalized = normalizeMarketplaceListingsResponse({
     listings: data.listings,

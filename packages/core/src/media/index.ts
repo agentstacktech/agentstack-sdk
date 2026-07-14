@@ -36,6 +36,10 @@ import {
   type ResumableUploadTarget,
 } from './resumableUpload';
 import {
+  buildHostingZipOpId,
+  fingerprintHostingZipFile,
+} from './hostingZipUploadId';
+import {
   createLightbox,
   isLightboxAvailable,
   type HtmlSlide,
@@ -131,6 +135,8 @@ export {
   opfsChunkSource,
   runResumableUpload,
   ResumableUploadError,
+  buildHostingZipOpId,
+  fingerprintHostingZipFile,
   createLightbox,
   isLightboxAvailable,
   getLightboxViewportSize,

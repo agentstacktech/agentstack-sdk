@@ -14,6 +14,7 @@ export const taskCapabilityManifestSchema = z.object({
     z.enum(['inline', 'card', 'banner', 'drawer', 'modal', 'page', 'hidden']),
   ).min(1),
   launch: z.object({
+    /** Shell route (`routeFn`) or same-origin `externalPath` (hosted vitrine). */
     deepLink: z.record(z.unknown()),
     actionPortId: z.string().optional(),
     resourceActionId: z.string().optional(),
@@ -29,6 +30,10 @@ export const taskCapabilityManifestSchema = z.object({
   }),
   verify: z.object({ portId: z.string().optional() }).optional(),
   estimatedMin: z.number().int().positive().optional(),
+  /** Optional Fabric CapabilityDescriptor id (WCP G-02). */
+  fabricCapabilityId: z.string().min(1).optional(),
+  /** UI-only when no descriptor (defaulted by frontend task() helper). */
+  localOnly: z.boolean().optional(),
   msc: z
     .object({
       titleKey: z.string(),

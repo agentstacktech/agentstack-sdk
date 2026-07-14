@@ -90,7 +90,64 @@ export { useAgentRun, type AgentRunState, type AgentRunStreamEvent } from './hoo
 export { useAgntBalance } from './hooks/useAgntBalance';
 export { usePaidAgentRun, type UsePaidAgentRunVariables } from './hooks/usePaidAgentRun';
 export { useEconomyCapability, type EconomyCapability } from './hooks/useEconomyCapability';
+export { useTestnetProfiles } from './hooks/useTestnetProfiles';
+export { useScenarioRun } from './hooks/useScenarioRun';
+export { useChainSurface, type ChainSurfaceAudience, type UseChainSurfaceOptions } from './hooks/useChainSurface';
 export { economyKeys } from './economy/economyQueryKeys';
+export { testnetKeys } from './economy/testnetQueryKeys';
+export { commerceKeys } from './commerce/commerceQueryKeys';
+export type { StorefrontKeyParams } from './commerce/commerceQueryKeys';
+export { useCart } from './hooks/useCart';
+export type {
+  AddCartLineVariables,
+  RemoveCartLineVariables,
+  MergeGuestLinesVariables,
+} from './hooks/useCart';
+export { useCheckout } from './hooks/useCheckout';
+export type {
+  CreateCheckoutSessionVariables,
+  ConfirmCheckoutSessionVariables,
+  CheckoutFromCartVariables,
+} from './hooks/useCheckout';
+export { useProductDetail } from './hooks/useProductDetail';
+export { useStorefront } from './hooks/useStorefront';
+export { useOrders } from './hooks/useOrders';
+export { useWalletBalance } from './hooks/useWalletBalance';
+export { useTopUp } from './hooks/useTopUp';
+export type { TopUpVariables } from './hooks/useTopUp';
+export { useSellerActivation } from './hooks/useSellerActivation';
+export type { ActivateSellerVariables } from './hooks/useSellerActivation';
+export { useMerchant } from './hooks/useMerchant';
+export { useMyPurchases } from './hooks/useMyPurchases';
+export type { MyPurchasesResult } from './hooks/useMyPurchases';
+export { useEntitlements } from './hooks/useEntitlements';
+export type { EntitlementsResult } from './hooks/useEntitlements';
+export { useSubscription } from './hooks/useSubscription';
+export type {
+  PurchaseSubscriptionVariables,
+  CancelSubscriptionVariables,
+  RenewSubscriptionVariables,
+} from './hooks/useSubscription';
+export { useRefund } from './hooks/useRefund';
+export type { RequestRefundVariables } from './hooks/useRefund';
+export {
+  BuyButton,
+  CartButton,
+  MiniShop,
+  ProductGridEmbed,
+  ProductQuickView,
+} from './commerce/embeds';
+export type {
+  BuyButtonProps,
+  CartButtonProps,
+  CommerceEmbedActions,
+  CommerceEmbedTelemetry,
+  MiniShopProps,
+  ProductGridEmbedProps,
+  ProductQuickViewProps,
+} from './commerce/embeds';
+export { formatMoney } from '@agentstack/sdk/commerce/money';
+export type { Money } from '@agentstack/sdk/commerce/money';
 export { createFeatureModule, type FeatureModuleConfig, type FeatureModule } from './createFeatureModule';
 export { RequireCapability, type RequireCapabilityProps } from './components/RequireCapability';
 

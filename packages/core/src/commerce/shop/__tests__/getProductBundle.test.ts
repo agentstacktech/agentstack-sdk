@@ -1,8 +1,28 @@
-import { describe, expect, it } from 'vitest';
 import { getProductBundle } from '../getProductBundle';
 import type { HTTPClient } from '../../../client/http-client';
 
 describe('getProductBundle', () => {
+  it('skips auth state check for public storefront PDP', async () => {
+    let skipAuth = false;
+    const client = {
+      get: async (_url: string, _params: unknown, options?: { skipAuthStateCheck?: boolean }) => {
+        skipAuth = options?.skipAuthStateCheck === true;
+        return {
+          data: {
+            listing: { uuid: 'u1' },
+            asset_card: { name: 'Test Item' },
+            seller: { project_id: 1, display_name: 'Acme' },
+            policy: { rails: ['wallet_internal'], storefront_public: true },
+            buyer_context: {},
+          },
+        };
+      },
+    } as unknown as HTTPClient;
+
+    await getProductBundle(client, 'u1');
+    expect(skipAuth).toBe(true);
+  });
+
   it('normalizes BFF response', async () => {
     const client = {
       get: async () => ({

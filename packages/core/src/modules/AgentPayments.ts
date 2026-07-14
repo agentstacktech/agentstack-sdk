@@ -21,6 +21,13 @@ export interface PaymentData {
   destination_wallet?: string;
   /** Recipient project ID (when paying to project wallet, e.g. /projects/5/pay) */
   recipient_project_id?: number;
+  /** Origin for webhook / Tochka notification_url derivation */
+  base_url?: string;
+  success_url?: string;
+  fail_url?: string;
+  country?: string;
+  use_project_keys?: boolean;
+  idempotency_key?: string;
 }
 
 export interface Payment {
@@ -39,6 +46,8 @@ export interface Payment {
   metadata?: Record<string, any>;
   /** Stripe client_secret for card payment (when preferred_method=card) */
   client_secret?: string;
+  /** Redirect checkout URL (e.g. Tochka) when Elements are not used */
+  payment_url?: string;
   external_id?: string;
 }
 
@@ -105,6 +114,7 @@ export class AgentPayments {
         updated_at: p.updated_at ?? '',
         ...(p.metadata && { metadata: p.metadata }),
         ...(p.client_secret && { client_secret: p.client_secret }),
+        ...(p.payment_url && { payment_url: p.payment_url }),
         ...(p.external_id && { external_id: p.external_id })
       };
     }

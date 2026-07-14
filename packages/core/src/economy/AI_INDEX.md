@@ -26,6 +26,8 @@
 
 **Not in this tree:** `/api/admin/agentnet/*` → `sdk.admin` (`modules/AgentAdmin.ts`), platform-operator only. Python: `sdk.agentnet_admin` (`packages/python/src/modules/agentnet_admin.py`). CI: `npm run check:economy-parity` in `packages/core`.
 
+**Testnet plane (T0):** `clients/TestnetClient.ts`, `clients/ChainSurfaceClient.ts` → `sdk.admin.testnet`, `sdk.admin.chainSurface`, `sdk.economy.chainSurface`. Public grants: `../public/grants/PublicGrantsClient.ts` → `sdk.public.grants`. Recipes: `recipes/testnetGrantDemoRecipe.ts`, `testnetThreeRailSmokeRecipe.ts`. Explorer: `agentnetExplorer.ts` (84532, 97, 421614). ADR: `docs/adr/AGENTNET_TESTNET_PLANE.md`.
+
 ## Sideways
 
 - Backend: `agentstack-core/services/agentcoin/`, `endpoints/agentcoin_endpoints.py`

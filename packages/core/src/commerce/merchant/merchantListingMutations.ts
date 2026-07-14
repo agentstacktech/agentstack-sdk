@@ -8,9 +8,8 @@ export async function updateMerchantListing(
   body: UpdateMerchantListingBody,
 ): Promise<unknown> {
   const response = await client.put(
-    `/commerce/merchant/listings/${listingUuid}`,
+    `/commerce/merchant/listings/${listingUuid}?project_id=${projectId}`,
     body,
-    { project_id: projectId },
   );
   return response.data ?? response;
 }
@@ -21,9 +20,8 @@ export async function deactivateListing(
   listingUuid: string,
 ): Promise<unknown> {
   const response = await client.put(
-    `/commerce/merchant/listings/${listingUuid}`,
+    `/commerce/merchant/listings/${listingUuid}?project_id=${projectId}`,
     { status: 'cancelled' },
-    { project_id: projectId },
   );
   return response.data ?? response;
 }
@@ -34,9 +32,8 @@ export async function syncListingPrice(
   listingUuid: string,
 ): Promise<unknown> {
   const response = await client.post(
-    `/commerce/merchant/listings/${listingUuid}/sync-price`,
+    `/commerce/merchant/listings/${listingUuid}/sync-price?project_id=${projectId}`,
     {},
-    { project_id: projectId },
   );
   return response.data ?? response;
 }
@@ -47,9 +44,8 @@ export async function reindexListing(
   listingUuid: string,
 ): Promise<void> {
   await client.post(
-    `/commerce/merchant/listings/${listingUuid}/reindex`,
+    `/commerce/merchant/listings/${listingUuid}/reindex?project_id=${projectId}`,
     {},
-    { project_id: projectId },
   );
 }
 
@@ -58,9 +54,8 @@ export async function bulkSyncStalePrices(
   projectId: number,
 ): Promise<{ synced: string[]; failed: string[]; count: number }> {
   const response = await client.post(
-    '/commerce/merchant/listings/bulk-sync-prices',
+    `/commerce/merchant/listings/bulk-sync-prices?project_id=${projectId}`,
     {},
-    { project_id: projectId },
   );
   const data = response.data ?? response;
   return {
@@ -76,9 +71,8 @@ export async function bulkDeactivateListings(
   listingUuids: string[],
 ): Promise<{ deactivated: string[]; failed: string[] }> {
   const response = await client.post(
-    '/commerce/merchant/listings/bulk-deactivate',
+    `/commerce/merchant/listings/bulk-deactivate?project_id=${projectId}`,
     { listing_uuids: listingUuids },
-    { project_id: projectId },
   );
   const data = response.data ?? response;
   return {

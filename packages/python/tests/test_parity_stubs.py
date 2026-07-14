@@ -46,3 +46,24 @@ def test_agent_assets_has_presets_and_crud() -> None:
     )
     for fragment in ("list_asset_presets", "create_asset", "/asset-presets"):
         assert fragment in text, fragment
+
+
+def test_agents_fleet_has_runtime_parity_helpers() -> None:
+    text = (Path(__file__).resolve().parents[1] / "src" / "modules" / "agent_agents_fleet.py").read_text(
+        encoding="utf-8"
+    )
+    for fragment in (
+        "list_templates",
+        "preview_template",
+        "create_from_template",
+        "list_runs",
+        "list_pending_approvals",
+        "get_run_detail",
+        "approve_run",
+        "approval_artifact_hash",
+        "approval_artifact_hash is required",
+        "metrics",
+        "gates",
+        "stream_path",
+    ):
+        assert fragment in text, fragment

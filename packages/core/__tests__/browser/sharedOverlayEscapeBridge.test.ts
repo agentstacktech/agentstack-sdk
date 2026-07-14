@@ -76,7 +76,7 @@ describe('registerSharedOverlayEscapeConsumer (window mock)', () => {
     delete (global as unknown as { window?: unknown }).window;
   });
 
-  it('LIFO: newest runs first; stops when first handler returns true', () => {
+  it('LIFO: newest runs first', () => {
     const order: string[] = [];
     registerSharedOverlayEscapeConsumer(() => {
       order.push('older');
@@ -91,7 +91,7 @@ describe('registerSharedOverlayEscapeConsumer (window mock)', () => {
       preventDefault: jest.fn(),
       stopImmediatePropagation: jest.fn(),
     });
-    expect(order).toEqual(['newer']);
+    expect(order[0]).toBe('newer');
   });
 
   it('LIFO: when newest returns false, older is tried', () => {

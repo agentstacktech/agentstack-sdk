@@ -11,6 +11,8 @@
  *
  * Target routing (gene: repo.engineering.client_side_computation.gen1):
  *   X-Upload-Target: storage       → finalize into 8DNA storage organelle
+ *   X-Upload-Target: hosting       → import ZIP into hosting bucket (GA-16)
+ *   X-Upload-Bucket-Id: {uuid}     → hosting bucket target
  *   X-Upload-Folder: docs__reports  → storage folder key (default "_")
  *   X-Upload-Scope:  user|project   → storage scope (default "user")
  *   X-Upload-Category: user         → storage category tag
@@ -48,8 +50,10 @@ export interface ChunkSource {
 }
 
 export interface ResumableUploadTarget {
-  /** `storage` → 8DNA row; any other value → legacy `uploads/` category. */
-  target?: 'storage' | 'legacy';
+  /** `storage` → 8DNA row; `hosting` → bucket ZIP import; omit → legacy uploads/. */
+  target?: 'storage' | 'legacy' | 'hosting';
+  /** Required when ``target === 'hosting'``. */
+  bucketId?: string;
   folder?: string;
   scope?: 'user' | 'project';
   category?: string;
@@ -68,6 +72,8 @@ export interface ResumableUploadInput {
 export interface ResumableUploadOptions {
   baseUrl?: string;
   authHeader?: string;
+  /** Merged into PATCH headers (CSRF, X-API-Key, X-Project-ID, …). */
+  headers?: Record<string, string>;
   fetchImpl?: typeof fetch;
   chunkSize?: number;
   /** Called with running bytes uploaded; useful for progress bars. */
@@ -133,11 +139,15 @@ export function opfsChunkSource(store: {
   };
 }
 
-function buildTargetHeaders(target?: ResumableUploadTarget): Record<string, string> {
+export function buildTargetHeaders(target?: ResumableUploadTarget): Record<string, string> {
   const out: Record<string, string> = {};
   if (!target) return out;
   if (target.target === 'storage') {
     out['X-Upload-Target'] = 'storage';
+  }
+  if (target.target === 'hosting') {
+    out['X-Upload-Target'] = 'hosting';
+    if (target.bucketId) out['X-Upload-Bucket-Id'] = target.bucketId;
   }
   if (target.folder) out['X-Upload-Folder'] = target.folder;
   if (target.scope) out['X-Upload-Scope'] = target.scope;
@@ -187,7 +197,10 @@ export async function runResumableUpload(
   const chunkSize = Math.max(16 * 1024, Math.min(4 * 1024 * 1024, opts.chunkSize ?? DEFAULT_CHUNK_SIZE));
   const mime = input.mime || 'application/octet-stream';
   const name = input.name || `upload-${input.opId}`;
-  const baseHeaders: HeadersInit = opts.authHeader ? { Authorization: opts.authHeader } : {};
+  const baseHeaders: HeadersInit = {
+    ...(opts.headers ?? {}),
+    ...(opts.authHeader ? { Authorization: opts.authHeader } : {}),
+  };
 
   const total = await input.source.size();
   if (total <= 0) {

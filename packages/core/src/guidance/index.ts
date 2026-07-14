@@ -13,3 +13,4 @@ export * from './store/LocalPathStore';
 export * from './store/RemotePathStore';
 export * from './store/migrateV1ToV2';
 export * from './validateDefinition';
+export * from './client/GuidanceClient';

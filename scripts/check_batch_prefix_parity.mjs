@@ -42,7 +42,7 @@ const fixture = readFixture();
 const ts = new Set(extractTsPrefixes(fs.readFileSync(batcherTs, 'utf8')));
 const py = new Set(extractPyPrefixes(fs.readFileSync(batchPy, 'utf8')));
 
-const required = ['/commerce', '/integrations', '/hosting'];
+const required = ['/commerce', '/integrations', '/hosting', '/fabric'];
 let failed = false;
 
 for (const p of required) {

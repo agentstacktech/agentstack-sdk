@@ -74,7 +74,7 @@ export { verifyAgentCoinMerkleProof } from './atoms/agentcoinProof';
 
 // Core modules
 export { AgentAuth } from './modules/AgentAuth';
-export type { LoginCredentials, AuthTokens, UserProfile } from './modules/AgentAuth';
+export type { LoginCredentials, AuthTokens, UserProfile, SessionBootstrapPayload, SessionBootstrapSettingsSummary } from './modules/AgentAuth';
 export { AgentAPI } from './modules/AgentAPI';
 export type { AddUserToProjectData } from './modules/AgentAPI';
 export { AgentNeural } from './modules/AgentNeural';
@@ -112,6 +112,8 @@ export {
   economyPurchaseCreditsRecipe,
   economyEnsureAgntBalanceRecipe,
   economyVerifyRunReceiptRecipe,
+  testnetGrantDemoRecipe,
+  testnetThreeRailSmokeRecipe,
   economyIdempotencyKey,
   formatAtomicAgnt,
   parseAgntToAtomic,
@@ -123,8 +125,37 @@ export {
   AGENTNET_NATIVE,
   AGENTNET_STABLE,
 } from './economy/agentnetIdentity';
-export { buildExplorerUrl } from './economy/agentnetExplorer';
+export {
+  buildExplorerUrl,
+  buildExplorerTxUrl,
+  buildExplorerUrlFromCaip2,
+  AGENTNET_TESTNET_EXPLORER_CHAIN_IDS,
+} from './economy/agentnetExplorer';
 export type { ExplorerLinkKind } from './economy/agentnetExplorer';
+export { TestnetClient, ChainSurfaceClient } from './economy';
+export type {
+  ChainProfile,
+  FaucetMintBody,
+  FaucetMintResult,
+  RunScenarioBody,
+  ScenarioRunResult,
+  TestnetScenarioId,
+  ProofTier,
+  TestnetGrantDemoRecipeParams,
+  TestnetGrantDemoRecipeResult,
+  TestnetThreeRailSmokeRecipeParams,
+  TestnetThreeRailSmokeRecipeResult,
+} from './economy';
+export { PublicGrantsClient, AgentPublicSurface } from './public';
+export type {
+  PublicGrantsSnapshot,
+  PublicGrantsGrsSlice,
+  PublicGrantsBlocker,
+  PublicGrantsProofTiers,
+  PublicContractLink,
+  PublicChainSurfacePayload,
+  PublicBatchProofPayload,
+} from './public';
 /** Platform-operator AgentNet admin (`/api/admin/agentnet/*`) — not on `sdk.platform`. */
 export { AgentAdmin } from './modules/AgentAdmin';
 export type {
@@ -140,13 +171,77 @@ export type {
   AgentcoinAdminOverviewPayload,
 } from './modules/AgentAdmin';
 export { AgentNetBnb } from './modules/AgentNetBnb';
+export { AgentNetSolana } from './modules/AgentNetSolana';
+export {
+  listPtrRails,
+  fetchProofBundle,
+  submitPtrValidation,
+  type PtrRailStatus,
+  type ProofToTaskBundle,
+  type PtrAnchorResult,
+} from './economy/agentnet/ptr';
+export {
+  listChainRails,
+  submitChainIntent,
+  getChainIntent,
+  getDelegation,
+  syncDelegation,
+  type ChainRailStatus,
+  type ChainIntentRecord,
+  type DelegationCaps,
+} from './economy/agentnet/chainControl';
 export type { PaymentData, Payment, PaymentMethod } from './modules/AgentPayments';
 export { AgentAnalytics } from './modules/AgentAnalytics';
 export type { AnalyticsEvent, DashboardMetrics, UsageStats } from './modules/AgentAnalytics';
 export { AgentSupport } from './modules/AgentSupport';
-export type { AgentRowDTO } from './modules/AgentsFleet';
+export type {
+  AgentApprovalReviewDTO,
+  AgentApproveRunOptions,
+  AgentPendingApprovalDTO,
+  AgentPendingApprovalListOptions,
+  AgentPendingToolCallDTO,
+  AgentPolicyPreviewBody,
+  AgentPolicyPreviewDTO,
+  AgentRunDetailDTO,
+  AgentRunEventDTO,
+  AgentRunListFilters,
+  AgentRunRowDTO,
+  AgentRunSpecDTO,
+  AgentRunStatusDTO,
+  AgentRunStreamFrameDTO,
+  AgentRunTracesDTO,
+  AgentRowDTO,
+  AgentSpecPatchDTO,
+  AgentStartRunOptions,
+  AgentStopRunOptions,
+  AgentTemplateDTO,
+  AgentTemplatePreviewBody,
+} from './modules/AgentsFleet';
+export { parseAgentRunSSE } from './modules/AgentsFleet';
 export { AgentWebhooks } from './modules/AgentWebhooks';
 export { AgentIntegrations, buildIntegrationHookCurl } from './modules/AgentIntegrations';
+export { AgentBots } from './modules/AgentBots';
+export { AgentCrm } from './modules/AgentCrm';
+export {
+  crmBoardResponseSchema,
+  crmContact360ResponseSchema,
+  crmContactSchema,
+  crmDealSchema,
+  crmDealTimelineResponseSchema,
+  crmListContactsResponseSchema,
+  crmTimelineItemSchema,
+  parseCrmBoardResponse,
+  parseCrmContact360Response,
+  parseCrmDealTimelineResponse,
+  parseCrmListContactsResponse,
+} from './modules/crmSchemas';
+export type {
+  CrmBoardResponse,
+  CrmContact,
+  CrmDeal,
+  CrmTimelineItem,
+} from './modules/crmSchemas';
+export { CrmAiClient } from './modules/CrmAiClient';
 export { AgentHosting } from './modules/AgentHosting';
 export type {
   QuickStartBody,
@@ -156,6 +251,13 @@ export type {
   BucketPatchBody,
   PromoteBuildBody,
 } from './modules/AgentHosting';
+export {
+  effectiveBucketName,
+  normalizeBucketName,
+  validateBucketName,
+  hostingQuickStartResponseSchema,
+} from './hosting';
+export type { HostingSiteBucketInput, HostingQuickStartResponse } from './hosting';
 export {
   integrationQueries,
   integrationListRecipes,
@@ -171,9 +273,23 @@ export type {
 } from './modules/integrationQueries';
 export type {
   IntegrationQuickSetupMeta,
+  IntegrationOwnerKind,
   IntegrationRecipeManifest,
   IntegrationSetupSecretSource,
+  IntegrationScenarioRow,
+  ListScenariosResponse,
+  ScenarioRunRow,
+  ListScenarioRunsResponse,
+  FieldMap,
 } from './types/integrations';
+export type {
+  AppDefinition,
+  AppActionSpec,
+  AppTriggerSpec,
+  DynamicFieldSource,
+  DynamicFieldsResponse,
+  ListAppsResponse,
+} from './types/integrationApps';
 export { AgentScheduler } from './modules/AgentScheduler';
 export { AgentNotifications } from './modules/AgentNotifications';
 export { AgentSocial } from './modules/AgentSocial';
@@ -359,6 +475,16 @@ export { AgentBilling } from './modules/AgentBilling';
 export { AgentRBAC } from './modules/AgentRBAC';
 export { AgentI18n } from './modules/AgentI18n';
 export { AgentDNA } from './modules/AgentDNA';
+export {
+  DnaLineageClient,
+  DnaMergePolicyClient,
+} from './dna';
+export type {
+  LineageDirection,
+  LineageNode,
+  ConflictStrategy,
+  EcosystemMergePolicy,
+} from './dna';
 export { AgentAdminData } from './modules/AgentAdminData';
 export type {
   AdminDataPeopleResponse,
@@ -369,6 +495,25 @@ export type {
 export { AgentLogic } from './modules/AgentLogic';
 export { AgentMarketplace } from './modules/AgentMarketplace';
 export { AgentEcosystem } from './modules/AgentEcosystem';
+export { AgentDiagnostics } from './modules/AgentDiagnostics';
+export type {
+  DiagnosticsProblemRow,
+  DiagnosticsProblemsPayload,
+  SecurityProbeMetricsPayload,
+  AdminHubSnapshotSecurityProbes,
+} from './modules/AgentDiagnostics';
+export { AgentCommerceAdmin } from './modules/AgentCommerceAdmin';
+export type {
+  SettlementFunnelPayload,
+  ReconcileEscrowPayload,
+} from './modules/AgentCommerceAdmin';
+export { AgentSeo, HOSTING_FUNNEL_PATHS } from './seo/index';
+export type {
+  SeoMetaTags,
+  HostingFunnelPath,
+  SeoCacheClearResult,
+  SeoHealthCheck,
+} from './seo/index';
 export type {
   EcosystemManifest,
   EcosystemPublishedChannel,
@@ -397,6 +542,13 @@ export type {
   AssetsUrlState,
   AssetsWizardStep,
 } from './commerce/assets';
+
+export {
+  HostedStorefrontClient,
+  type HostedManifestResponse,
+  type HostedPublishResponse,
+  type HostedStorefrontManifest,
+} from './commerce';
 
 // 🧬 NEW! Protein System Modules (v0.3.6)
 export { AgentProtein } from './modules/AgentProtein';
@@ -542,6 +694,8 @@ export {
   opfsChunkSource,
   runResumableUpload,
   ResumableUploadError,
+  buildHostingZipOpId,
+  fingerprintHostingZipFile,
   createLightbox,
   isLightboxAvailable,
   getLightboxViewportSize,
@@ -851,4 +1005,38 @@ export type {
   TASK_CATALOG_METADATA,
   TaskCatalogEntry,
 } from './capability-tasks';
+
+export {
+  capabilityDescriptorSchema,
+  capabilityDescriptorFixtureSchema,
+  parseCapabilityDescriptor,
+  parseCapabilityDescriptorFixture,
+  capabilityResultSchema,
+  parseCapabilityResult,
+  principalContextSchema,
+  parsePrincipalContext,
+  contextRequestSchema,
+  contextBundleSchema,
+  parseContextRequest,
+  parseContextBundle,
+  getContext,
+  getCapability,
+  listCapabilities,
+  getFabricCostSnapshot,
+  getFabricQueueSnapshot,
+  replayFabricDlqItem,
+} from './fabric';
+export type {
+  CapabilityDescriptor,
+  CapabilityDescriptorFixture,
+  CapabilityResult,
+  PrincipalContext,
+  ContextRequest,
+  ContextBundle,
+  CapabilityListResponse,
+  FabricCostSnapshot,
+  FabricQueueSnapshot,
+  FabricDlqReplayRequest,
+  FabricDlqReplayResult,
+} from './fabric';
 

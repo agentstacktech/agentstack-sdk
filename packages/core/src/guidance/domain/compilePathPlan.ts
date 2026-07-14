@@ -78,6 +78,8 @@ function nodeToPlan(
       ...base,
       kind: 'capability',
       taskId: node.taskId,
+      fabricCapabilityId: node.fabricCapabilityId,
+      fabricCapabilityDomain: node.fabricCapabilityDomain,
       capabilitySurface: node.surface ?? 'inline',
       verifySpec: node.verify,
     };

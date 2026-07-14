@@ -1,4 +1,3 @@
-import { describe, expect, it } from 'vitest';
 import { getWebCodecsVideoEncodeCapability } from '../../src/media/video/webcodecsEncodeCapabilities';
 
 describe('webcodecsEncodeCapabilities', () => {

@@ -1,10 +1,20 @@
 import type { HTTPClient } from '../client/http-client';
+import { CommerceAiClient } from './ai/CommerceAiClient';
 import { CartClient } from './cart/CartClient';
+import { CartFacade } from './cart/CartFacade';
+import { HostedStorefrontClient } from './storefront/HostedStorefrontClient';
+import { StorefrontSeedClient } from './storefront/StorefrontSeedClient';
 import { CheckoutClient } from './checkout/CheckoutClient';
 import { OrdersClient } from './orders/OrdersClient';
+import { SellerActivationClient } from './sell/SellerActivationClient';
+import { EntitlementsClient } from './entitlements/EntitlementsClient';
+import { SubscriptionClient } from './subscription/SubscriptionClient';
+import { RefundClient } from './refund/RefundClient';
+import { MerchantClient } from './merchant/MerchantClient';
 import { bulkCreateListings } from './marketplace/bulkClient';
 import { listStorefrontListings, type ListStorefrontParams } from './marketplace/storefrontClient';
 import { getProductBundle, type ProductBundle } from './shop/getProductBundle';
+import { resolveShopSlug } from './shop/resolveShopSlug';
 import { getMerchantShelfStats } from './merchant/getShelfStats';
 import { getSellerDashboard } from './merchant/getSellerDashboard';
 import { getMerchantHubSnapshot } from './merchant/getMerchantHubSnapshot';
@@ -36,17 +46,27 @@ export type ListOffersParams = ListStorefrontParams;
 
 export class CommerceFacade {
   readonly cart: CartClient;
+  readonly cartFacade: CartFacade;
   readonly checkout: CheckoutClient;
   readonly orders: OrdersClient;
+  readonly sell: SellerActivationClient;
+  readonly entitlements: EntitlementsClient;
+  readonly subscription: SubscriptionClient;
+  readonly refund: RefundClient;
+  readonly merchantClient: MerchantClient;
 
   readonly discovery: {
     listOffers: (params?: ListOffersParams) => ReturnType<typeof listStorefrontListings>;
     getProduct: (listingUuid: string) => Promise<ProductBundle>;
+    resolveShopSlug: (slug: string) => ReturnType<typeof resolveShopSlug>;
   };
 
   readonly merchant: {
     createListing: (data: Record<string, unknown>) => Promise<unknown>;
-    bulkCreate: typeof bulkCreateListings;
+    bulkCreate: (
+      projectId: number,
+      body: Parameters<typeof bulkCreateListings>[2],
+    ) => ReturnType<typeof bulkCreateListings>;
     /** @deprecated Use getDashboard */
     getShelfStats: (projectId: number) => ReturnType<typeof getMerchantShelfStats>;
     getDashboard: (projectId: number) => ReturnType<typeof getSellerDashboard>;
@@ -111,22 +131,39 @@ export class CommerceFacade {
     ) => ReturnType<typeof grantParticipantHolding>;
   };
 
+  readonly storefront: {
+    seed: StorefrontSeedClient;
+    hosted: HostedStorefrontClient;
+  };
+
+  readonly ai: CommerceAiClient;
+
   /** @deprecated Use discovery.listOffers */
   listStorefront: (params?: ListOffersParams) => ReturnType<typeof listStorefrontListings>;
   /** @deprecated Use merchant.bulkCreate */
-  bulkCreateListings: typeof bulkCreateListings;
+  bulkCreateListings: (
+    projectId: number,
+    body: Parameters<typeof bulkCreateListings>[2],
+  ) => ReturnType<typeof bulkCreateListings>;
 
   constructor(private readonly http: HTTPClient) {
     this.cart = new CartClient(http);
+    this.cartFacade = new CartFacade(http, 'server');
     this.checkout = new CheckoutClient(http);
     this.orders = new OrdersClient(http);
+    this.sell = new SellerActivationClient(http);
+    this.entitlements = new EntitlementsClient(http);
+    this.subscription = new SubscriptionClient(http);
+    this.refund = new RefundClient(http);
+    this.merchantClient = new MerchantClient(http);
     this.discovery = {
       listOffers: (params) => listStorefrontListings(http, params),
       getProduct: (listingUuid) => getProductBundle(http, listingUuid),
+      resolveShopSlug: (slug) => resolveShopSlug(http, slug),
     };
     this.merchant = {
       createListing: async (data) => {
-        const response = await http.post('/marketplace/listings', data);
+        const response = await http.post('/commerce/merchant/listings', data);
         return response.data?.listing ?? response.data;
       },
       bulkCreate: (projectId, body) => bulkCreateListings(http, projectId, body),
@@ -157,6 +194,11 @@ export class CommerceFacade {
       getWalletSummary: (projectId) => getParticipantWalletSummary(http, projectId),
       grantHolding: (projectId, body) => grantParticipantHolding(http, projectId, body),
     };
+    this.storefront = {
+      seed: new StorefrontSeedClient(http),
+      hosted: new HostedStorefrontClient(http),
+    };
+    this.ai = new CommerceAiClient(http);
     this.listStorefront = this.discovery.listOffers;
     this.bulkCreateListings = this.merchant.bulkCreate;
   }

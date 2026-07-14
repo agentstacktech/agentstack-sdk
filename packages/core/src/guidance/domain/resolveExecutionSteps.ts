@@ -23,12 +23,22 @@ export function resolveExecutionSteps(playbook: Playbook, state: PlaybookStateV2
   return fallback.filter((id) => playbook.nodes[id]);
 }
 
+const EXECUTABLE_KINDS = new Set(['task', 'capability', 'verify', 'recipe', 'action']);
+
 /** Legacy sell-digital rules when executionRules omitted. */
 export function resolveExecutionStepsLegacy(playbook: Playbook, state: PlaybookStateV2): string[] {
   if (playbook.executionRules?.length) return resolveExecutionSteps(playbook, state);
+  /** Prefer explicit defaultExecutionSteps (WCP: fabric-demo recipe_run must compile). */
+  const defaults = playbook.defaultExecutionSteps ?? [];
+  if (defaults.length > 0 && playbook.id !== 'sell-digital-content') {
+    return defaults.filter((id) => {
+      const n = playbook.nodes[id];
+      return n && EXECUTABLE_KINDS.has(n.kind);
+    });
+  }
   if (playbook.id !== 'sell-digital-content') {
     return Object.values(playbook.nodes)
-      .filter((n) => n.kind === 'task' || n.kind === 'capability' || n.kind === 'verify')
+      .filter((n) => EXECUTABLE_KINDS.has(n.kind))
       .map((n) => n.id);
   }
   const tasks: string[] = [];

@@ -36,6 +36,19 @@ describe('EntitySnapshotRepository', () => {
     expect(r.has('other:1')).toBe(true);
   });
 
+  it('isFresh respects maxAgeMs from meta.fetchedAt', () => {
+    const r = createEntitySnapshotRepository();
+    const key = snapshotKeyProjectData(11);
+    const now = Date.now();
+    r.setSnapshot(key, { v: 1 }, { fetchedAt: now - 120_000 });
+    expect(r.isFresh(key, 60_000)).toBe(false);
+    expect(r.isFresh(key, 180_000)).toBe(true);
+    r.setSnapshot(key, { v: 2 }, { fetchedAt: now });
+    expect(r.isFresh(key, 60_000)).toBe(true);
+    expect(r.invalidate(key)).toBe(true);
+    expect(r.isFresh(key, 60_000)).toBe(false);
+  });
+
   it('mergeSnapshot shallowMerge and deepMerge', () => {
     const r = createEntitySnapshotRepository();
     const key = snapshotKeyProjectData(9);

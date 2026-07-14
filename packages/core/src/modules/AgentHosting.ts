@@ -3,6 +3,9 @@
  */
 
 import { HTTPClient } from '../client/http-client';
+import { blobChunkSource, runResumableUpload } from '../media/resumableUpload';
+import { buildHostingZipOpId } from '../media/hostingZipUploadId';
+import type { APIResponse } from '../types';
 
 export interface QuickStartBody {
   project_id: number;
@@ -20,6 +23,8 @@ export interface QuickStartResult {
   site_id: string;
   url: string;
   skipped?: boolean;
+  edge_ready?: boolean;
+  manifest_hash?: string | null;
 }
 
 /** Known hosting API `detail` codes (see docs/api/HOSTING_ERROR_CODES.md). */
@@ -43,6 +48,32 @@ export interface HostingApiErrorBody {
 export interface HostingSitesListResult {
   sites: unknown[];
   quota: Record<string, number>;
+  primary_site_bucket_id?: string | null;
+}
+
+export interface ProjectHostingPlaneAction {
+  id: string;
+  label_key: string;
+  href_kind: string;
+  priority: number;
+}
+
+export interface ProjectHostingPlaneV1 {
+  schema_version: 1;
+  project_id: number;
+  ladder: Record<string, boolean>;
+  sites: {
+    count: number;
+    public_count: number;
+    primary_public_url?: string | null;
+    primary_bucket_id?: string | null;
+    any_edge_ready: boolean;
+    any_pending_edge: boolean;
+  };
+  quota: Record<string, unknown>;
+  apps: Record<string, unknown>;
+  next_actions: ProjectHostingPlaneAction[];
+  computed_at: string;
 }
 
 export interface BucketCreateBody {
@@ -60,6 +91,10 @@ export interface BucketPatchBody {
   status?: string;
   visibility?: string;
   routing_mode?: string;
+  seo_title?: string | null;
+  seo_description?: string | null;
+  seo_robots?: string | null;
+  seo_banner_asset_id?: string | null;
 }
 
 export interface PromoteBuildBody {
@@ -68,10 +103,20 @@ export interface PromoteBuildBody {
 }
 
 export class AgentHosting {
+  /** Use tus-lite resumable upload for ZIPs at or above this size (GA-16). */
+  static readonly RESUMABLE_ZIP_THRESHOLD_BYTES = 4 * 1024 * 1024;
+
   constructor(private client: HTTPClient) {}
 
   quickStart(body: QuickStartBody) {
     return this.client.post<QuickStartResult>('/hosting/sites/quick-start', body);
+  }
+
+  getProjectPlane(projectId: number) {
+    return this.client.get<{ success: boolean; data: ProjectHostingPlaneV1 }>(
+      `/projects/${projectId}/hosting-plane`,
+      { skipCache: true },
+    );
   }
 
   listSites(
@@ -83,6 +128,13 @@ export class AgentHosting {
       skipBatching: options?.skipBatching ?? true,
       skipCache: options?.skipCache ?? true,
     });
+  }
+
+  setPrimarySite(projectId: number, bucketId: string) {
+    return this.client.put<{ ok: boolean; primary_site_bucket_id?: string | null }>(
+      '/hosting/primary-site',
+      { project_id: projectId, bucket_id: bucketId },
+    );
   }
 
   getQuota(projectId: number) {
@@ -388,13 +440,17 @@ export class AgentHosting {
   /**
    * Multipart ZIP import into an existing bucket.
    * Uses FormData (not JSON) — documented exception to JSON-only hygiene.
+   * Files ≥ {@link AgentHosting.RESUMABLE_ZIP_THRESHOLD_BYTES} use tus-lite resumable upload.
    */
-  importZip(
+  async importZip(
     projectId: number,
     bucketId: string,
     file: File,
-    options?: { signal?: AbortSignal },
-  ) {
+    options?: { signal?: AbortSignal; onProgress?: (uploaded: number, total: number) => void },
+  ): Promise<APIResponse<{ files_written: number; bytes?: number }>> {
+    if (file.size >= AgentHosting.RESUMABLE_ZIP_THRESHOLD_BYTES) {
+      return this.importZipResumable(projectId, bucketId, file, options);
+    }
     const form = new FormData();
     form.append('file', file);
     return this.client.post<{ files_written: number; bytes?: number }>(
@@ -407,5 +463,48 @@ export class AgentHosting {
         signal: options?.signal,
       },
     );
+  }
+
+  private async importZipResumable(
+    projectId: number,
+    bucketId: string,
+    file: File,
+    options?: { signal?: AbortSignal; onProgress?: (uploaded: number, total: number) => void },
+  ): Promise<APIResponse<{ files_written: number; bytes?: number }>> {
+    const cfg = this.client.getConfig();
+    const apiOrigin = (cfg.apiBase || cfg.baseUrl || '')
+      .replace(/\/+$/, '')
+      .replace(/\/api\/?$/, '');
+    const headers = this.client.buildFetchHeaders({}, `/hosting/buckets/${bucketId}/import-zip`);
+    const opId = buildHostingZipOpId(projectId, bucketId, file);
+    const result = await runResumableUpload(
+      {
+        opId,
+        mime: file.type || 'application/zip',
+        name: file.name || 'site.zip',
+        source: blobChunkSource(file),
+        target: { target: 'hosting', projectId, bucketId },
+      },
+      {
+        baseUrl: apiOrigin,
+        authHeader: headers.Authorization,
+        headers,
+        signal: options?.signal,
+        onProgress: options?.onProgress,
+      },
+    );
+    const payload = result.response;
+    return {
+      data: {
+        files_written: Number(payload.files_written ?? 0),
+        bytes: payload.bytes != null ? Number(payload.bytes) : undefined,
+      },
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      config: { method: 'PATCH', url: `/api/files/resumable/${opId}` },
+      duration: result.elapsedMs,
+      timestamp: Date.now(),
+    };
   }
 }

@@ -41,7 +41,7 @@ describe('AgentPayments', () => {
 
       const result = await payments.createPayment(paymentData);
 
-      expect(mockHttpClient.post).toHaveBeenCalledWith('/payments/create', paymentData);
+      expect(mockHttpClient.post).toHaveBeenCalledWith('/payments', paymentData);
       expect(result).toEqual(testPayment);
     });
 
@@ -87,24 +87,13 @@ describe('AgentPayments', () => {
       expect(result).toEqual(expectedResponse);
     });
 
-    it('should update payment', async () => {
-      const paymentId = 'payment_123';
-      const updateData = { description: 'Updated description' };
-      const expectedResponse = { ...testPayment, ...updateData };
-
-      mockHttpClient.put.mockResolvedValueOnce({
-        data: expectedResponse,
-      });
-
-      const result = await payments.updatePayment(paymentId, updateData);
-
-      expect(mockHttpClient.put).toHaveBeenCalledWith(`/payments/${paymentId}`, updateData);
-      expect(result).toEqual(expectedResponse);
-    });
-
     it('should cancel payment', async () => {
       const paymentId = 'payment_123';
-      const expectedResponse = { message: 'Payment cancelled successfully' };
+      const expectedResponse = {
+        success: true,
+        message: 'Payment refunded successfully',
+        payment_id: paymentId,
+      };
 
       mockHttpClient.post.mockResolvedValueOnce({
         data: expectedResponse,
@@ -112,26 +101,16 @@ describe('AgentPayments', () => {
 
       const result = await payments.cancelPayment(paymentId);
 
-      expect(mockHttpClient.post).toHaveBeenCalledWith(`/payments/${paymentId}/cancel`);
+      expect(mockHttpClient.post).toHaveBeenCalledWith(`/payments/${paymentId}/refund`, {
+        reason: 'Cancelled by user',
+      });
       expect(result).toEqual(expectedResponse);
     });
   });
 
   describe('Payment Methods', () => {
     it('should get payment methods', async () => {
-      const expectedResponse = {
-        payment_methods: [
-          {
-            id: 'pm_123',
-            type: 'card',
-            last_four: '4242',
-            brand: 'visa',
-            expiry_month: 12,
-            expiry_year: 2025,
-            is_default: true,
-          },
-        ],
-      };
+      const expectedResponse = { config: { methods: ['card'], currency: 'USD' } };
 
       mockHttpClient.get.mockResolvedValueOnce({
         data: expectedResponse,
@@ -139,62 +118,18 @@ describe('AgentPayments', () => {
 
       const result = await payments.getPaymentMethods();
 
-      expect(mockHttpClient.get).toHaveBeenCalledWith('/payments/methods');
-      expect(result).toEqual(expectedResponse);
-    });
-
-    it('should add payment method', async () => {
-      const methodData = {
-        type: 'card',
-        token: 'tok_123',
-      };
-
-      const expectedResponse = {
-        id: 'pm_123',
-        type: 'card',
-        last_four: '4242',
-        brand: 'visa',
-        expiry_month: 12,
-        expiry_year: 2025,
-        is_default: false,
-      };
-
-      mockHttpClient.post.mockResolvedValueOnce({
-        data: expectedResponse,
-      });
-
-      const result = await payments.addPaymentMethod(methodData);
-
-      expect(mockHttpClient.post).toHaveBeenCalledWith('/payments/methods', methodData);
-      expect(result).toEqual(expectedResponse);
-    });
-
-    it('should remove payment method', async () => {
-      const methodId = 'pm_123';
-      const expectedResponse = { message: 'Payment method removed successfully' };
-
-      mockHttpClient.delete.mockResolvedValueOnce({
-        data: expectedResponse,
-      });
-
-      const result = await payments.removePaymentMethod(methodId);
-
-      expect(mockHttpClient.delete).toHaveBeenCalledWith(`/payments/methods/${methodId}`);
-      expect(result).toEqual(expectedResponse);
-    });
-
-    it('should set default payment method', async () => {
-      const methodId = 'pm_123';
-      const expectedResponse = { message: 'Default payment method updated' };
-
-      mockHttpClient.post.mockResolvedValueOnce({
-        data: expectedResponse,
-      });
-
-      const result = await payments.setDefaultPaymentMethod(methodId);
-
-      expect(mockHttpClient.post).toHaveBeenCalledWith(`/payments/methods/${methodId}/default`);
-      expect(result).toEqual(expectedResponse);
+      expect(mockHttpClient.get).toHaveBeenCalledWith('/payments/config');
+      expect(result.methods).toEqual([
+        {
+          id: 'card',
+          name: 'card',
+          type: 'card',
+          is_active: true,
+          configuration: {},
+          supported_currencies: ['USD'],
+          fees: { fixed: 0, percentage: 0 },
+        },
+      ]);
     });
   });
 
@@ -219,35 +154,9 @@ describe('AgentPayments', () => {
         data: expectedResponse,
       });
 
-      const result = await payments.createRefund(paymentId, refundData);
+      const result = await payments.refundPayment(paymentId, refundData);
 
       expect(mockHttpClient.post).toHaveBeenCalledWith(`/payments/${paymentId}/refund`, refundData);
-      expect(result).toEqual(expectedResponse);
-    });
-
-    it('should get refunds', async () => {
-      const paymentId = 'payment_123';
-      const expectedResponse = {
-        refunds: [
-          {
-            id: 'refund_123',
-            payment_id: paymentId,
-            amount: 500,
-            reason: 'Customer request',
-            status: 'completed',
-            created_at: '2025-01-01T00:00:00Z',
-          },
-        ],
-        total: 1,
-      };
-
-      mockHttpClient.get.mockResolvedValueOnce({
-        data: expectedResponse,
-      });
-
-      const result = await payments.getRefunds(paymentId);
-
-      expect(mockHttpClient.get).toHaveBeenCalledWith(`/payments/${paymentId}/refunds`);
       expect(result).toEqual(expectedResponse);
     });
   });

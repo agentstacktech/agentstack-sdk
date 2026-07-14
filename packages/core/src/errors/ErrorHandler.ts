@@ -3,6 +3,8 @@
  * Provides consistent error handling across all API operations
  */
 
+import { UnauthorizedError } from '../types/shared/HTTPTypes';
+
 export interface BaseError {
   code: string;
   message: string;
@@ -66,6 +68,7 @@ export class SDKErrorHandler {
     new NetworkErrorHandler(),
     new ValidationErrorHandler(),
     new NotFoundErrorHandler(),
+    new UnauthorizedErrorHandler(),
     new PermissionErrorHandler(),
     new ServerErrorHandler(),
     new FallbackErrorHandler()
@@ -318,6 +321,28 @@ export class NotFoundErrorHandler implements ErrorHandler {
   private async navigateToList(): Promise<void> {
     // Navigate to list view
     window.location.href = '/list';
+  }
+}
+
+export class UnauthorizedErrorHandler implements ErrorHandler {
+  canHandle(error: Error): boolean {
+    return error instanceof UnauthorizedError;
+  }
+
+  getRecoveryOptions(): RecoveryOption[] {
+    return [];
+  }
+
+  async handle(error: UnauthorizedError): Promise<HandledError> {
+    return {
+      userMessage:
+        'Invalid email or password. Please check your credentials and try again.',
+      technicalMessage: error.message || 'Unauthorized',
+      severity: 'critical',
+      recoverable: false,
+      recoveryOptions: [],
+      logLevel: 'warn',
+    };
   }
 }
 

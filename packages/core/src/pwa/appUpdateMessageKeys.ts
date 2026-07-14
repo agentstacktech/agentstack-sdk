@@ -13,7 +13,10 @@ export const APP_UPDATE_MESSAGE_KEYS = {
     stale_assets: 'pwa.app_update.title_assets',
   },
   subtitle: 'pwa.app_update.subtitle',
+  subtitle_deep: 'pwa.app_update.subtitle_deep',
+  subtitle_chunk_stale: 'pwa.app_update.subtitle_chunk_stale',
   cta: 'pwa.app_update.cta',
+  cta_deep: 'pwa.app_update.cta_deep',
   dismiss: 'pwa.app_update.dismiss',
   defer: 'pwa.app_update.defer',
 } as const;

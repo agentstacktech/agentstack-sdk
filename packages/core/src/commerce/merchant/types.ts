@@ -50,6 +50,7 @@ export type IncomingOrderRow = {
   buyer_display_name?: string;
   buyer_user_id?: number;
   total_usdt: string;
+  status?: string;
   completed_at?: string;
   created_at?: string;
   lines?: Record<string, unknown>[];

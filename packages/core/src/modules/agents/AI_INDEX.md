@@ -5,10 +5,12 @@
 ## Read first
 
 - [AgentsFleet.ts](AgentsFleet.ts)
-- [docs/adr/AGENTS_FLEET_ARCHITECTURE.md](../../../../docs/adr/AGENTS_FLEET_ARCHITECTURE.md)
+- [docs/adr/AGENTS_FLEET_ARCHITECTURE.md](../../../../../../docs/adr/AGENTS_FLEET_ARCHITECTURE.md)
+- [docs/adr/AGENTS_UI_RUNTIME_RENAISSANCE.md](../../../../../../docs/adr/AGENTS_UI_RUNTIME_RENAISSANCE.md)
 
 ## Hot files
 
 - `AgentsFleet.ts` — REST facade for `/api/projects/{id}/agents/*` and `/api/users/me/agents/*`
 - **UI V2 helpers:** `listLlmProviders()`, `listFapTemplates()`, `previewPolicy` / `previewPolicyMine`, `previewTemplate` / `previewTemplateMine`, `updateSpecPatch` / `updateSpecPatchMine` (client `mergeAgentSpec` + GET + PUT)
+- **Parity backlog:** typed run DTOs, run detail, list filters (`status`, `since`, `with_agc_purchase`), timeline, and stream helpers must stay aligned with REST/MCP/Python.
 - `forProject(id)` — chained helpers including `previewPolicy`, `previewTemplate`, `updateSpecPatch`

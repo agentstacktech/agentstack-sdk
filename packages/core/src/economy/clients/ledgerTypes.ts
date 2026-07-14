@@ -47,6 +47,7 @@ export interface AgentCoinBatchProofPayload {
   merkle_root: string;
   payload_hash?: string | null;
   created_at?: string | null;
+  checkpoint?: Record<string, unknown> | null;
   entries: AgentCoinBatchProofEntry[];
   proofs: AgentCoinBatchProofLeg[];
 }

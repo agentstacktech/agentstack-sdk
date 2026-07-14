@@ -260,6 +260,26 @@ export interface MetadataComponent {
   custom_fields?: Record<string, any>;
 
   /**
+   * Catalog lifecycle state for commerce/assets UI.
+   */
+  lifecycle?: string;
+
+  /**
+   * Whether this asset can be transferred or listed.
+   */
+  transferable?: boolean;
+
+  /**
+   * Preset identifier used to create this asset.
+   */
+  created_by_preset?: string;
+
+  /**
+   * Exchange pair metadata for market-facing assets.
+   */
+  exchange_pair?: string;
+
+  /**
    * Base asset ID (for inheritance)
    */
   extends?: string;

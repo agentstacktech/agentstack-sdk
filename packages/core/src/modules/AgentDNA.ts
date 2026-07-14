@@ -11,6 +11,7 @@
 
 import { HTTPClient } from '../client/http-client';
 import { diagnosticLogger } from '../utils/DiagnosticLogger';
+import { DnaLineageClient, DnaMergePolicyClient } from '../dna';
 
 // ============================================================================
 // TYPES
@@ -88,9 +89,15 @@ export interface DNAFilter {
  */
 export class AgentDNA {
   private client: HTTPClient;
+  /** Lineage graph (`/api/dna/lineage/*`). Genetic tag: core.8dna.lineage_graph.gen1 */
+  public readonly lineage: DnaLineageClient;
+  /** Ecosystem merge policy settings. Genetic tag: core.8dna.ecosystem_merge_policy.gen1 */
+  public readonly mergePolicy: DnaMergePolicyClient;
 
   constructor(client: HTTPClient) {
     this.client = client;
+    this.lineage = new DnaLineageClient(client);
+    this.mergePolicy = new DnaMergePolicyClient(client);
   }
 
   /**

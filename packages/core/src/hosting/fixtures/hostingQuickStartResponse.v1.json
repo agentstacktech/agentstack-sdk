@@ -1,0 +1,9 @@
+{
+  "success": true,
+  "bucket_id": "demo-bucket-01",
+  "site_id": "site-01",
+  "url": "https://example.com/s/1/demo-bucket-01/",
+  "skipped": false,
+  "edge_ready": true,
+  "manifest_hash": "abc123"
+}

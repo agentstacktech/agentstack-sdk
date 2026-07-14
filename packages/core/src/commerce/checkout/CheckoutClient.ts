@@ -1,4 +1,6 @@
 import type { HTTPClient } from '../../client/http-client';
+import { mapCommerceHttpError } from '../errors/mapCommerceHttpError';
+import { shouldPollCheckout } from './checkoutStateMachine';
 
 export type CreateCheckoutSessionRequest = {
   listing_uuid: string;
@@ -6,6 +8,19 @@ export type CreateCheckoutSessionRequest = {
   buyer_project_id?: number;
   lines?: Array<{ listing_uuid: string; quantity: number }>;
 };
+
+function mapCheckoutHttpError(err: unknown): never {
+  const e = err as {
+    status?: number;
+    response?: { status?: number; data?: Record<string, unknown> };
+    data?: Record<string, unknown>;
+  };
+  const status = Number(e?.status ?? e?.response?.status ?? 0);
+  const body = (e?.response?.data ?? e?.data) as
+    | { error?: string; detail?: string | Record<string, unknown>; error_code?: string }
+    | undefined;
+  throw mapCommerceHttpError(status || 500, body);
+}
 
 export class CheckoutClient {
   constructor(private readonly http: HTTPClient) {}
@@ -17,12 +32,16 @@ export class CheckoutClient {
     const headers = idempotencyKey
       ? { 'Idempotency-Key': idempotencyKey }
       : undefined;
-    const response = await this.http.post(
-      '/commerce/checkout/sessions',
-      body,
-      { headers },
-    );
-    return response.data ?? response;
+    try {
+      const response = await this.http.post(
+        '/commerce/checkout/sessions',
+        body,
+        { headers },
+      );
+      return response.data ?? response;
+    } catch (err) {
+      mapCheckoutHttpError(err);
+    }
   }
 
   async getSession(sessionId: string) {
@@ -36,12 +55,33 @@ export class CheckoutClient {
     const headers = idempotencyKey
       ? { 'Idempotency-Key': idempotencyKey }
       : undefined;
-    const response = await this.http.post(
-      `/commerce/checkout/sessions/${sessionId}/confirm`,
-      {},
-      { headers },
-    );
-    return response.data ?? response;
+    try {
+      const response = await this.http.post(
+        `/commerce/checkout/sessions/${sessionId}/confirm`,
+        {},
+        { headers },
+      );
+      return response.data ?? response;
+    } catch (err) {
+      mapCheckoutHttpError(err);
+    }
+  }
+
+  /** Create checkout from server cart (wallet confirms inline; fiat awaits external pay). */
+  async createFromCart(rail = 'wallet_internal', idempotencyKey?: string) {
+    const headers = idempotencyKey
+      ? { 'Idempotency-Key': idempotencyKey }
+      : undefined;
+    try {
+      const response = await this.http.post(
+        '/commerce/cart/checkout',
+        {},
+        { params: { rail }, headers },
+      );
+      return response.data ?? response;
+    } catch (err) {
+      mapCheckoutHttpError(err);
+    }
   }
 
   async pollUntilTerminal(
@@ -54,13 +94,22 @@ export class CheckoutClient {
     while (Date.now() - start < timeout) {
       const result = await this.getSession(sessionId);
       const session = result.session ?? result;
-      const status = session?.status;
+      const status = String(session?.status ?? '');
       if (
         status === 'completed' ||
         status === 'failed' ||
         status === 'expired' ||
         status === 'cancelled'
       ) {
+        return result;
+      }
+      const uiState =
+        status === 'awaiting_payment'
+          ? 'awaiting_payment'
+          : status === 'confirming'
+            ? 'confirming'
+            : 'idle';
+      if (!shouldPollCheckout(uiState)) {
         return result;
       }
       await new Promise((r) => setTimeout(r, interval));

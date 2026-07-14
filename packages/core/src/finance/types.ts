@@ -13,8 +13,8 @@ export interface RailBalanceSlice {
   display_decimal: string;
   as_of_iso: string;
   project_id?: number;
-  wallet_id?: string;
-  storage?: string;
+  wallet_id?: string | null;
+  storage?: string | null;
   explorer_url?: string | null;
   reconciliation_ok?: boolean | null;
 }

@@ -9,6 +9,7 @@ import { LedgerClient } from './clients/LedgerClient';
 import { ProofClient } from './clients/ProofClient';
 import { VaultClient } from './clients/VaultClient';
 import { WalletsClient } from './clients/WalletsClient';
+import { ChainSurfaceClient } from './clients/ChainSurfaceClient';
 import { ProjectEconomyScope } from './ProjectEconomyScope';
 import { WorkingSetClient } from './workingSet/WorkingSetClient';
 
@@ -24,6 +25,7 @@ export class AgentEconomyFacade {
   readonly funding: FundingClient;
   readonly proofs: ProofClient;
   readonly wallets: WalletsClient;
+  readonly chainSurface: ChainSurfaceClient;
   readonly workingSet: WorkingSetClient;
   readonly bridgeTracker: BridgeIntentTracker;
 
@@ -49,6 +51,7 @@ export class AgentEconomyFacade {
     this.funding = new FundingClient(this.ledger);
     this.proofs = new ProofClient(this.ledger);
     this.wallets = new WalletsClient(this.ledger);
+    this.chainSurface = new ChainSurfaceClient(http);
     this.workingSet = new WorkingSetClient(http);
     this.bridgeTracker = new BridgeIntentTracker((pid, p) =>
       this.bridge.listIntents(pid, p).then((r) => ({ intents: r.intents })),

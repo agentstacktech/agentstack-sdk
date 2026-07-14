@@ -1,6 +1,8 @@
 /**
  * @agentstack/sdk/pwa — Update Plane + service worker helpers.
  */
+export * from './appUpdateRecovery';
+export * from './buildId';
 export * from './appUpdatePlane';
 export * from './appUpdateBroadcast';
 export * from './appUpdateCoordinator';
@@ -16,3 +18,10 @@ export * from './serviceWorkerContour';
 export * from './serviceWorkerBestRegistration';
 export * from './messengerSwPostMessage';
 export * from './messengerOsNotificationFallback';
+export * from './updatePlaneDiagnostics';
+export * from './chunkErrors';
+export {
+  isRecentTransientNetworkBlip,
+  isTransientBrowserNetworkError,
+  noteTransientNetworkError,
+} from '../client/networkErrors';

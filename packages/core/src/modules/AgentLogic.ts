@@ -85,6 +85,10 @@ export interface UpdateLogicRequest {
       parameters: Record<string, any>;
     }>;
   };
+  triggers?: Array<Record<string, any>>;
+  schedulers?: Array<Record<string, any>>;
+  space?: Array<Record<string, any>>;
+  editor_metadata?: Record<string, any>;
   enabled?: boolean;
   priority?: number;
 }

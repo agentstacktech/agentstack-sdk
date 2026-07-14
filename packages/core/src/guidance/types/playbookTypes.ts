@@ -5,6 +5,10 @@ import type { StepStatus } from './pathStepStatus';
 export const PlaybookIdSchema = z.enum([
   'sell-digital-content',
   'host-static-site',
+  'host-sell-scale-one-project',
+  'host-and-sell-15',
+  'start-selling',
+  'try-hosting-demo-5',
   'first-integration',
   'support-channel',
   'agents-first',
@@ -17,6 +21,9 @@ export const PlaybookIdSchema = z.enum([
   'wallet-payments',
   'micropath-synthetic',
   'project-safe-exit',
+  'grant-testnet-demo',
+  'fabric-demo',
+  'messaging-channel-bot',
 ]);
 
 export type PlaybookId = z.infer<typeof PlaybookIdSchema>;
@@ -58,7 +65,9 @@ const PlaybookNodeSchema = z.discriminatedUnion('kind', [
     id: z.string(),
     titleKey: z.string().optional(),
     titleDefault: z.string(),
-    taskId: z.string(),
+    taskId: z.string().optional(),
+    fabricCapabilityId: z.string().optional(),
+    fabricCapabilityDomain: z.string().optional(),
     surface: z.enum(['inline', 'card', 'drawer', 'modal', 'page']).optional(),
     help: z.array(PathStepHelpBlockSchema).optional(),
     verify: GoalVerifySpecSchema.optional(),
@@ -105,22 +114,35 @@ export const ExecutionStepRuleSchema = z.object({
   steps: z.array(z.string()),
 });
 
-export const PlaybookSchema = z.object({
-  id: PlaybookIdSchema,
-  version: z.number(),
-  titleKey: z.string().optional(),
-  titleDefault: z.string(),
-  intentPatterns: z.array(z.string()),
-  intentKeywords: z.array(z.string()),
-  audienceMask: z.object({
-    dev: z.boolean().optional(),
-    user: z.boolean().optional(),
-  }),
-  entryNodeId: z.string(),
-  nodes: z.record(z.string(), PlaybookNodeSchema),
-  executionRules: z.array(ExecutionStepRuleSchema).optional(),
-  defaultExecutionSteps: z.array(z.string()).optional(),
-});
+export const PlaybookSchema = z
+  .object({
+    id: PlaybookIdSchema,
+    version: z.number(),
+    titleKey: z.string().optional(),
+    titleDefault: z.string(),
+    intentPatterns: z.array(z.string()),
+    intentKeywords: z.array(z.string()),
+    audienceMask: z.object({
+      dev: z.boolean().optional(),
+      user: z.boolean().optional(),
+    }),
+    entryNodeId: z.string(),
+    nodes: z.record(z.string(), PlaybookNodeSchema),
+    executionRules: z.array(ExecutionStepRuleSchema).optional(),
+    defaultExecutionSteps: z.array(z.string()).optional(),
+  })
+  .superRefine((playbook, ctx) => {
+    for (const [nodeId, node] of Object.entries(playbook.nodes)) {
+      if (node.kind !== 'capability') continue;
+      if (!node.taskId && !node.fabricCapabilityId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'capability node requires taskId or fabricCapabilityId',
+          path: ['nodes', nodeId],
+        });
+      }
+    }
+  });
 
 export type Playbook = z.infer<typeof PlaybookSchema>;
 export type PlaybookNode = z.infer<typeof PlaybookNodeSchema>;
@@ -172,7 +194,7 @@ export type PlaybookEvent =
   | { type: 'SET_PROJECT'; projectId: number }
   | { type: 'ADVANCE' }
   | { type: 'ACTION_DONE'; nodeId: string }
-  | { type: 'TASK_COMPLETE'; nodeId: string }
+  | { type: 'TASK_COMPLETE'; nodeId: string; artifact?: Record<string, unknown> }
   | { type: 'STEP_FOCUS'; nodeId: string }
   | { type: 'STEP_OPEN'; nodeId: string }
   | { type: 'VERIFY_OK'; nodeId: string; artifact?: StepProgressEntry['artifact'] }
@@ -202,6 +224,10 @@ export type PathStepPlan = {
   capabilitySurface?: 'inline' | 'card' | 'drawer' | 'modal' | 'page';
   /** ResourceSurfaceManifest action id for `?action=` deep links */
   resourceActionId?: string;
+  /** Fabric MCP capability id (`frontend.fabric.capability_ui.gen1`) */
+  fabricCapabilityId?: string;
+  /** Optional domain prefix for descriptor catalog filter */
+  fabricCapabilityDomain?: string;
   portId?: string;
   verifySpec?: import('./pathStepHelp').GoalVerifySpec;
   recipeId?: string;

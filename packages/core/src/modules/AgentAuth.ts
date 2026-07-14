@@ -10,7 +10,7 @@ import { logger } from '../utils/logger';
 import { maskSecretForLog } from '../utils/maskSecretForLog';
 import { SDKErrorHandler, NetworkError, ValidationError, NotFoundError, PermissionError, ServerError } from '../errors/ErrorHandler';
 import { executeOrNotFoundFallback } from '../utils/httpDeleteIdempotent';
-import { ConflictError } from '../types/shared/HTTPTypes';
+import { ConflictError, UnauthorizedError } from '../types/shared/HTTPTypes';
 import { retryManager } from '../errors/RetryManager';
 import { offlineManager } from '../errors/OfflineManager';
 import { getStorageItem, setStorageItem, removeStorageItem } from '../utils/storage-utils';
@@ -55,6 +55,19 @@ export interface UserProfile {
   updated_at: string;
   /** Optional piggyback from `GET /api/auth/me` (platform feature gates). */
   feature_availability?: Record<string, unknown>;
+}
+
+export interface SessionBootstrapSettingsSummary {
+  theme?: string;
+  language?: string;
+  timezone?: string;
+}
+
+/** Full payload from `GET /api/auth/me/bootstrap` (single cold-start round-trip). */
+export interface SessionBootstrapPayload {
+  user: UserProfile;
+  settings_summary?: SessionBootstrapSettingsSummary;
+  accessible_project_ids?: number[];
 }
 
 
@@ -136,6 +149,9 @@ export class AgentAuth extends SimpleEventEmitter {
   private authStateStore?: AuthStateStore;
   /** Dedupe parallel `GET /auth/me` (Strict Mode double-mount, refreshUser + bootstrap). */
   private getCurrentUserInFlight: Promise<UserProfile> | null = null;
+  /** Dedupe parallel `GET /auth/me/bootstrap`. */
+  private sessionBootstrapInFlight: Promise<SessionBootstrapPayload> | null = null;
+  private lastSessionBootstrap: SessionBootstrapPayload | null = null;
 
   constructor(client: HTTPClient, authStateStore?: AuthStateStore) {
     super();
@@ -148,6 +164,18 @@ export class AgentAuth extends SimpleEventEmitter {
    * Transform HTTP errors to SDK error types
    */
   private transformError(error: any): Error {
+    if (
+      error instanceof UnauthorizedError ||
+      error instanceof ConflictError ||
+      error instanceof PermissionError ||
+      error instanceof ValidationError ||
+      error instanceof NotFoundError ||
+      error instanceof ServerError ||
+      error instanceof NetworkError
+    ) {
+      return error;
+    }
+
     if (error.response) {
       const status = error.response.status;
       const message = error.response.data?.detail || error.message;
@@ -218,6 +246,9 @@ export class AgentAuth extends SimpleEventEmitter {
         
         // Handle 8DNA response format
         const data = response.data;
+        if (!data) {
+          throw new UnauthorizedError('Invalid credentials');
+        }
         if (data.success && data.session) {
           // Convert AgentStack session response to AuthTokens format
           const session = data.session;
@@ -410,6 +441,8 @@ export class AgentAuth extends SimpleEventEmitter {
             }
           });
 
+          this.client.markRecentLoginSuccess();
+
           const sessionProjectId = normalizeProjectId(session.project_id);
           if (sessionProjectId) {
             this.client.updateConfig({ projectId: sessionProjectId });
@@ -512,11 +545,17 @@ export class AgentAuth extends SimpleEventEmitter {
     }
   }
 
+  async refreshToken(data: { refresh_token: string } | string): Promise<AuthTokens> {
+    return this.refresh(typeof data === 'string' ? data : data.refresh_token);
+  }
+
   /**
    * Выход из системы
    */
   async logout(): Promise<void> {
     this.getCurrentUserInFlight = null;
+    this.sessionBootstrapInFlight = null;
+    this.lastSessionBootstrap = null;
     try {
       this.authStateStore?.setState({
         state: 'logging_out',
@@ -582,29 +621,57 @@ export class AgentAuth extends SimpleEventEmitter {
    * Session bootstrap (v1 alias of ``/auth/me``). Use for cold-start single round-trip.
    */
   async getSessionBootstrap(): Promise<UserProfile> {
-    if (this.getCurrentUserInFlight) {
-      return this.getCurrentUserInFlight;
+    const payload = await this.getSessionBootstrapPayload();
+    return payload.user;
+  }
+
+  /** Last successful bootstrap payload (for SPA prefetch dedupe without a second HTTP call). */
+  getLastSessionBootstrap(): SessionBootstrapPayload | null {
+    return this.lastSessionBootstrap;
+  }
+
+  /**
+   * Cold-start session restore: user + settings_summary + accessible_project_ids in one GET.
+   */
+  async getSessionBootstrapPayload(options?: { force?: boolean }): Promise<SessionBootstrapPayload> {
+    if (this.sessionBootstrapInFlight) {
+      return this.sessionBootstrapInFlight;
     }
-    const work = this.fetchSessionBootstrapOnce();
-    this.getCurrentUserInFlight = work;
+    if (!options?.force && this.lastSessionBootstrap) {
+      return this.lastSessionBootstrap;
+    }
+    const work = this.fetchSessionBootstrapPayloadOnce();
+    this.sessionBootstrapInFlight = work;
     work.finally(() => {
-      if (this.getCurrentUserInFlight === work) {
-        this.getCurrentUserInFlight = null;
+      if (this.sessionBootstrapInFlight === work) {
+        this.sessionBootstrapInFlight = null;
       }
     });
     return work;
   }
 
-  private async fetchSessionBootstrapOnce(): Promise<UserProfile> {
+  private async fetchSessionBootstrapPayloadOnce(): Promise<SessionBootstrapPayload> {
     const response = await this.client.get('/auth/me/bootstrap', undefined, {
       skipBatching: true,
       skipCache: true,
     });
-    const data = response.data;
-    if (data.success && data.data) {
-      return this.mapUserProfileFromMePayload(data.data);
+    const body = response.data as {
+      success?: boolean;
+      data?: Record<string, unknown>;
+      settings_summary?: SessionBootstrapSettingsSummary;
+      accessible_project_ids?: number[];
+    };
+    if (!body?.success || !body.data) {
+      throw new Error('Session bootstrap failed');
     }
-    throw new Error('Session bootstrap failed');
+    const user = this.mapUserProfileFromMePayload(body.data);
+    const payload: SessionBootstrapPayload = {
+      user,
+      settings_summary: body.settings_summary,
+      accessible_project_ids: body.accessible_project_ids,
+    };
+    this.lastSessionBootstrap = payload;
+    return payload;
   }
 
   private mapUserProfileFromMePayload(userData: Record<string, unknown>): UserProfile {
@@ -646,7 +713,7 @@ export class AgentAuth extends SimpleEventEmitter {
     });
 
     const data = response.data;
-    if (data.success && data.data) {
+    if (data?.success && data.data) {
       return this.mapUserProfileFromMePayload(data.data as Record<string, unknown>);
     }
     throw new Error('Failed to get current user');
@@ -962,6 +1029,15 @@ export class AgentAuth extends SimpleEventEmitter {
     return data;
   }
 
+  async revokeSession(sessionUuid: string, reason?: string): Promise<{
+    success: boolean;
+    message: string;
+    session_uuid: string;
+    terminated_at: string;
+  }> {
+    return this.terminateSession(sessionUuid, reason);
+  }
+
   /**
    * Завершение всех сессий
    */
@@ -1014,6 +1090,10 @@ export class AgentAuth extends SimpleEventEmitter {
     // Use the new user sessions endpoint with project grouping
     const response = await this.client.get('/sessions');
     return response.data || response;
+  }
+
+  async getActiveSessions(): Promise<Awaited<ReturnType<AgentAuth['getSessions']>>> {
+    return this.getSessions();
   }
 
   // ===== JSON Profile Data Methods =====

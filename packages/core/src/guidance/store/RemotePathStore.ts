@@ -50,4 +50,22 @@ export class RemotePathStore implements IPathStore {
       updatedAt: new Date().toISOString(),
     }));
   }
+
+  /** Path hydrate BFF — session + capability_matrix_keys (`docs/perf/PATH_HYDRATE_BFF.md`). */
+  async hydrateSession(sessionId: string): Promise<{
+    session: Record<string, unknown>;
+    capability_matrix_keys: string[];
+  } | null> {
+    const res = await this.http.get<{
+      session?: Record<string, unknown>;
+      capability_matrix_keys?: string[];
+    }>(
+      `/api/projects/${this.projectId}/guidance/sessions/${encodeURIComponent(sessionId)}/hydrate`,
+    );
+    if (!res.data?.session) return null;
+    return {
+      session: res.data.session,
+      capability_matrix_keys: res.data.capability_matrix_keys ?? [],
+    };
+  }
 }
