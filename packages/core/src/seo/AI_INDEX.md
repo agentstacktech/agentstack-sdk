@@ -13,8 +13,8 @@
 
 | File | Role |
 |------|------|
-| [`packages/core/src/seo/index.ts`](../packages/core/src/seo/index.ts) | REST client for `/api/seo/meta` |
-| [`shared/seo/seo_copy_registry.py`](../../../shared/seo/seo_copy_registry.py) | Python SoT (codegen → frontend JSON) |
+| [`index.ts`](./index.ts) | REST client for `/api/seo/meta` |
+| [`shared/seo/seo_copy_registry.py`](../../../../../shared/seo/seo_copy_registry.py) | Python SoT (codegen → frontend JSON) |
 | [`docs/seo/AI_INDEX.md`](../../../docs/seo/AI_INDEX.md) | Platform SEO docs index |
 
 ## Usage

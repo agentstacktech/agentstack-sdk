@@ -20,10 +20,32 @@ export class BadRequestError extends Error {
   }
 }
 
+export type AuthErrorCode =
+  | 'session_expired'
+  | 'session_revoked'
+  | 'session_not_found'
+  | 'auth_mint_timeout'
+  | 'backend_unavailable'
+  | 'unauthorized';
+
 export class UnauthorizedError extends Error {
-  constructor(message: string) {
+  public readonly status: number;
+  public readonly code: AuthErrorCode;
+  public readonly traceId?: string;
+
+  constructor(
+    message: string,
+    options?: {
+      status?: number;
+      code?: AuthErrorCode;
+      traceId?: string;
+    },
+  ) {
     super(message);
     this.name = 'UnauthorizedError';
+    this.status = options?.status ?? 401;
+    this.code = options?.code ?? 'unauthorized';
+    this.traceId = options?.traceId;
   }
 }
 
@@ -72,21 +94,24 @@ export class InternalServerError extends Error {
 export class ServerError extends Error {
   /** Present when raised from HTTPClient for HTTP error responses (e.g. 503). */
   public readonly status?: number;
-  /** JSON ``error`` field when API returns structured body (e.g. ``AgentCoinSchemaMissing``). */
+  /** JSON ``error`` / ``code`` field when API returns structured body. */
   public readonly apiCode?: string;
   /** ``request_id`` / trace from JSON body when present. */
   public readonly requestId?: string;
+  /** Parsed ``Retry-After`` header seconds when present (Session OS V3.1 M5). */
+  public readonly retryAfterSec?: number;
 
   constructor(
     message: string,
     status?: number,
-    options?: { apiCode?: string; requestId?: string }
+    options?: { apiCode?: string; requestId?: string; retryAfterSec?: number }
   ) {
     super(message);
     this.name = 'ServerError';
     this.status = status;
     this.apiCode = options?.apiCode;
     this.requestId = options?.requestId;
+    this.retryAfterSec = options?.retryAfterSec;
   }
 }
 

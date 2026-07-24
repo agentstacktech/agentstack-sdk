@@ -27,6 +27,7 @@ function makeCoordinator(overrides: Partial<AppUpdateCoordinatorConfig> = {}) {
       await opts.strategy({
         reason: opts.reason,
         mode: opts.mode,
+        selectedTier: opts.selectedTier,
         runSwUpdate: async () => undefined,
         hardReload: () => undefined,
       });
@@ -135,7 +136,167 @@ describe('createAppUpdateCoordinator', () => {
     coordinator.ingestSignal({ reason: 'build_id', remoteBuildId: remote });
     const s = coordinator.getState();
     expect(s.suggestDeepRecovery).toBe(true);
+    expect(s.selectedTier).toBe(2);
     expect(coordinator.shouldShowBanner()).toBe(true);
+  });
+
+  it('predicts L2 on first build_id when SW controller present', () => {
+    const { coordinator } = makeCoordinator({
+      localBuildId: '0.4.13-t1000',
+      getApplyEnvironment: () => ({
+        hasWaitingWorker: false,
+        hasServiceWorkerController: true,
+        isStandaloneDisplay: false,
+        chunkRecoveryAttempted: false,
+      }),
+    });
+    coordinator.ingestSignal({ reason: 'build_id', remoteBuildId: '0.4.13-t2000' });
+    const s = coordinator.getState();
+    expect(s.selectedTier).toBe(2);
+    expect(s.suggestDeepRecovery).toBe(true);
+  });
+
+  it('predicts L0 when waiting worker (not L2)', () => {
+    const { coordinator } = makeCoordinator({
+      getApplyEnvironment: () => ({
+        hasWaitingWorker: true,
+        hasServiceWorkerController: true,
+        isStandaloneDisplay: false,
+        chunkRecoveryAttempted: false,
+      }),
+    });
+    coordinator.ingestSignal({ reason: 'sw_waiting' });
+    expect(coordinator.getState().selectedTier).toBe(0);
+    expect(coordinator.getState().suggestDeepRecovery).toBe(false);
+  });
+
+  it('applyEffective uses selectedTier mode', async () => {
+    const { coordinator, applyCalls } = makeCoordinator({
+      localBuildId: '0.4.13-t1000',
+      getApplyEnvironment: () => ({
+        hasWaitingWorker: false,
+        hasServiceWorkerController: true,
+        isStandaloneDisplay: false,
+        chunkRecoveryAttempted: false,
+      }),
+    });
+    coordinator.ingestSignal({ reason: 'build_id', remoteBuildId: '0.4.13-t2000' });
+    await coordinator.applyEffective();
+    expect(applyCalls.some((c) => c.mode === 'policy_deep_recovery')).toBe(true);
+  });
+
+  it('applyEffective force-acquires deep lock when stamp is busy', async () => {
+    let forceSeen: boolean | undefined;
+    const { coordinator, applyCalls } = makeCoordinator({
+      localBuildId: '0.4.13-t1000',
+      getApplyEnvironment: () => ({
+        hasWaitingWorker: false,
+        hasServiceWorkerController: true,
+        isStandaloneDisplay: false,
+        chunkRecoveryAttempted: false,
+      }),
+      acquireDeepRecoveryLock: async (opts) => {
+        forceSeen = opts?.force === true;
+        return true;
+      },
+    });
+    coordinator.ingestSignal({ reason: 'build_id', remoteBuildId: '0.4.13-t2000' });
+    await coordinator.applyEffective();
+    expect(forceSeen).toBe(true);
+    expect(applyCalls.some((c) => c.mode === 'policy_deep_recovery')).toBe(true);
+  });
+
+  it('rolls back to pending when deep lock busy without force', async () => {
+    const { coordinator, applyCalls } = makeCoordinator({
+      localBuildId: '0.4.13-t1000',
+      getApplyEnvironment: () => ({
+        hasWaitingWorker: false,
+        hasServiceWorkerController: true,
+        isStandaloneDisplay: false,
+        chunkRecoveryAttempted: false,
+      }),
+      acquireDeepRecoveryLock: async () => false,
+    });
+    coordinator.ingestSignal({ reason: 'build_id', remoteBuildId: '0.4.13-t2000' });
+    await coordinator.apply({
+      reason: 'build_id',
+      mode: 'policy_deep_recovery',
+    });
+    expect(applyCalls.length).toBe(0);
+    expect(coordinator.getState().status).toBe('pending');
+    expect(coordinator.getState().suggestDeepRecovery).toBe(true);
+  });
+
+  it('suppresses ingest while apply is in flight', async () => {
+    let releaseApply!: () => void;
+    const applyGate = new Promise<void>((resolve) => {
+      releaseApply = resolve;
+    });
+    const { coordinator } = makeCoordinator({
+      onApply: async (opts) => {
+        await applyGate;
+        await opts.strategy({
+          reason: opts.reason,
+          mode: opts.mode,
+          selectedTier: opts.selectedTier,
+          runSwUpdate: async () => undefined,
+          hardReload: () => undefined,
+        });
+      },
+    });
+    coordinator.ingestSignal({ reason: 'build_id', remoteBuildId: 'r1' });
+    const applyPromise = coordinator.apply({
+      reason: 'build_id',
+      mode: 'user',
+    });
+    await Promise.resolve();
+    expect(coordinator.getState().status).toBe('applying');
+    coordinator.ingestSignal({ reason: 'deploy', serverStartedAt: 't-new' });
+    expect(coordinator.getState().status).toBe('applying');
+    expect(coordinator.getState().reason).toBe('build_id');
+    releaseApply();
+    await applyPromise;
+  });
+
+  it('navigation fallback uses onNavigationFallback for deep recovery', async () => {
+    const fallback = jest.fn();
+    const { coordinator } = makeCoordinator({
+      onNavigationFallback: fallback,
+      scheduleTimeout: (fn) => {
+        fn();
+        return 1;
+      },
+    });
+    coordinator.ingestSignal({ reason: 'build_id', remoteBuildId: 'r2' });
+    await coordinator.apply({
+      reason: 'build_id',
+      mode: 'policy_deep_recovery',
+      forceDeepLock: true,
+    });
+    expect(fallback).toHaveBeenCalledWith({
+      mode: 'policy_deep_recovery',
+      reason: 'build_id',
+    });
+  });
+
+  it('prompt budget blocks second need_refresh for same identity', () => {
+    const { coordinator } = makeCoordinator({
+      tabGeneration: 'test-gen',
+      getApplyEnvironment: () => ({
+        hasWaitingWorker: false,
+        hasServiceWorkerController: false,
+        isStandaloneDisplay: false,
+        chunkRecoveryAttempted: false,
+      }),
+    });
+    let events = 0;
+    coordinator.subscribeEvents(() => {
+      events += 1;
+    });
+    coordinator.ingestSignal({ reason: 'build_id', remoteBuildId: 'r1' });
+    coordinator.ingestSignal({ reason: 'deploy', serverStartedAt: 't-new' });
+    expect(events).toBe(1);
+    expect(coordinator.getState().status).toBe('pending');
   });
 
   it('suppresses banner when recovery is ineffective', () => {
@@ -171,5 +332,15 @@ describe('createAppUpdateCoordinator', () => {
     coordinator.ingestSignal({ reason: 'build_id', remoteBuildId: '0.4.13-t2000' });
     await coordinator.forceDeepRecovery();
     expect(applyCalls.some((c) => c.mode === 'policy_deep_recovery')).toBe(true);
+  });
+
+  it('acknowledgeHealthy clears pending without snooze', () => {
+    const { coordinator, storage } = makeCoordinator();
+    coordinator.ingestSignal({ reason: 'build_id', remoteBuildId: 'r1' });
+    expect(coordinator.shouldShowBanner()).toBe(true);
+    coordinator.acknowledgeHealthy();
+    expect(coordinator.getState().status).toBe('idle');
+    expect(coordinator.shouldShowBanner()).toBe(false);
+    expect(Number(storage.getItem('agentstack:pwa_update_snooze_until') ?? 0)).toBe(0);
   });
 });

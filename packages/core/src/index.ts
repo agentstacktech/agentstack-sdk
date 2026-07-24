@@ -158,6 +158,15 @@ export type {
 } from './public';
 /** Platform-operator AgentNet admin (`/api/admin/agentnet/*`) — not on `sdk.platform`. */
 export { AgentAdmin } from './modules/AgentAdmin';
+export {
+  enqueueAdminLongRunJob,
+  pollAdminLongRunJob,
+  waitForAdminLongRunJobTerminal,
+  normalizeAdminApiPath,
+  type AdminLongRunJob,
+  type AdminLongRunJobStatus,
+  type EnqueueAdminLongRunJobResult,
+} from './admin/longRunJob';
 export type {
   AgentcoinSchemaStatusPayload,
   AgentcoinChainSurfacePayload,
@@ -250,6 +259,9 @@ export type {
   BucketCreateBody,
   BucketPatchBody,
   PromoteBuildBody,
+  HostingBucketFileRow,
+  HostingBucketFilesList,
+  ListBucketFilesOptions,
 } from './modules/AgentHosting';
 export {
   effectiveBucketName,
@@ -544,6 +556,27 @@ export type {
 } from './commerce/assets';
 
 export {
+  CapabilityCostProfileSchema,
+  CallCostPreviewSchema,
+  CostDimensionSchema,
+  MoneyMinorSchema,
+  PricingClassSchema,
+  RatedChargeSchema,
+  UnitEconomicsContractFixtureSchema,
+  UsageEvidenceEventSchema,
+} from './cost';
+export type {
+  CallCostPreview,
+  CapabilityCostProfile,
+  CostDimension,
+  MoneyMinor,
+  PricingClass,
+  RatedCharge,
+  UnitEconomicsContractFixture,
+  UsageEvidenceEvent,
+} from './cost';
+
+export {
   HostedStorefrontClient,
   type HostedManifestResponse,
   type HostedPublishResponse,
@@ -552,7 +585,7 @@ export {
 
 // 🧬 NEW! Protein System Modules (v0.3.6)
 export { AgentProtein } from './modules/AgentProtein';
-export { ProteinCommandChannel } from './modules/ProteinCommandChannel';
+export { ProteinCommandChannel, assertProteinCommandResponseOk } from './modules/ProteinCommandChannel';
 export type {
   ProteinCommandExecuteRequest,
   ProteinBatchCommandRequest,
@@ -804,7 +837,15 @@ export type {
 } from './modules/logic/types/NodeTypes';
 
 // HTTP Client
-export { HTTPClient, normalizeGetQueryArg } from './client/http-client';
+export { HTTPClient, normalizeGetQueryArg, REACT_QUERY_TRANSPORT_RETRY } from './client/http-client';
+export {
+  API_WARMING_UP_CODE,
+  AUTH_MINT_BUSY_CODES,
+  isApiWarmingUpError,
+  isAuthTransientRetryError,
+  parseApiWarmingFromBody,
+  warmingRetryDelayMs,
+} from './client/apiWarming';
 
 // Utilities
 export { SimpleEventEmitter } from './utils/event-emitter';

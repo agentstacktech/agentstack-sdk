@@ -91,6 +91,8 @@ export interface UpdateLogicRequest {
   editor_metadata?: Record<string, any>;
   enabled?: boolean;
   priority?: number;
+  /** PathAtom patches (`space{uid}.*`) — server `logic_path_atom_updates`. */
+  path_updates?: Record<string, unknown>;
 }
 
 export interface ExecuteLogicRequest {
@@ -389,6 +391,29 @@ export class AgentLogic {
   /** Alias for run console UI (`frontend.logic.run_console.gen1`). */
   async listExecutions(logicId: string, limit: number = 10): Promise<LogicExecution[]> {
     return this.getExecutionHistory(logicId, limit);
+  }
+
+  /**
+   * Batch recent executions for up to 20 rules (single request).
+   */
+  async getRecentExecutionsBatch(
+    projectId: number,
+    logicIds: string[],
+    limitPerRule: number = 1,
+  ): Promise<{
+    success: boolean;
+    project_id: number;
+    executions_by_rule: Record<string, LogicExecution[]>;
+    logic_ids: string[];
+  }> {
+    const response = await this.client.get(
+      `/projects/${projectId}/logic/executions/recent`,
+      {
+        ids: logicIds.slice(0, 20).join(','),
+        limit: limitPerRule,
+      },
+    );
+    return response.data;
   }
 
   /** Dry-run alias for simulate UI (`frontend.logic.run_console.gen1`). */

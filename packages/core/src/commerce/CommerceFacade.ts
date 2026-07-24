@@ -11,6 +11,10 @@ import { EntitlementsClient } from './entitlements/EntitlementsClient';
 import { SubscriptionClient } from './subscription/SubscriptionClient';
 import { RefundClient } from './refund/RefundClient';
 import { MerchantClient } from './merchant/MerchantClient';
+import {
+  CommerceIntentClient,
+  CommerceSurfaceClient,
+} from './surfaces';
 import { bulkCreateListings } from './marketplace/bulkClient';
 import { listStorefrontListings, type ListStorefrontParams } from './marketplace/storefrontClient';
 import { getProductBundle, type ProductBundle } from './shop/getProductBundle';
@@ -48,6 +52,8 @@ export class CommerceFacade {
   readonly cart: CartClient;
   readonly cartFacade: CartFacade;
   readonly checkout: CheckoutClient;
+  readonly surfaces: CommerceSurfaceClient;
+  readonly intents: CommerceIntentClient;
   readonly orders: OrdersClient;
   readonly sell: SellerActivationClient;
   readonly entitlements: EntitlementsClient;
@@ -150,6 +156,8 @@ export class CommerceFacade {
     this.cart = new CartClient(http);
     this.cartFacade = new CartFacade(http, 'server');
     this.checkout = new CheckoutClient(http);
+    this.surfaces = new CommerceSurfaceClient(http);
+    this.intents = new CommerceIntentClient(http);
     this.orders = new OrdersClient(http);
     this.sell = new SellerActivationClient(http);
     this.entitlements = new EntitlementsClient(http);

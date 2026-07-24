@@ -4,6 +4,7 @@ export type CommerceErrorCode =
   | 'RAIL_UNAVAILABLE'
   | 'CHECKOUT_FAILED'
   | 'SESSION_NOT_FOUND'
+  | 'CHECKOUT_SESSION_EXPIRED'
   | 'CART_EMPTY'
   | 'PRICE_CHANGED'
   | 'SLICE_MISSING'

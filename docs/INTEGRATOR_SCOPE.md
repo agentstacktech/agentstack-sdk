@@ -53,6 +53,19 @@ Monorepo frontend sets `sdkAudience: 'platform_operator'` in `shared/sdk-client.
 
 Do **not** use legacy hosts (`api.agentstack.com`, `api.agentstack.tech`, `docs.agentstack.com`). Node/scripts: `AGENTSTACK_API_BASE=https://agentstack.tech/api` or omit and call `resolveAgentStackApiBase()`.
 
+---
+
+## Channel decision (MCP vs REST vs OpenAPI)
+
+| Need | Prefer | Notes |
+| ---- | ------ | ----- |
+| New agent / automation integrations | **MCP** `agentstack.execute` | Discovery: `GET /mcp/actions` |
+| Project/user key-value data | **8DNA** `GET/POST /api/dna/data` or MCP `projects.update_project` | Universal channel |
+| Typed SPA / SDK REST already in use | **REST** `/api/*` | Marked `x-channel: rest_compat` in OpenAPI |
+| Contract / codegen / explorer | **OpenAPI** `/openapi.json`, `/docs`, `/api-docs` | Gene `docs.api.specs.gen1` |
+
+See [API_CHANNELS_AND_PROTOCOLS.md](../../docs/API_CHANNELS_AND_PROTOCOLS.md) and [OPENAPI.md](../../docs/api/OPENAPI.md).
+
 ## Configuration
 
 ```typescript

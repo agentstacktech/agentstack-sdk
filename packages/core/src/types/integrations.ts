@@ -78,6 +78,8 @@ export const InstallRecipeBodySchema = z.object({
   slug: z.string().optional(),
   secrets: z.record(z.unknown()).optional(),
   config: z.record(z.unknown()).optional(),
+  /** Optional; also sent as Idempotency-Key header when provided. */
+  idempotency_key: z.string().min(1).optional(),
 });
 
 export type InstallRecipeBody = z.infer<typeof InstallRecipeBodySchema>;
@@ -107,6 +109,7 @@ export const InstallRecipeResultSchema = z.object({
   owner_kind: z.string(),
   project_id: z.number(),
   logic_rule_ids: z.array(z.string()).default([]),
+  scenario_id: z.string().optional().nullable(),
 });
 
 export type InstallRecipeResult = z.infer<typeof InstallRecipeResultSchema>;

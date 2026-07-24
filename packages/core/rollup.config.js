@@ -24,6 +24,7 @@ const commerceSubpackages = [
   'refund',
   'participant',
   'guidance',
+  'surfaces',
 ];
 
 function commerceSubpackageRollup(name) {
@@ -194,6 +195,34 @@ export default [
     external: ['eventemitter3', 'zod'],
   },
   {
+    input: 'src/cost/explorer.ts',
+    output: [
+      { file: 'dist/cost/explorer.js', format: 'cjs', sourcemap: true, inlineDynamicImports: true },
+      { file: 'dist/cost/explorer.esm.js', format: 'esm', sourcemap: true, inlineDynamicImports: true },
+    ],
+    plugins: [
+      resolve({ browser: true, preferBuiltins: false }),
+      commonjs(),
+      typescript({ tsconfig: './tsconfig.json', declaration: false, declarationMap: false }),
+      terser(),
+    ],
+    external: ['eventemitter3', 'zod'],
+  },
+  {
+    input: 'src/cost/index.ts',
+    output: [
+      { file: 'dist/cost/index.js', format: 'cjs', sourcemap: true, inlineDynamicImports: true },
+      { file: 'dist/cost/index.esm.js', format: 'esm', sourcemap: true, inlineDynamicImports: true },
+    ],
+    plugins: [
+      resolve({ browser: true, preferBuiltins: false }),
+      commonjs(),
+      typescript({ tsconfig: './tsconfig.json', declaration: false, declarationMap: false }),
+      terser(),
+    ],
+    external: ['eventemitter3', 'zod'],
+  },
+  {
     input: 'src/commerce/assets/index.ts',
     output: [
       { file: 'dist/commerce/assets/index.js', format: 'cjs', sourcemap: true, inlineDynamicImports: true },
@@ -352,6 +381,18 @@ export default [
   {
     input: 'src/fabric/index.ts',
     output: [{ file: 'dist/fabric/index.d.ts', format: 'esm' }],
+    plugins: [dts()],
+    external: [/\.css$/],
+  },
+  {
+    input: 'src/cost/explorer.ts',
+    output: [{ file: 'dist/cost/explorer.d.ts', format: 'esm' }],
+    plugins: [dts()],
+    external: [/\.css$/],
+  },
+  {
+    input: 'src/cost/index.ts',
+    output: [{ file: 'dist/cost/index.d.ts', format: 'esm' }],
     plugins: [dts()],
     external: [/\.css$/],
   },

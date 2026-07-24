@@ -99,7 +99,18 @@ export class AgentPayments {
    * Создание платежа (POST /payments — единый путь с бэкендом)
    */
   async createPayment(paymentData: PaymentData): Promise<Payment> {
-    const response = await this.client.post('/payments', paymentData);
+    const idempotencyKey =
+      (typeof paymentData.idempotency_key === 'string' && paymentData.idempotency_key.trim()) ||
+      (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `pay-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
+    const body = { ...paymentData, idempotency_key: idempotencyKey };
+    const response = await this.client.post('/payments', body, {
+      timeout: 60_000,
+      headers: {
+        'Idempotency-Key': idempotencyKey,
+      },
+    });
     const data = response.data;
     if (data?.payment) {
       const p = data.payment;

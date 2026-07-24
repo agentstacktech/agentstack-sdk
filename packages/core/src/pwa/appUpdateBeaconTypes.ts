@@ -17,4 +17,13 @@ export type AppUpdateBeaconEvent =
   | { type: 'pwa.update.force_floor'; local: string; min: string }
   | { type: 'pwa.probe.invalid_build_id'; source: string; bodyLen: number }
   | { type: 'pwa.probe.skipped'; reason: string }
-  | { type: 'pwa.sw.precache_updated' };
+  | { type: 'pwa.sw.precache_updated' }
+  | {
+      type: 'pwa.update.tier_chosen';
+      tier: number;
+      reason: string;
+      predicted: boolean;
+    }
+  | { type: 'pwa.update.prompt_budget_hit'; identity: string }
+  | { type: 'pwa.update.reason_upgraded'; from: string; to: string }
+  | { type: 'pwa.update.second_banner_blocked'; identity: string };

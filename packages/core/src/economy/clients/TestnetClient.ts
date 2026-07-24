@@ -4,6 +4,7 @@
  */
 
 import type { HTTPClient } from '../../client/http-client';
+import { waitForAdminLongRunJobTerminal } from '../../admin/longRunJob';
 import type {
   ChainProfile,
   FaucetMintBody,
@@ -34,13 +35,29 @@ export class TestnetClient {
     scenarioId: TestnetScenarioId | string,
     body: RunScenarioBody = {},
     opts?: { signal?: AbortSignal },
-  ): Promise<{ run_id: string }> {
-    const res = await this.http.post<{ run_id: string }>(
+  ): Promise<{ run_id: string; status?: string; poll_url?: string }> {
+    const res = await this.http.post<{ run_id: string; status?: string; poll_url?: string }>(
       `${ADMIN_TESTNET_PREFIX}/scenarios/${encodeURIComponent(scenarioId)}/run`,
       body,
-      { skipBatching: true, signal: opts?.signal },
+      { skipBatching: true, signal: opts?.signal, timeout: 30_000 },
     );
     return res.data;
+  }
+
+  /** Enqueue scenario then poll until terminal (async job plane). */
+  async runScenarioAsync(
+    scenarioId: TestnetScenarioId | string,
+    body: RunScenarioBody = {},
+    opts?: { signal?: AbortSignal; maxWaitMs?: number },
+  ): Promise<ScenarioRunResult> {
+    const enqueued = await this.runScenario(scenarioId, body, opts);
+    const pollUrl =
+      enqueued.poll_url ??
+      `${ADMIN_TESTNET_PREFIX}/scenarios/${encodeURIComponent(enqueued.run_id)}`;
+    return waitForAdminLongRunJobTerminal<ScenarioRunResult>(this.http, pollUrl, {
+      signal: opts?.signal,
+      maxWaitMs: opts?.maxWaitMs ?? 180_000,
+    });
   }
 
   async getScenarioRun(

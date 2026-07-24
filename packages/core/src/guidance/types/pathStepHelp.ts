@@ -38,6 +38,14 @@ export const GoalVerifySpecSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('botExists'), minCount: z.number().optional() }),
   z.object({ kind: z.literal('botLive'), minCount: z.number().optional() }),
   z.object({ kind: z.literal('botChannelAttached'), minCount: z.number().optional() }),
+  z.object({ kind: z.literal('agentExists'), minCount: z.number().optional() }),
+  z.object({ kind: z.literal('agentRunSucceeded'), agentIdKey: z.string().optional() }),
+  z.object({ kind: z.literal('logicRuleInstalled'), minCount: z.number().optional() }),
+  z.object({ kind: z.literal('storageFileExists'), minCount: z.number().optional() }),
+  z.object({ kind: z.literal('crmContactExists'), minCount: z.number().optional() }),
+  z.object({ kind: z.literal('supportThreadExists') }),
+  z.object({ kind: z.literal('apiKeyExists'), minCount: z.number().optional() }),
+  z.object({ kind: z.literal('schedulerTaskActive') }),
   z.object({ kind: z.literal('manualConfirm'), checklistKeys: z.array(z.string()) }),
 ]);
 

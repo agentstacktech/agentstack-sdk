@@ -10,6 +10,7 @@ export * from './appUpdateMessageKeys';
 export * from './appUpdateBeaconTypes';
 export * from './appUpdateProbeScheduler';
 export * from './appUpdateReloadStrategies';
+export * from './appUpdateStrategyLadder';
 export * from './deploySignalPort';
 export * from './deployBroadcast';
 export * from './serviceWorkerReady';
@@ -20,6 +21,7 @@ export * from './messengerSwPostMessage';
 export * from './messengerOsNotificationFallback';
 export * from './updatePlaneDiagnostics';
 export * from './chunkErrors';
+export * from './hostedRecovery';
 export {
   isRecentTransientNetworkBlip,
   isTransientBrowserNetworkError,

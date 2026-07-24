@@ -2,8 +2,12 @@ import type { HTTPClient } from '../../client/http-client';
 import type { IPathStore } from './IPathStore';
 import type { PathSessionIndex, PlaybookId, PlaybookStateV2 } from '../types/playbookTypes';
 
+const DEPRECATED_MSG =
+  'RemotePathStore load/save is deprecated — use GuidanceClient via sdk.platform.guidance.forProject(id) or frontend pathServerSync.ts';
+
 /**
  * Server-backed path store (`sdk.guidance.gen1` P2).
+ * @deprecated Prefer `GuidanceClient` + `pathServerSync` in the SPA shell.
  */
 export class RemotePathStore implements IPathStore {
   constructor(
@@ -12,15 +16,15 @@ export class RemotePathStore implements IPathStore {
   ) {}
 
   loadState(_userId: string, _playbookId: PlaybookId, _playbook?: import('../types/playbookTypes').Playbook): PlaybookStateV2 | null {
-    return null;
+    throw new Error(DEPRECATED_MSG);
   }
 
   saveState(_userId: string, _playbookId: PlaybookId, _state: PlaybookStateV2): void {
-    /* PATCH session via REST — wired when session id tracked client-side */
+    throw new Error(DEPRECATED_MSG);
   }
 
   clearState(_userId: string, _playbookId: PlaybookId): void {
-    /* no-op remote */
+    throw new Error(DEPRECATED_MSG);
   }
 
   loadSessionIndex(_userId: string): PathSessionIndex {

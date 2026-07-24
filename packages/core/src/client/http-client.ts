@@ -1,6 +1,16 @@
 /**
  * Modern HTTP Client for AgentStack SDK
  * Features: retry, caching, interceptors, metrics, error handling
+ *
+ * **AbortSignal:** `RequestConfig.signal` is linked to the internal timeout
+ * controller — React Query cancellation aborts the fetch without logging a false timeout.
+ *
+ * **React Query:** TanStack Query owns retry/backoff for server-state reads. Pass
+ * `retry: { maxAttempts: 0 }` on SDK calls inside `queryFn` / `mutationFn` so transport
+ * retries do not stack with Query retries. See `REACT_QUERY_TRANSPORT_RETRY`.
+ *
+ * **Deadline hint:** `X-Request-Timeout-Ms` is sent from the effective request timeout
+ * for server `DeadlineMiddleware` alignment.
  */
 
 import { SimpleEventEmitter } from '../utils/event-emitter';
@@ -16,11 +26,23 @@ import { AuthStateStore } from '../utils/auth-state';
 import { RequestBatcher } from '../utils/request-batcher';
 import { ProteinCache } from '../storage/protein-cache';
 import { getStorageItem, setStorageItem, removeStorageItem } from '../utils/storage-utils';
+import {
+  readBrowserAccessToken,
+  writeBrowserAccessToken,
+  clearBrowserAccessTokenIfJtiPrefix,
+} from '../utils/browserAccessToken';
 import { AGENTSTACK_DEV_API_BASE } from '../config/agentstackEndpoints';
 import {
   isTransientBrowserNetworkError,
   noteTransientNetworkError,
 } from './networkErrors';
+import { isTypedDna503Code } from '../utils/classifyAuthFailure';
+import {
+  API_WARMING_UP_CODE,
+  isApiWarmingUpError,
+  parseApiWarmingFromBody,
+  warmingRetryDelayMs,
+} from './apiWarming';
 import { applyCsrfHeader, shouldIncludeCredentials } from '../security/csrf';
 import { assertIntegratorMayCallAdminApi } from '../config/integratorScope';
 import {
@@ -28,6 +50,11 @@ import {
   readProjectIdFromBrowserStorage,
   resolveEffectiveProjectId,
 } from '../config/projectContext';
+import { isSdkPublicRoute } from '../utils/publicRoutes';
+import {
+  jwtProjectIdFromToken,
+  resolveRequestProjectContext,
+} from './resolveRequestProjectContext';
 import {
   SDKConfig,
   RequestConfig,
@@ -50,11 +77,22 @@ import {
   SDKMetrics
 } from '../types';
 
+/** Use on SDK calls inside React Query `queryFn` / `mutationFn` — transport retry off. */
+export const REACT_QUERY_TRANSPORT_RETRY: Partial<RetryConfig> = { maxAttempts: 0 };
+
+const MUTATING_METHODS = new Set<HTTPMethod>([
+  HTTPMethod.POST,
+  HTTPMethod.PUT,
+  HTTPMethod.PATCH,
+  HTTPMethod.DELETE,
+]);
+
 /** Keys hoisted from the 2nd `get()` argument into {@link RequestConfig} (not query string). */
 const HTTP_GET_OPTION_KEYS = new Set<string>([
   'skipBatching',
   'skipCache',
   'skipAuthStateCheck',
+  'skipAuthCriticalDefer',
   'signal',
   'timeout',
   'retry',
@@ -123,8 +161,12 @@ export class HTTPClient extends SimpleEventEmitter {
   private circuitBreakers: CircuitBreakerManager; // v0.1.39: Safe State Machines!
   private authToken: string | null = null;
   private apiKey: string | null = null;
+  /** Last seen auth:session epoch from ``X-AgentStack-Cache-Epoch`` (Scale CFD-02). */
+  private cacheEpoch: string | null = null;
+  private static readonly CACHE_EPOCH_HEADER = 'X-AgentStack-Cache-Epoch';
   private authStateStore: AuthStateStore;
   private isRefreshingToken: boolean = false; // Предотвращает бесконечные циклы refresh
+  private purgeSessionInFlight = false;
   private refreshAttempts: number = 0; // Счетчик попыток refresh
   private urlRetryCounts = new Map<string, number>(); // Счетчик retry по URL
   private urlRetryDelays = new Map<string, number>(); // Задержки retry по URL
@@ -148,7 +190,10 @@ export class HTTPClient extends SimpleEventEmitter {
   private refreshBlockedUntil: number = 0; // Время до которого refresh заблокирован
   /** Suppress session_expired after login while stale in-flight 401s may still land. */
   private postLoginGraceUntil: number = 0;
-  static readonly POST_LOGIN_GRACE_MS = 15_000;
+  /** Floor iat from successful mint — block LS resurrect of older JTIs during grace (E1b-03). */
+  private mintFloorIat: number = 0;
+  /** Post-login grace covers slow mint (server p95 can be 15–45s). Plan P2. */
+  static readonly POST_LOGIN_GRACE_MS = 60_000;
   private globalRefreshDepth: number = 0; // ✅ MEMORY LEAK FIX: Глобальная глубина рекурсии refresh
   
   // ✅ MEMORY LEAK FIX: Константы для ограничения накопления запросов
@@ -317,11 +362,11 @@ export class HTTPClient extends SimpleEventEmitter {
     this.metrics = this.initializeMetrics();
     this.authStateStore = authStateStore || new AuthStateStore();
 
-    // Initialize circuit breakers (v0.1.39!) - DISABLED FOR DEBUGGING
+    // Initialize circuit breakers — open briefly after repeated 502/timeout (auth resilience P4).
     this.circuitBreakers = new CircuitBreakerManager({
-      maxFailures: 999999, // Disable circuit breaker
-      resetTimeout: 1, // Very short timeout
-      maxResetTimeout: 1 // Very short timeout
+      maxFailures: 5,
+      resetTimeout: 5_000,
+      maxResetTimeout: 15_000,
     });
     
     // Initialize request batcher (optional, enabled by default)
@@ -536,6 +581,23 @@ export class HTTPClient extends SimpleEventEmitter {
       requestConfig.skipBatching = true;
     }
 
+    // Z7 / Pass 11 AuthCriticalSection: defer non-auth noise (pool relief; $0 server).
+    if (
+      this.isInAuthCriticalSection() &&
+      !requestConfig.skipAuthCriticalDefer &&
+      (pathOnly.includes('/telemetry/') ||
+        pathOnly.includes('/api/telemetry/') ||
+        pathOnly.includes('/oauth') ||
+        pathOnly.includes('/seo') ||
+        pathOnly.includes('/social/') ||
+        pathOnly.includes('/api/projects'))
+    ) {
+      const err = new Error('Request deferred: auth critical section');
+      (err as Error & { name: string; code?: string }).name = 'AbortError';
+      (err as Error & { code?: string }).code = 'auth_critical_defer';
+      throw err;
+    }
+
     // ✅ MEMORY LEAK FIX: Проверяем, не заблокирован ли refresh - если да, блокируем новые запросы
     const now = Date.now();
     if (this.refreshBlockedUntil > now && !requestConfig.skipAuthStateCheck) {
@@ -645,7 +707,8 @@ export class HTTPClient extends SimpleEventEmitter {
             method: requestConfig.method,
             url: requestConfig.url,
             headers: requestConfig.headers,
-            params: requestConfig.params
+            params: requestConfig.params,
+            signal: requestConfig.signal,
           };
           
           const batchedData = await this.requestBatcher!.add(batcherConfig);
@@ -718,8 +781,11 @@ export class HTTPClient extends SimpleEventEmitter {
   private async executeRequest<T>(config: RequestConfig, startTime: number): Promise<APIResponse<T>> {
     const retryConfig = this.buildRetryConfig(config.retry);
     let lastError: Error = new Error('Unknown error');
+    /** Deploy warm-up can exceed default 3 attempts (Retry-After ≈ 5s × N). */
+    let maxAttempts = retryConfig.maxAttempts;
+    let sawWarming = false;
 
-    for (let attempt = 0; attempt <= retryConfig.maxAttempts; attempt++) {
+    for (let attempt = 0; attempt <= maxAttempts; attempt++) {
       try {
         const response = await this.makeHTTPRequest<T>(config);
         const duration = Date.now() - startTime;
@@ -735,16 +801,25 @@ export class HTTPClient extends SimpleEventEmitter {
       } catch (error) {
         lastError = error as Error;
 
+        if (isApiWarmingUpError(error) && !sawWarming) {
+          sawWarming = true;
+          // Respect explicit maxAttempts: 0 (React Query transport); otherwise allow warm-up soak.
+          if (retryConfig.maxAttempts > 0) {
+            maxAttempts = Math.max(maxAttempts, 8);
+          }
+        }
+
         // Don't retry certain errors
         if (
           this.shouldNotRetry(error as AgentStackError, config) ||
-          attempt === retryConfig.maxAttempts
+          attempt === maxAttempts
         ) {
           break;
         }
 
-        // Calculate delay with exponential backoff and jitter
-        const delay = this.calculateRetryDelay(attempt, retryConfig);
+        const delay = isApiWarmingUpError(error)
+          ? warmingRetryDelayMs(error, this.calculateRetryDelay(attempt, retryConfig))
+          : this.calculateRetryDelay(attempt, retryConfig);
         await this.delay(delay);
 
         this.emit('request:retry', { config, attempt: attempt + 1, delay, error });
@@ -777,6 +852,21 @@ export class HTTPClient extends SimpleEventEmitter {
     
     // Build headers
     const headers = this.buildHeaders(interceptedConfig.headers, url);
+
+    const effectiveTimeout =
+      interceptedConfig.timeout ??
+      (interceptedConfig.useAiTimeout
+        ? this.config.aiTimeout ?? 180_000
+        : this.config.timeout);
+    if (effectiveTimeout != null && effectiveTimeout > 0) {
+      headers['X-Request-Timeout-Ms'] = String(effectiveTimeout);
+    }
+    if (
+      interceptedConfig.idempotencyKey &&
+      MUTATING_METHODS.has(interceptedConfig.method)
+    ) {
+      headers['Idempotency-Key'] = interceptedConfig.idempotencyKey;
+    }
 
     if (
       interceptedConfig.method === HTTPMethod.GET &&
@@ -862,6 +952,18 @@ export class HTTPClient extends SimpleEventEmitter {
     return this.authToken;
   }
 
+  /** Active X-Project-ID header source (mint pid after login). */
+  public getProjectId(): number | string | undefined {
+    return this.config.projectId;
+  }
+
+  public setProjectId(projectId: number | string | null | undefined): void {
+    const pid = normalizeProjectId(projectId);
+    if (pid) {
+      this.config.projectId = pid;
+    }
+  }
+
   public getApiKey(): string | null {
     return this.apiKey;
   }
@@ -890,6 +992,15 @@ export class HTTPClient extends SimpleEventEmitter {
     
     this.apiKey = isValidApiKey ? cleanApiKey : null;
 
+    if (isValidApiKey && cleanApiKey) {
+      const pidFromKey = HTTPClient.jwtClaim(cleanApiKey, 'project_id');
+      const parsedPid = pidFromKey ? Number(pidFromKey) : 0;
+      if (parsedPid > 0 && !this.config.projectId) {
+        this.config.projectId = parsedPid;
+        logger.debug('🔑 SDK setApiKey inferred projectId from key', { projectId: parsedPid });
+      }
+    }
+
     if (isValidApiKey) {
       const state = this.authStateStore.getState();
       if (
@@ -916,9 +1027,60 @@ export class HTTPClient extends SimpleEventEmitter {
    */
   public markRecentLoginSuccess(): void {
     this.postLoginGraceUntil = Date.now() + HTTPClient.POST_LOGIN_GRACE_MS;
+    // Login invalidates prior sessions → auth:session epoch bumps. Drop the stale
+    // client epoch so bootstrap does not fail_closed (AUTH-EPOCH-01 / log 2026-07-18).
+    this.clearCacheEpoch();
+    // Deploy warm-up may have opened breakers on 503s; clear so post-login bootstrap can proceed.
+    this.resetCircuitBreakers();
+    const mem = this.getAuthToken?.() || this.authToken || '';
+    if (mem) {
+      this.noteMintFloorFromToken(mem);
+    }
     logger.debug('Post-login grace window started', {
       graceMs: HTTPClient.POST_LOGIN_GRACE_MS,
+      mintFloorIat: this.mintFloorIat || undefined,
     });
+  }
+
+  /** Record mint JWT iat so refreshTokensFromStorage cannot resurrect older/dead JTIs. */
+  public noteMintFloorFromToken(token: string): void {
+    const iat = Number(HTTPClient.jwtClaim(token, 'iat')) || 0;
+    if (iat > this.mintFloorIat) {
+      this.mintFloorIat = iat;
+    }
+  }
+
+  /** Reset all per-endpoint circuit breakers (e.g. after login during API warm-up). */
+  public resetCircuitBreakers(): void {
+    this.circuitBreakers.resetAll();
+  }
+
+  /**
+   * Reset only auth / bootstrap / login breakers (G-16 — avoid telemetry thundering herd).
+   */
+  public resetAuthCircuitBreakers(): void {
+    this.circuitBreakers.resetMatching([
+      'auth/login',
+      'auth/me',
+      'auth/register',
+      '/login',
+      'oauth2',
+    ]);
+  }
+
+  private authCriticalUntil = 0;
+
+  /** Z7 AuthCriticalSection — client gate; $0 server. */
+  public beginAuthCriticalSection(ms = 45_000): void {
+    this.authCriticalUntil = Date.now() + ms;
+  }
+
+  public endAuthCriticalSection(): void {
+    this.authCriticalUntil = 0;
+  }
+
+  public isInAuthCriticalSection(): boolean {
+    return Date.now() < this.authCriticalUntil;
   }
 
   public isInPostLoginGrace(): boolean {
@@ -926,27 +1088,66 @@ export class HTTPClient extends SimpleEventEmitter {
   }
 
   /**
-   * Force refresh tokens from localStorage
-   * ✅ CRITICAL FIX: Read tokens directly from localStorage WITHOUT prefix first
-   * This ensures tokens are always found after page reload
+   * Force refresh tokens from browser storage.
+   * Prefer fresher of sessionStorage vs localStorage (FLOW-06 / Session OS V3.3).
+   * Never overwrite a newer in-memory mint with a stale storage JWT.
    */
   public refreshTokensFromStorage(): void {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      // ✅ CRITICAL: Read directly from localStorage first (no prefix)
-      // This ensures tokens saved by setTokens() are always found
-      const accessToken = localStorage.getItem('access_token') || getStorageItem('access_token');
-      const apiKey = localStorage.getItem('api_key') || getStorageItem('api_key');
-      
-      // ✅ CRITICAL: Log for debugging
+    if (typeof window === 'undefined') return;
+    try {
+      const storedAccess = readBrowserAccessToken();
+      const apiKey =
+        (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('api_key')) ||
+        (typeof localStorage !== 'undefined' && localStorage.getItem('api_key')) ||
+        getStorageItem('api_key') ||
+        '';
+
+      const mem = this.getAuthToken?.() || this.authToken || '';
+      let accessToken = storedAccess;
+      if (mem && storedAccess) {
+        // Keep mem if it is fresher (post-mint before storage catch-up).
+        const memIat = HTTPClient.jwtClaim(mem, 'iat');
+        const storedIat = HTTPClient.jwtClaim(storedAccess, 'iat');
+        const memN = Number(memIat) || 0;
+        const storedN = Number(storedIat) || 0;
+        if (memN > storedN) {
+          accessToken = mem;
+          writeBrowserAccessToken(mem);
+        }
+      } else if (mem && !storedAccess) {
+        accessToken = mem;
+        writeBrowserAccessToken(mem);
+      }
+
+      // E1b-03: during post-mint grace, never apply JWT older than mint floor (dead JTI resurrect).
+      if (this.isInPostLoginGrace() && this.mintFloorIat > 0 && accessToken) {
+        const candIat = Number(HTTPClient.jwtClaim(accessToken, 'iat')) || 0;
+        if (candIat < this.mintFloorIat) {
+          if (mem) {
+            accessToken = mem;
+          } else {
+            logger.debug(
+              'refreshTokensFromStorage: skipped older JWT during post-login grace',
+              { candIat, mintFloorIat: this.mintFloorIat },
+            );
+            accessToken = '';
+          }
+        }
+      }
+      // Prefer in-memory mint during grace even if storage claims a higher iat (cross-tab race).
+      if (this.isInPostLoginGrace() && mem) {
+        accessToken = mem;
+      }
+
       if (accessToken || apiKey) {
         logger.debug('🔄 HTTPClient.refreshTokensFromStorage: Tokens found', {
           hasAccessToken: !!accessToken,
           hasApiKey: !!apiKey,
           accessTokenLength: accessToken?.length || 0,
-          apiKeyLength: apiKey?.length || 0
+          apiKeyLength: apiKey?.length || 0,
         });
       }
-      
+
       if (accessToken) {
         this.setAuthToken(accessToken);
       }
@@ -955,8 +1156,19 @@ export class HTTPClient extends SimpleEventEmitter {
       }
       const storedPid = readProjectIdFromBrowserStorage();
       if (storedPid) {
-        this.config.projectId = storedPid;
+        if (this.isInPostLoginGrace() && accessToken) {
+          const mintPid = jwtProjectIdFromToken(accessToken);
+          if (mintPid) {
+            this.config.projectId = mintPid;
+          } else {
+            this.config.projectId = storedPid;
+          }
+        } else {
+          this.config.projectId = storedPid;
+        }
       }
+    } catch {
+      /* ignore storage access errors */
     }
   }
 
@@ -1053,6 +1265,7 @@ export class HTTPClient extends SimpleEventEmitter {
         if (cached) {
           return cached;
         }
+        this.captureCacheEpochFromResponse(response);
         const api304: APIResponse<T> = {
           data: null as T,
           status: 304,
@@ -1148,47 +1361,98 @@ export class HTTPClient extends SimpleEventEmitter {
                 d.includes('checkpoint_no_cover')
               );
             })();
-          if (isAuthMeSessionProbe || isExpectedAgentnet404) {
+          const isExpectedDna404 =
+            response.status === 404 &&
+            (url.includes('/dna/') || url.includes('/api/dna/')) &&
+            (() => {
+              const raw = (responseData as { detail?: unknown })?.detail;
+              const detail =
+                typeof raw === 'string'
+                  ? raw
+                  : String(
+                      (raw as { message?: string })?.message ??
+                        (responseData as { message?: string })?.message ??
+                        '',
+                    );
+              const d = detail.toLowerCase();
+              return (
+                d.includes('entity') &&
+                d.includes('not found') &&
+                !d.includes('router')
+              );
+            })();
+          if (isAuthMeSessionProbe || isExpectedAgentnet404 || isExpectedDna404) {
             logger.debug(
               `HTTP ${response.status} ${config.method} ${url}${
-                isAuthMeSessionProbe ? ' (session probe — stale token)' : ' (expected agentnet 404)'
+                isAuthMeSessionProbe
+                  ? ' (session probe — stale token)'
+                  : isExpectedAgentnet404
+                    ? ' (expected agentnet 404)'
+                    : ' (expected DNA entity 404)'
               }`,
             );
+          } else if (
+            response.status === 503 &&
+            isTypedDna503Code(
+              (() => {
+                const root = responseData as { code?: string; detail?: { code?: string } };
+                return root?.code ?? root?.detail?.code;
+              })(),
+            )
+          ) {
+            const code =
+              (responseData as { code?: string; detail?: { code?: string } })?.code ??
+              (responseData as { detail?: { code?: string } })?.detail?.code;
+            logger.debug(
+              `HTTP 503 (${code}) ${config.method} ${url} — typed DNA/admission shed`,
+            );
+            if (typeof window !== 'undefined' && code) {
+              try {
+                window.dispatchEvent(
+                  new CustomEvent('agentstack.dna.degraded', {
+                    detail: { code, source: 'http-client' },
+                  }),
+                );
+              } catch {
+                /* ignore */
+              }
+            }
           } else {
             logger.warn(`HTTP Error ${response.status} ${config.method} ${url}`, responseData);
           }
         }
-        // ✅ CRITICAL: For 401 errors on public pages, return immediately without processing
-        // This prevents any redirect logic from executing
+        // ✅ CRITICAL: For 401 on public pages — throw typed UnauthorizedError, no redirect.
+        // Soft-success {data:null} caused AgentAuth "Session bootstrap failed" unhandledrejection.
+        // AUTH-RACE-02: still purge dead JTI / stale epoch so login probes stop storming.
         if (response.status === 401 && typeof window !== 'undefined' && config.method === HTTPMethod.GET) {
           const currentPath = window.location.pathname;
-          const publicRoutes = ['/', '/login', '/register', '/pricing', '/faq', '/api-docs', '/webhook-docs', '/oauth/callback'];
-          const isPublicRoute = publicRoutes.some(route => 
-            currentPath === route || currentPath.startsWith(route + '/')
-          );
-          if (isPublicRoute) {
-            // On public pages, return error response immediately - NO PROCESSING, NO REDIRECT
+          if (isSdkPublicRoute(currentPath)) {
             if (isAuthMeSessionProbe) {
               logger.debug(
                 `Session probe 401 on public page ${currentPath} for ${url} — no redirect`,
               );
             } else {
               logger.warn(
-                `🚫 BLOCKED: Returning 401 error on public page ${currentPath} for ${url} - NO PROCESSING, NO REDIRECT`,
+                `🚫 BLOCKED: 401 on public page ${currentPath} for ${url} - NO REDIRECT`,
               );
             }
-            const detail = (responseData as any)?.error?.detail || (responseData as any)?.detail || 'Unauthorized';
-            const error = new UnauthorizedError(detail);
-            return {
-              data: null as any,
+            const rawDetail =
+              (responseData as any)?.error?.detail ?? (responseData as any)?.detail;
+            const { authCode } = this.purgeDeadSessionFromClient(rawDetail);
+            const detailStr =
+              typeof rawDetail === 'string'
+                ? rawDetail
+                : rawDetail && typeof rawDetail === 'object'
+                  ? String(
+                      (rawDetail as { message?: string }).message ||
+                        JSON.stringify(rawDetail),
+                    )
+                  : 'Unauthorized';
+            throw new UnauthorizedError(detailStr, {
               status: 401,
-              statusText: response.statusText,
-              headers: this.parseHeaders(response.headers),
-              duration: 0,
-              timestamp: Date.now(),
-              config,
-              traceId: response.headers.get('X-Trace-Id') || undefined
-            };
+              code: authCode,
+              traceId: response.headers.get('X-Trace-Id') || undefined,
+            });
           }
         }
         // For non-public pages or non-401 errors, process normally (will throw)
@@ -1205,6 +1469,7 @@ export class HTTPClient extends SimpleEventEmitter {
         timestamp: 0, // Will be set by caller
         traceId: response.headers.get('X-Trace-Id') || undefined
       };
+      this.captureCacheEpochFromResponse(response);
 
       // Сбрасываем счетчики retry для успешного URL
       if (response.ok) {
@@ -1519,11 +1784,7 @@ export class HTTPClient extends SimpleEventEmitter {
         // Отправляем событие об истечении токена
         if (typeof window !== 'undefined') {
           const currentPath = window.location.pathname;
-          // Список публичных путей, которые не требуют авторизации
-          const publicRoutes = ['/', '/login', '/register', '/pricing', '/faq', '/api-docs', '/webhook-docs', '/oauth/callback'];
-          const isPublicRoute = publicRoutes.some(route => 
-            currentPath === route || currentPath.startsWith(route + '/')
-          );
+          const isPublicRoute = isSdkPublicRoute(currentPath);
           
           // Отправляем событие только если не на публичной странице
           if (!isPublicRoute) {
@@ -1694,27 +1955,130 @@ export class HTTPClient extends SimpleEventEmitter {
     return false;
   }
 
+  /** Structured auth miss from Bearer contour (log 2026-07-17). */
+  private static isSessionNotFoundDetail(rawDetail: unknown): boolean {
+    if (rawDetail && typeof rawDetail === 'object' && !Array.isArray(rawDetail)) {
+      return (rawDetail as { code?: string }).code === 'session_not_found';
+    }
+    return false;
+  }
+
+  /** Fail-closed epoch miss after deploy bump (log 2026-07-18). */
+  private static isCacheEpochStaleDetail(rawDetail: unknown): boolean {
+    if (rawDetail && typeof rawDetail === 'object' && !Array.isArray(rawDetail)) {
+      return (rawDetail as { code?: string }).code === 'cache_epoch_stale';
+    }
+    return false;
+  }
+
+  private static jwtClaim(token: string, claim: string): string {
+    try {
+      const mid = token.split('.')[1];
+      if (!mid) return '';
+      const b64 = mid.replace(/-/g, '+').replace(/_/g, '/');
+      const json = JSON.parse(
+        typeof atob === 'function'
+          ? atob(b64)
+          : Buffer.from(b64, 'base64').toString('utf8'),
+      );
+      return String(json?.[claim] || '').replace(/-/g, '');
+    } catch {
+      return '';
+    }
+  }
+
+  /**
+   * Drop terminated/absent JTIs from memory + localStorage and notify Session OS.
+   * Must run on public routes too — login-page probes previously skipped this and
+   * kept hammering /auth/me/bootstrap with a dead Bearer (AUTH-RACE-02).
+   */
+  private purgeDeadSessionFromClient(rawDetail: unknown): {
+    sessionMiss: boolean;
+    epochStale: boolean;
+    authCode: 'session_not_found' | 'cache_epoch_stale' | 'session_expired' | 'unauthorized';
+  } {
+    if (this.purgeSessionInFlight) {
+      return {
+        sessionMiss: HTTPClient.isSessionNotFoundDetail(rawDetail),
+        epochStale: HTTPClient.isCacheEpochStaleDetail(rawDetail),
+        authCode: HTTPClient.isSessionNotFoundDetail(rawDetail)
+          ? 'session_not_found'
+          : 'unauthorized',
+      };
+    }
+    this.purgeSessionInFlight = true;
+    try {
+      return this._purgeDeadSessionFromClientImpl(rawDetail);
+    } finally {
+      this.purgeSessionInFlight = false;
+    }
+  }
+
+  private _purgeDeadSessionFromClientImpl(rawDetail: unknown): {
+    sessionMiss: boolean;
+    epochStale: boolean;
+    authCode: 'session_not_found' | 'cache_epoch_stale' | 'session_expired' | 'unauthorized';
+  } {
+    const sessionMiss = HTTPClient.isSessionNotFoundDetail(rawDetail);
+    const epochStale = HTTPClient.isCacheEpochStaleDetail(rawDetail);
+    if (epochStale) {
+      this.clearCacheEpoch();
+    }
+    const detailObj =
+      rawDetail && typeof rawDetail === 'object' && !Array.isArray(rawDetail)
+        ? (rawDetail as { jti_prefix?: string; reason?: string; project_id?: number; code?: string })
+        : null;
+    if (sessionMiss && detailObj?.jti_prefix) {
+      const prefix = String(detailObj.jti_prefix).replace(/-/g, '');
+      const memTok = this.getAuthToken() || '';
+      const memJti = HTTPClient.jwtClaim(memTok, 'jti');
+      if (memJti && memJti.startsWith(prefix)) {
+        this.setAuthToken('');
+      }
+      try {
+        if (typeof window !== 'undefined' && detailObj?.jti_prefix) {
+          const prefix = String(detailObj.jti_prefix).replace(/-/g, '');
+          if (clearBrowserAccessTokenIfJtiPrefix(prefix)) {
+            logger.debug(
+              `Cleared dead access_token jti_prefix=${prefix} reason=${detailObj.reason}`,
+            );
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    if ((sessionMiss || epochStale) && typeof window !== 'undefined') {
+      try {
+        window.dispatchEvent(
+          new CustomEvent('agentstack.auth.session_not_found', {
+            detail: {
+              project_id: detailObj?.project_id,
+              jti_prefix: detailObj?.jti_prefix
+                ? String(detailObj.jti_prefix).replace(/-/g, '')
+                : undefined,
+              reason: detailObj?.reason || (epochStale ? 'cache_epoch_stale' : undefined),
+            },
+          }),
+        );
+      } catch {
+        /* ignore */
+      }
+    }
+    let authCode: 'session_not_found' | 'cache_epoch_stale' | 'session_expired' | 'unauthorized' =
+      'unauthorized';
+    if (sessionMiss) authCode = 'session_not_found';
+    else if (epochStale) authCode = 'cache_epoch_stale';
+    else if (HTTPClient.isTokenExpiredDetail(rawDetail)) authCode = 'session_expired';
+    return { sessionMiss, epochStale, authCode };
+  }
+
   private static dispatchAuthExpiredOnProtectedPage(): void {
     if (typeof window === 'undefined') {
       return;
     }
     const currentPath = window.location.pathname;
-    const publicRoutes = [
-      '/',
-      '/login',
-      '/register',
-      '/pricing',
-      '/faq',
-      '/api-docs',
-      '/webhook-docs',
-      '/oauth/callback',
-    ];
-    const isPublicRoute = publicRoutes.some((route) => {
-      const normalizedRoute = route === '/' ? '/' : route;
-      const normalizedPath = currentPath === '/' ? '/' : currentPath.replace(/\/$/, '');
-      return normalizedPath === normalizedRoute || normalizedPath.startsWith(`${normalizedRoute}/`);
-    });
-    if (!isPublicRoute) {
+    if (!isSdkPublicRoute(currentPath)) {
       window.dispatchEvent(new Event('auth:expired'));
     }
   }
@@ -1733,17 +2097,11 @@ export class HTTPClient extends SimpleEventEmitter {
     // This prevents any redirect logic from executing on public pages
     if (typeof window !== 'undefined' && response.status === 401) {
       const currentPath = window.location.pathname;
-      const publicRoutes = ['/', '/login', '/register', '/pricing', '/faq', '/api-docs', '/webhook-docs', '/oauth/callback'];
-      const isPublicRoute = publicRoutes.some(route => {
-        const normalizedRoute = route === '/' ? '/' : route;
-        const normalizedPath = currentPath === '/' ? '/' : currentPath.replace(/\/$/, '');
-        return normalizedPath === normalizedRoute || normalizedPath.startsWith(normalizedRoute + '/');
-      });
+      const isPublicRoute = isSdkPublicRoute(currentPath);
       
       if (isPublicRoute && config?.method === HTTPMethod.GET) {
         const url = config?.url || 'unknown';
         const isAuthMeProbe = url.includes('/auth/me');
-        // On public pages, just return the error without any redirect logic
         if (isAuthMeProbe) {
           logger.debug(
             `Session probe 401 on public page "${currentPath}" for ${url} — no redirect`,
@@ -1753,18 +2111,12 @@ export class HTTPClient extends SimpleEventEmitter {
             `🚫 BLOCKED: Ignoring 401 error on public page "${currentPath}" for ${url} - NO REDIRECT`,
           );
         }
-        const error = new UnauthorizedError(message || 'Unauthorized');
-        // ✅ CRITICAL: Return immediately - don't process error further
-        return {
-          data: null as any,
+        const { authCode } = this.purgeDeadSessionFromClient(rawDetail);
+        throw new UnauthorizedError(message || 'Unauthorized', {
           status: 401,
-          statusText: response.statusText,
-          headers: this.parseHeaders(response.headers),
-          duration: 0,
-          timestamp: Date.now(),
-          config,
-          traceId
-        } as APIResponse<any>;
+          code: authCode,
+          traceId,
+        });
       } else {
         logger.debug(`✅ Processing 401 error on protected page "${currentPath}" for ${config?.url || 'unknown'}`);
       }
@@ -1780,6 +2132,12 @@ export class HTTPClient extends SimpleEventEmitter {
         const url = config?.url || 'unknown';
         const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/me');
         const isSettingsFieldGet = url.includes('/auth/settings/get');
+        const sessionMissEarly =
+          HTTPClient.isSessionNotFoundDetail(rawDetail) ||
+          HTTPClient.isCacheEpochStaleDetail(rawDetail);
+        if (sessionMissEarly) {
+          this.purgeDeadSessionFromClient(rawDetail);
+        }
         const shouldMarkSessionExpired =
           !config?.skipAuthStateCheck &&
           !isAuthEndpoint &&
@@ -1798,10 +2156,69 @@ export class HTTPClient extends SimpleEventEmitter {
         }
 
         // ✅ Fix: Don't attempt token refresh for login/auth endpoints to prevent infinite loops
-        // Check this FIRST before any retry logic
+        // Check this FIRST before any retry logic — except post-login grace for /auth/me*
+        // where another tab may still hold a terminated JTI while storage has the new mint.
         if (isAuthEndpoint) {
+          const isMeProbe = url.includes('/auth/me');
+          const sessionMiss = HTTPClient.isSessionNotFoundDetail(rawDetail);
+          const detailObj =
+            rawDetail && typeof rawDetail === 'object' && !Array.isArray(rawDetail)
+              ? (rawDetail as { jti_prefix?: string })
+              : null;
+          if (
+            isMeProbe &&
+            this.isInPostLoginGrace() &&
+            sessionMiss &&
+            detailObj?.jti_prefix
+          ) {
+            const prefix = String(detailObj.jti_prefix).replace(/-/g, '').slice(0, 12);
+            const memJti = HTTPClient.jwtClaim(this.getAuthToken() || '', 'jti');
+            if (memJti && !memJti.startsWith(prefix)) {
+              logger.debug(
+                `Post-login grace: ignoring stale bootstrap 401 jti_prefix=${prefix}`,
+              );
+              error = new UnauthorizedError(message || 'Unauthorized', {
+                status: 401,
+                code: 'stale_jti_discarded',
+                traceId,
+              });
+              break;
+            }
+          }
+          if (
+            isMeProbe &&
+            this.isInPostLoginGrace() &&
+            config &&
+            !(config as RequestConfig & { _postLoginMeRetry?: boolean })._postLoginMeRetry
+          ) {
+            const before = this.getAuthToken();
+            this.refreshTokensFromStorage();
+            const after = this.getAuthToken();
+            if (after && after !== before) {
+              logger.debug(
+                `Post-login grace: retrying ${url} with newer token from storage` +
+                  (sessionMiss ? ' (session_not_found)' : ''),
+              );
+              return this.request<any>({
+                ...config,
+                _postLoginMeRetry: true,
+              } as RequestConfig);
+            }
+          }
+          // Dead JTI / stale epoch → clear client so tabs stop hammering (AUTH-RACE-02).
+          if (sessionMiss || HTTPClient.isCacheEpochStaleDetail(rawDetail)) {
+            this.purgeDeadSessionFromClient(rawDetail);
+          }
           logger.debug(`🚫 Skipping token refresh for auth endpoint: ${url}`);
-          error = new UnauthorizedError(message || 'Unauthorized');
+          error = new UnauthorizedError(message || 'Unauthorized', {
+            status: 401,
+            code: sessionMiss
+              ? 'session_not_found'
+              : HTTPClient.isCacheEpochStaleDetail(rawDetail)
+                ? 'cache_epoch_stale'
+                : 'unauthorized',
+            traceId,
+          });
           break;
         }
 
@@ -1867,11 +2284,7 @@ export class HTTPClient extends SimpleEventEmitter {
            // Но только если мы не на публичной странице
            if (this.refreshAttempts >= 3 && typeof window !== 'undefined') {
              const currentPath = window.location.pathname;
-             // Список публичных путей, которые не требуют авторизации
-             const publicRoutes = ['/', '/login', '/register', '/pricing', '/faq', '/api-docs', '/webhook-docs', '/oauth/callback'];
-             const isPublicRoute = publicRoutes.some(route => 
-               currentPath === route || currentPath.startsWith(route + '/')
-             );
+             const isPublicRoute = isSdkPublicRoute(currentPath);
              if (!isPublicRoute) {
                logger.warn('Max retry attempts reached and token refresh failed, redirecting to login page');
                window.location.href = '/login';
@@ -1906,11 +2319,7 @@ export class HTTPClient extends SimpleEventEmitter {
         // ✅ Fix: Check if we're on public pages before attempting refresh
         if (typeof window !== 'undefined') {
           const currentPath = window.location.pathname;
-          // Список публичных путей, которые не требуют авторизации
-          const publicRoutes = ['/', '/login', '/register', '/pricing', '/faq', '/api-docs', '/webhook-docs', '/oauth/callback'];
-          const isPublicRoute = publicRoutes.some(route => 
-            currentPath === route || currentPath.startsWith(route + '/')
-          );
+          const isPublicRoute = isSdkPublicRoute(currentPath);
           if (isPublicRoute) {
             logger.debug(`🚫 Skipping token refresh on public page ${currentPath} for ${url}`);
             // Очищаем счетчики
@@ -2065,27 +2474,61 @@ export class HTTPClient extends SimpleEventEmitter {
       case 503:
       case 504: {
         const root = (data && typeof data === 'object' ? data : null) as Record<string, unknown> | null;
-        const apiCode =
-          typeof root?.error === 'string'
-            ? root.error
-            : typeof (errorData as any)?.error === 'string'
-              ? (errorData as any).error
-              : undefined;
+        const detail =
+          root?.detail && typeof root.detail === 'object'
+            ? (root.detail as Record<string, unknown>)
+            : null;
+        const warming = parseApiWarmingFromBody(root ?? data);
+        let apiCode =
+          (typeof root?.code === 'string' && root.code) ||
+          (typeof detail?.code === 'string' && detail.code) ||
+          (typeof root?.error === 'string' && root.error) ||
+          (typeof (errorData as any)?.error === 'string' && (errorData as any).error) ||
+          (typeof (errorData as any)?.code === 'string' && (errorData as any).code) ||
+          undefined;
+        if (warming.warming && !apiCode) {
+          apiCode = API_WARMING_UP_CODE;
+        }
+        if (warming.warming && typeof window !== 'undefined') {
+          try {
+            window.dispatchEvent(
+              new CustomEvent('agentstack.api.warming', {
+                detail: {
+                  code: apiCode || warming.code || API_WARMING_UP_CODE,
+                  retryAfterSec: warming.retryAfterSec,
+                },
+              }),
+            );
+          } catch {
+            /* ignore */
+          }
+        }
         const requestId =
           typeof root?.request_id === 'string'
             ? root.request_id
             : typeof (errorData as any)?.request_id === 'string'
               ? (errorData as any).request_id
               : undefined;
+        const retryAfterHdr = response.headers.get('Retry-After');
+        const retryAfterFromHdr = retryAfterHdr
+          ? Math.max(1, parseInt(retryAfterHdr, 10) || 0) || undefined
+          : undefined;
+        const retryAfterSec = retryAfterFromHdr ?? warming.retryAfterSec;
         if (response.status === 503 && apiCode === 'AgentCoinSchemaMissing') {
           logger.warn(
             `HTTP 503 (AgentCoin L0 schema missing) ${config?.method || ''} ${config?.url || ''}`.trim(),
             { requestId, message: message?.slice(0, 200) },
           );
+        } else if (warming.warming) {
+          logger.debug(
+            `HTTP 503 (API warming up) ${config?.method || ''} ${config?.url || ''}`.trim(),
+            { retryAfterSec, message: message?.slice(0, 120) },
+          );
         }
         error = new ServerError(message || 'Server Error', response.status, {
-          apiCode,
+          apiCode: apiCode || undefined,
           requestId,
+          retryAfterSec,
         });
         break;
       }
@@ -2102,6 +2545,10 @@ export class HTTPClient extends SimpleEventEmitter {
   }
 
   private shouldNotRetry(error: AgentStackError, config?: RequestConfig): boolean {
+    // Nginx warm-up 503 — retry even on POST (login / mint) while edge recovers.
+    if (isApiWarmingUpError(error)) {
+      return false;
+    }
     if (
       error instanceof ServerError &&
       config?.method &&
@@ -2112,7 +2559,10 @@ export class HTTPClient extends SimpleEventEmitter {
     if (
       error instanceof ServerError &&
       error.status === 503 &&
-      error.apiCode === 'AgentCoinSchemaMissing'
+      (error.apiCode === 'AgentCoinSchemaMissing' ||
+        error.apiCode === 'auth_mint_in_progress' ||
+        error.apiCode === 'project_key_unavailable' ||
+        error.apiCode === 'auth_mint_timeout')
     ) {
       return true;
     }
@@ -2305,6 +2755,12 @@ export class HTTPClient extends SimpleEventEmitter {
     }
   }
 
+  /**
+   * Clear the client request queue / retry maps only.
+   * Does **not** abort in-flight ``fetch`` (no AbortController).
+   * Login / mint must also call ``auth.invalidateSessionBootstrap()`` so a stale
+   * bootstrap GET cannot complete with a terminated JTI (AUTH-RACE-02).
+   */
   public cancelPendingRequests(): void {
     // ✅ MEMORY LEAK FIX: Очищаем и очередь, и timestamps
     this.requestQueue.clear();
@@ -2455,6 +2911,7 @@ export class HTTPClient extends SimpleEventEmitter {
 
     // Очистка кэша
     this.clearCache();
+    this.cacheEpoch = null;
 
     // Очистка proteinCache
     if (this.proteinCache) {
@@ -2493,20 +2950,26 @@ export class HTTPClient extends SimpleEventEmitter {
       headers: defaultHeaders,
       body: config.body,
       params: config.params,
-      timeout: config.timeout || this.config.timeout,
+      timeout:
+        config.timeout ??
+        (config.useAiTimeout
+          ? this.config.aiTimeout ?? 180_000
+          : this.config.timeout),
       retry: config.retry,
-      idempotencyKey: config.idempotencyKey || this.generateIdempotencyKey(),
+      idempotencyKey: config.idempotencyKey,
       skipCache: config.skipCache || false,
       skipAuthStateCheck: config.skipAuthStateCheck || false,
+      skipAuthCriticalDefer: config.skipAuthCriticalDefer || false,
       skipBatching: config.skipBatching,
       signal: config.signal,
       fetchPriority: config.fetchPriority,
+      useAiTimeout: config.useAiTimeout,
     };
   }
 
   private buildRetryConfig(config?: Partial<RetryConfig>): RetryConfig {
     return {
-      maxAttempts: config?.maxAttempts || this.config.retryAttempts,
+      maxAttempts: config?.maxAttempts ?? this.config.retryAttempts,
       delay: config?.delay || this.config.retryDelay,
       baseDelay: config?.baseDelay || this.config.retryDelay,
       maxDelay: config?.maxDelay || 30000,
@@ -2657,11 +3120,33 @@ export class HTTPClient extends SimpleEventEmitter {
     return this.buildHeaders(extra, url);
   }
 
+  /** Capture server epoch so subsequent requests can assert freshness (CFD-02). */
+  private captureCacheEpochFromResponse(response: Response): void {
+    try {
+      const raw =
+        response.headers.get(HTTPClient.CACHE_EPOCH_HEADER) ||
+        response.headers.get(HTTPClient.CACHE_EPOCH_HEADER.toLowerCase());
+      if (raw != null && String(raw).trim() !== '') {
+        this.cacheEpoch = String(raw).trim();
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  /** Clear client epoch (logout / auth reset). */
+  public clearCacheEpoch(): void {
+    this.cacheEpoch = null;
+  }
+
   private buildHeaders(customHeaders: Record<string, string>, url?: string): Record<string, string> {
     // ✅ CRITICAL FIX: Загружаем токены из localStorage, если они отсутствуют
-    // Это критично для восстановления сессии после перезагрузки страницы
-    // (дополнительная проверка на случай, если токены не были загружены при инициализации)
-    if (typeof window !== 'undefined' && (!this.authToken || !this.apiKey)) {
+    // Hosted guest (skipStorageTokenHydration): never inherit SPA ecosystem JWT.
+    if (
+      typeof window !== 'undefined' &&
+      (!this.authToken || !this.apiKey) &&
+      !this.config.skipStorageTokenHydration
+    ) {
       this.refreshTokensFromStorage();
     }
     
@@ -2684,6 +3169,17 @@ export class HTTPClient extends SimpleEventEmitter {
     }
     
     const headers: Record<string, string> = { ...cleanCustomHeaders };
+
+    // Scale CFD-02: echo last auth:session epoch for warm L1 fail-closed.
+    // Skip during post-login grace — login just bumped the server epoch; echoing the
+    // pre-login value causes cache_epoch_stale on /auth/me/bootstrap (AUTH-EPOCH-01).
+    if (
+      this.cacheEpoch &&
+      !headers[HTTPClient.CACHE_EPOCH_HEADER] &&
+      !this.isInPostLoginGrace()
+    ) {
+      headers[HTTPClient.CACHE_EPOCH_HEADER] = this.cacheEpoch;
+    }
 
     // Debug logging (logger automatically disables in production)
     logger.debug('SDK buildHeaders debug', {
@@ -2752,6 +3248,11 @@ export class HTTPClient extends SimpleEventEmitter {
       });
     }
 
+    // LEC P3-02: post-mint grace on all requests in the window — BE downgrades
+    // terminated-JTI noise (incident mint_grace=False after restart/mint race).
+    if (this.isInPostLoginGrace()) {
+      headers['X-Auth-Mint-Grace'] = '1';
+    }
 
     // ✅ Fix: Add API key header - API key is REQUIRED for /auth/login to validate project
     // Only skip for /auth/refresh (uses token refresh, not API key)
@@ -2818,8 +3319,48 @@ export class HTTPClient extends SimpleEventEmitter {
       headers['X-Project-ID'] = String(this.config.projectId);
     }
 
-    // Add user context for authenticated requests (skip for auth endpoints)
+    // V3.2 H1: shared resolveRequestProjectContext — omit Bearer on JWT↔header mismatch.
+    let omittedBearerForMismatch = false;
     if (this.authToken && this.authToken.trim().length > 0 && !isAuthEndpoint) {
+      const headerPidRaw = headers['X-Project-ID'] || headers['x-project-id'] || '';
+      const binding = resolveRequestProjectContext({
+        headerProjectId: headerPidRaw ? Number(headerPidRaw) : null,
+        jwtProjectId: jwtProjectIdFromToken(this.authToken),
+        vaultToken: this.authToken,
+      });
+      if (binding.mode === 'guest' || !binding.bearer) {
+        const tokenPid = String(jwtProjectIdFromToken(this.authToken) ?? '');
+        const headerPid = String(headerPidRaw);
+        if (tokenPid && headerPid && tokenPid !== headerPid) {
+          const warnKey = `${tokenPid}->${headerPid}`;
+          if (!(HTTPClient as unknown as { _mismatchWarnKeys?: Set<string> })._mismatchWarnKeys) {
+            (HTTPClient as unknown as { _mismatchWarnKeys: Set<string> })._mismatchWarnKeys =
+              new Set();
+          }
+          const keys = (HTTPClient as unknown as { _mismatchWarnKeys: Set<string> })
+            ._mismatchWarnKeys;
+          if (!keys.has(warnKey)) {
+            keys.add(warnKey);
+            logger.warn(
+              'Bearer project_id mismatch with X-Project-ID — omitting Bearer to honor header',
+              { tokenPid, headerPid },
+            );
+          }
+          delete headers['Authorization'];
+          delete headers['authorization'];
+          omittedBearerForMismatch = true;
+        }
+      }
+    }
+
+    // Add user context for authenticated requests (skip for auth endpoints)
+    // Do not attach X-User-ID when Bearer was omitted for project mismatch (guest scope).
+    if (
+      this.authToken &&
+      this.authToken.trim().length > 0 &&
+      !isAuthEndpoint &&
+      !omittedBearerForMismatch
+    ) {
       // Extract user_id from JWT token (simple decode without validation for header)
       try {
         const tokenParts = this.authToken.split('.');

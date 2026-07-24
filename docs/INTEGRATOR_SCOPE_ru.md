@@ -54,6 +54,19 @@ Ecosystem admin (`/api/admin/*`, `sdk.admin`, `sdk.platform.adminData`, protocol
 
 Не используйте устаревшие хосты (`api.agentstack.com`, …). Node: `AGENTSTACK_API_BASE=https://agentstack.tech/api` или `resolveAgentStackApiBase()`.
 
+---
+
+## Выбор канала (MCP vs REST vs OpenAPI)
+
+| Задача | Предпочтение | Заметки |
+| ------ | ------------ | ------- |
+| Новые агенты / автоматизации | **MCP** `agentstack.execute` | Каталог: `GET /mcp/actions` |
+| KV данные проекта/пользователя | **8DNA** `GET/POST /api/dna/data` или MCP | Универсальный канал |
+| Уже используемый SPA/SDK REST | **REST** `/api/*` | В OpenAPI: `x-channel: rest_compat` |
+| Контракт / codegen / explorer | **OpenAPI** `/openapi.json`, `/docs`, `/api-docs` | Ген `docs.api.specs.gen1` |
+
+См. [API_CHANNELS_AND_PROTOCOLS.md](../../docs/API_CHANNELS_AND_PROTOCOLS.md) и [OPENAPI.md](../../docs/api/OPENAPI.md).
+
 ## Конфигурация
 
 ```typescript

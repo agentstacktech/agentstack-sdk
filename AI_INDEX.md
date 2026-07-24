@@ -1,10 +1,12 @@
 # 🤖 AI Index - AgentStack Unified SDK
 
+**Genetic code:** `repo.platform.sdk.gen1`
+
 **Service:** AgentStack Unified SDK  
 **Type:** Multi-language SDK (TypeScript + Python + React)  
 **Stack:** TypeScript / Python / React / Rollup  
 **Status:** Production Ready  
-**Last Updated:** 2026-04-09
+**Last Updated:** 2026-07-16
 
 > **Maintainer note:** этот индекс для навигации по репозиторию. **API-truth для интеграторов:** [AGENTS.md](AGENTS.md), [README.en.md](README.en.md), [docs/DOC_HUB.md](docs/DOC_HUB.md). Псевдокод ниже может отставать от `packages/core/src` — сверяйтесь с исходниками.
 
@@ -17,6 +19,21 @@
 **Docs i18n (EN canonical + `*_ru.md`):** [docs/DOCS_I18N.md](docs/DOCS_I18N.md) · [docs/DOC_HUB.md](docs/DOC_HUB.md) (`repo.platform.sdk.docs_i18n.gen1`) · sync matrix [docs/DOC_SYNC_MATRIX.md](docs/DOC_SYNC_MATRIX.md) (regen via `npm run generate:docs-i18n` / `check:docs-i18n:all`)  
 **Integration flows (npm / submodule / monorepo / …):** [docs/SDK_INTEGRATION_FLOWS.md](docs/SDK_INTEGRATION_FLOWS.md) · RU: [docs/SDK_INTEGRATION_FLOWS_ru.md](docs/SDK_INTEGRATION_FLOWS_ru.md) (`repo.platform.sdk.integration_flows.gen1`)  
 **Submodule consumer (git vendoring):** [docs/SUBMODULE_CONSUMER.md](docs/SUBMODULE_CONSUMER.md) · monorepo [docs/sdk/SDK_SUBMODULE_INTEGRATION.md](../docs/sdk/SDK_SUBMODULE_INTEGRATION.md) · scripts `submodule-add-sdk.mjs`, `bootstrap-submodule-consumer.mjs`
+
+## Subsystem pointers
+
+| Genetic tag | Child AI_INDEX | Scope |
+|-------------|----------------|-------|
+| `repo.platform.sdk.agent_protocol.gen1` | [packages/core/src/protocol/AI_INDEX.md](packages/core/src/protocol/AI_INDEX.md) | `sdk.protocol` — REST, protein bus, snapshots |
+| `sdk.react.query.gen1` | [packages/react/AI_INDEX.md](packages/react/AI_INDEX.md) | React hooks, TanStack Query + SDK mutations |
+| `sdk.economy.gen1` | [packages/core/src/economy/AI_INDEX.md](packages/core/src/economy/AI_INDEX.md) | AgentNet economy clients and recipes |
+| `sdk.commerce.assets.gen1` | [packages/core/src/commerce/assets/AI_INDEX.md](packages/core/src/commerce/assets/AI_INDEX.md) | Commerce assets wizard and preset helpers |
+| `frontend.commerce.kit.gen1` | [packages/react/src/commerce/AI_INDEX.md](packages/react/src/commerce/AI_INDEX.md) | React commerce primitives and embeds |
+| `sdk.media.gen1` | [packages/core/src/media/AI_INDEX.md](packages/core/src/media/AI_INDEX.md) | Client thumbnails, OPFS cache, resumable upload |
+| `sdk.pwa.update_plane.gen2` | [packages/core/src/pwa/AI_INDEX.md](packages/core/src/pwa/AI_INDEX.md) | PWA update FSM and deploy probe scheduler |
+| `sdk.seo.gen1` | [packages/core/src/seo/AI_INDEX.md](packages/core/src/seo/AI_INDEX.md) | SEO registry helpers for hosted surfaces |
+| `core.agents.fleet.gen1` | [packages/core/src/modules/agents/AI_INDEX.md](packages/core/src/modules/agents/AI_INDEX.md) | Agents Fleet typed runs, SSE, approvals |
+| `sdk.commerce.surfaces.gen1` | [packages/core/src/commerce/surfaces/AI_INDEX.md](packages/core/src/commerce/surfaces/AI_INDEX.md) | Hosted storefront surface contracts |
 
 **Versioning (v0.4.6 platform):** `SDK_VERSION.semantic` and `AGENTSTACK_CORE_VERSION` are generated from **`AGENTSTACK_CORE_VERSION`** in [`shared/constants.py`](../shared/constants.py) via `npm run sync:agentstack-version` in `packages/core` (see `src/generated/agentstack-core-version.ts`). Align `package.json` `"version"` with that string for in-repo releases. See [`docs/VERSIONING.md`](../docs/VERSIONING.md). **AI navigation:** [`docs/AI_NAVIGATION_MAP.md`](../docs/AI_NAVIGATION_MAP.md). **AgentProtocol:** [`packages/core/src/protocol/AI_INDEX.md`](packages/core/src/protocol/AI_INDEX.md). **Relay / social ADRs:** [`docs/adr/AI_INDEX.md`](../docs/adr/AI_INDEX.md). **OpTrace:** [`docs/OPTRACE_FOR_AGENTS.md`](../docs/OPTRACE_FOR_AGENTS.md) — `getOrCreateCorrelationIds` / `optraceLog` in `packages/core/src/utils/optrace.ts` + HTTP client headers.
 

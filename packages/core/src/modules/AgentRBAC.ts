@@ -248,26 +248,31 @@ export class AgentRBAC {
 
   /**
    * Получить список всех доступных permissions
+   * @param projectId — required (BE no longer defaults to project 1)
    */
-  async getAvailablePermissions(): Promise<{
+  async getAvailablePermissions(projectId: number): Promise<{
     permissions: Record<string, Permission>;
     total_resources: number;
   }> {
-    const response = await this.client.get('/rbac/permissions');
+    const response = await this.client.get(`/rbac/permissions?project_id=${projectId}`);
     return response.data;
   }
 
   /**
    * Получить список всех доступных permissions с кешированием
+   * @param projectId - ID проекта
    * @param force - Принудительное обновление кеша
    */
-  async getAvailablePermissionsCached(force: boolean = false): Promise<{
+  async getAvailablePermissionsCached(
+    projectId: number,
+    force: boolean = false,
+  ): Promise<{
     permissions: Record<string, Permission>;
     total_resources: number;
     fromCache: boolean;
     cachedAt?: number;
   }> {
-    const cacheKey = 'permissions:all';
+    const cacheKey = `permissions:${projectId}`;
     
     // Проверяем кеш, если не force
     if (!force) {
@@ -282,7 +287,7 @@ export class AgentRBAC {
     }
     
     // Загружаем из API
-    const data = await this.getAvailablePermissions();
+    const data = await this.getAvailablePermissions(projectId);
     
     // Сохраняем в кеш
     this.permissionsCache.set(cacheKey, data);

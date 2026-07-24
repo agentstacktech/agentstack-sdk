@@ -14,11 +14,13 @@ import { ConflictError, UnauthorizedError } from '../types/shared/HTTPTypes';
 import { retryManager } from '../errors/RetryManager';
 import { offlineManager } from '../errors/OfflineManager';
 import { getStorageItem, setStorageItem, removeStorageItem } from '../utils/storage-utils';
+import { writeBrowserAccessToken } from '../utils/browserAccessToken';
 import {
   AGENTSTACK_PRODUCTION_API_BASE,
   AGENTSTACK_PRODUCTION_ORIGIN,
 } from '../config/agentstackEndpoints';
 import { normalizeProjectId } from '../config/projectContext';
+import { isTypedDna503Code } from '../utils/classifyAuthFailure';
 import type {
   UserSettings,
   NotificationSettings,
@@ -31,6 +33,10 @@ export interface LoginCredentials {
   email: string;
   password: string;
   project_id?: number;
+  /** Client correlation id; echoed by mint for logs / multi-tab race debug. */
+  mint_id?: string;
+  /** Optional device binding hint (Session OS V3.1). */
+  device_fingerprint?: string;
 }
 
 export interface AuthTokens {
@@ -41,6 +47,10 @@ export interface AuthTokens {
   user_id?: string;
   project_id?: string;
   permissions?: string[];
+  /** Correlation from mint/refresh (auth resilience P1). */
+  mint_id?: string;
+  jti?: string;
+  authz_generation?: number;
 }
 
 export interface UserProfile {
@@ -68,6 +78,8 @@ export interface SessionBootstrapPayload {
   user: UserProfile;
   settings_summary?: SessionBootstrapSettingsSummary;
   accessible_project_ids?: number[];
+  accessible_project_ids_digest?: string;
+  membership_generation?: number;
 }
 
 
@@ -152,12 +164,43 @@ export class AgentAuth extends SimpleEventEmitter {
   /** Dedupe parallel `GET /auth/me/bootstrap`. */
   private sessionBootstrapInFlight: Promise<SessionBootstrapPayload> | null = null;
   private lastSessionBootstrap: SessionBootstrapPayload | null = null;
+  /** Abort in-flight bootstrap when force-login discards a stale flight (AUTH-RACE-02). */
+  private sessionBootstrapAbort: AbortController | null = null;
 
   constructor(client: HTTPClient, authStateStore?: AuthStateStore) {
     super();
     this.client = client;
     this.errorHandler = new SDKErrorHandler();
     this.authStateStore = authStateStore;
+  }
+
+  /**
+   * Drop cached / in-flight session bootstrap (login start, logout, force refresh).
+   * Does not abort other HTTP — pair with ``httpClient.cancelPendingRequests`` as needed.
+   * Note: ``cancelPendingRequests`` alone does **not** abort fetch; call this for bootstrap.
+   */
+  invalidateSessionBootstrap(reason = 'manual'): void {
+    try {
+      this.sessionBootstrapAbort?.abort();
+    } catch {
+      /* ignore */
+    }
+    this.sessionBootstrapAbort = null;
+    this.sessionBootstrapInFlight = null;
+    this.lastSessionBootstrap = null;
+    if (reason === 'force_login' || reason === 'login_start') {
+      try {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('agentstack.auth.bootstrap.stale_jti_discarded', {
+              detail: { reason },
+            }),
+          );
+        }
+      } catch {
+        /* ignore */
+      }
+    }
   }
 
   /**
@@ -238,12 +281,164 @@ export class AgentAuth extends SimpleEventEmitter {
    * Вход в систему
    */
   async login(credentials: LoginCredentials): Promise<AuthTokens> {
-    return this.errorHandler.executeWithErrorHandling(async () => {
-      try {
-        const response = await retryManager.executeWithRetry(
-          () => this.client.post('/auth/login', credentials, { skipAuthStateCheck: true })
-        );
-        
+    // Auth must always throw on failure — never return null (502/restart mid-login).
+    try {
+        // Stable mint_id per login gesture in localStorage so cross-tab retries
+        // share one fencing id (Session OS V3.1 M2 / incident 2026-07-17 G5/G12).
+        const projectKey = String(credentials.project_id ?? '1');
+        const mintStorageKey = `agentstack_login_mint:${projectKey}`;
+        let mintId =
+          (typeof credentials.mint_id === 'string' && credentials.mint_id.trim()) || '';
+        const readMint = (store: Storage | undefined) => {
+          if (!store) return '';
+          try {
+            return (store.getItem(mintStorageKey) || '').trim();
+          } catch {
+            return '';
+          }
+        };
+        if (!mintId) {
+          mintId =
+            readMint(typeof localStorage !== 'undefined' ? localStorage : undefined) ||
+            readMint(typeof sessionStorage !== 'undefined' ? sessionStorage : undefined);
+        }
+        if (!mintId) {
+          mintId =
+            typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+              ? crypto.randomUUID()
+              : `mint-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+        }
+        try {
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(mintStorageKey, mintId);
+          }
+          if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.setItem(mintStorageKey, mintId);
+          }
+        } catch {
+          /* ignore */
+        }
+
+        const loginBody: LoginCredentials = { ...credentials, mint_id: mintId };
+        const loginTimeoutMs = 60_000;
+        // Cover server lease/create budget (~12s hard) + waiters; wall ≤ loginTimeoutMs.
+        const maxMintPolls = 20;
+        let response: { data?: any } | null = null;
+        let lastErr: unknown = null;
+        const mintDeadline = Date.now() + loginTimeoutMs;
+
+        for (let attempt = 0; attempt < maxMintPolls; attempt++) {
+          if (Date.now() >= mintDeadline) {
+            break;
+          }
+          try {
+            response = await retryManager.executeWithRetry(
+              () =>
+                this.client.post('/auth/login', loginBody, {
+                  skipAuthStateCheck: true,
+                  timeout: Math.max(5_000, mintDeadline - Date.now()),
+                  headers: {
+                    'Idempotency-Key': mintId,
+                    'X-Mint-Id': mintId,
+                  },
+                }),
+              { maxRetries: 0 }
+            );
+            const code =
+              (response?.data as any)?.code ||
+              (response?.data as any)?.detail?.code;
+            if (
+              isTypedDna503Code(code) ||
+              code === 'api_warming_up' ||
+              code === 'login_capacity' ||
+              code === 'project_key_unavailable' ||
+              code === 'auth_mint_timeout' ||
+              code === 'auth_mint_in_progress' ||
+              code === 'auth_crypto_timeout' ||
+              code === 'auth_lookup_timeout' ||
+              ((response as any)?.status === 503 && !code)
+            ) {
+              const retryAfterRaw =
+                (response as any)?.headers?.['retry-after'] ||
+                (response as any)?.headers?.['Retry-After'] ||
+                '2';
+              const retryAfterSec = Math.max(1, parseInt(String(retryAfterRaw), 10) || 2);
+              const sleepMs = Math.min(
+                retryAfterSec * 1000,
+                Math.max(0, mintDeadline - Date.now()),
+              );
+              if (sleepMs <= 0) break;
+              await new Promise((r) => setTimeout(r, sleepMs));
+              continue;
+            }
+            lastErr = null;
+            break;
+          } catch (err: any) {
+            lastErr = err;
+            const detailCode =
+              err?.apiCode ||
+              err?.response?.data?.code ||
+              err?.response?.data?.detail?.code ||
+              err?.data?.code ||
+              err?.data?.detail?.code;
+            const status = err?.response?.status || err?.status;
+            const isTimeout =
+              err?.name === 'TimeoutError' ||
+              /timeout/i.test(String(err?.message || ''));
+            if (
+              isTypedDna503Code(detailCode) ||
+              detailCode === 'api_warming_up' ||
+              detailCode === 'login_capacity' ||
+              detailCode === 'project_key_unavailable' ||
+              detailCode === 'auth_mint_timeout' ||
+              detailCode === 'auth_mint_in_progress' ||
+              detailCode === 'auth_crypto_timeout' ||
+              detailCode === 'auth_lookup_timeout' ||
+              (status === 503 && !detailCode) ||
+              isTimeout
+            ) {
+              const retryAfterSec = Math.max(
+                1,
+                Number(err?.retryAfterSec) ||
+                  parseInt(
+                    String(
+                      err?.response?.headers?.['retry-after'] ||
+                        err?.response?.headers?.['Retry-After'] ||
+                        '2',
+                    ),
+                    10,
+                  ) ||
+                  2,
+              );
+              const sleepMs = Math.min(
+                retryAfterSec * 1000,
+                Math.max(0, mintDeadline - Date.now()),
+              );
+              if (sleepMs <= 0) break;
+              await new Promise((r) => setTimeout(r, sleepMs));
+              continue;
+            }
+            throw err;
+          }
+        }
+        if (!response && lastErr) {
+          throw lastErr;
+        }
+        if (!response) {
+          throw new Error('Login mint in progress — please retry');
+        }
+
+        try {
+          if (typeof localStorage !== 'undefined') {
+            localStorage.removeItem(mintStorageKey);
+          }
+          if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.removeItem(mintStorageKey);
+          }
+        } catch {
+          /* ignore */
+        }
+
         // Handle 8DNA response format
         const data = response.data;
         if (!data) {
@@ -312,8 +507,16 @@ export class AgentAuth extends SimpleEventEmitter {
             token_type: 'Bearer',
             expires_in: 86400, // 24 hours
             user_id: session.user_id?.toString(),
-            project_id: session.project_id?.toString(),
-            permissions: session.permissions || []
+            project_id: session.project_id?.toString() || data.project_id?.toString(),
+            permissions: session.permissions || [],
+            mint_id: typeof data.mint_id === 'string' ? data.mint_id : undefined,
+            jti: typeof data.jti === 'string' ? data.jti : session.jti,
+            authz_generation:
+              typeof data.authz_generation === 'number'
+                ? data.authz_generation
+                : typeof session.authz_generation === 'number'
+                  ? session.authz_generation
+                  : undefined,
           };
 
           // ✅ CRITICAL: Set tokens and API key FIRST, then set auth state
@@ -384,14 +587,17 @@ export class AgentAuth extends SimpleEventEmitter {
                   session_uuid: session.uuid || '',
                 });
               } else {
-                // Fallback: save directly to localStorage WITHOUT prefix
+                // Fallback: mirror access_token + session fields (session + local)
+                writeBrowserAccessToken(authTokens.access_token);
                 if (typeof window !== 'undefined' && window.localStorage) {
-                  if (session.api_key) localStorage.setItem('api_key', session.api_key);
+                  if (session.api_key) {
+                    localStorage.setItem('api_key', session.api_key);
+                    sessionStorage?.setItem('api_key', session.api_key);
+                  }
                   if (session.user_token) localStorage.setItem('user_token', session.user_token);
                   localStorage.setItem('user_id', newUserId);
                   localStorage.setItem('project_id', newProjectId);
                   if (session.uuid) localStorage.setItem('session_uuid', session.uuid);
-                  // Also save with prefix for compatibility
                   setStorageItem('user_id', newUserId);
                   setStorageItem('project_id', newProjectId);
                   setStorageItem('api_key', session.api_key || '');
@@ -400,14 +606,17 @@ export class AgentAuth extends SimpleEventEmitter {
                 }
               }
             } catch (e) {
-              // Fallback: save directly to localStorage WITHOUT prefix
+              // Fallback: mirror access_token + session fields (session + local)
+              writeBrowserAccessToken(authTokens.access_token);
               if (typeof window !== 'undefined' && window.localStorage) {
-                if (session.api_key) localStorage.setItem('api_key', session.api_key);
+                if (session.api_key) {
+                  localStorage.setItem('api_key', session.api_key);
+                  sessionStorage?.setItem('api_key', session.api_key);
+                }
                 if (session.user_token) localStorage.setItem('user_token', session.user_token);
                 localStorage.setItem('user_id', newUserId);
                 localStorage.setItem('project_id', newProjectId);
                 if (session.uuid) localStorage.setItem('session_uuid', session.uuid);
-                // Also save with prefix for compatibility
                 setStorageItem('user_id', newUserId);
                 setStorageItem('project_id', newProjectId);
                 setStorageItem('api_key', session.api_key || '');
@@ -453,26 +662,244 @@ export class AgentAuth extends SimpleEventEmitter {
         } else {
           throw new Error(data.message || 'Login failed');
         }
-      } catch (error) {
-        this.emit('auth:login:failed', error);
-        throw this.transformError(error);
-      }
-    }, { operation: 'login' }) as Promise<AuthTokens>;
+    } catch (error) {
+      this.emit('auth:login:failed', error);
+      throw this.transformError(error);
+    }
   }
 
   /**
-   * Login by user API key (SPA). Returns backend JSON as-is; does not attach SDK session.
-   * Caller persists `session_token` / triggers auth refresh as needed.
+   * Login by user API key (SPA). Session OS mint parity — stable mint_id + poll on 503.
    */
-  async loginByUserApiKey(userApiKey: string): Promise<Record<string, unknown>> {
+  async loginByUserApiKey(
+    userApiKey: string,
+    options?: { project_id?: number; mint_id?: string },
+  ): Promise<Record<string, unknown>> {
+    const projectKey = String(options?.project_id ?? 'key');
+    const mintStorageKey = `agentstack_login_by_key_mint:${projectKey}`;
+    let mintId = (options?.mint_id || '').trim();
+    if (!mintId && typeof localStorage !== 'undefined') {
+      try {
+        mintId = (localStorage.getItem(mintStorageKey) || '').trim();
+      } catch {
+        /* ignore */
+      }
+    }
+    if (!mintId) {
+      mintId =
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `mint-key-${Date.now()}`;
+    }
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(mintStorageKey, mintId);
+      }
+    } catch {
+      /* ignore */
+    }
+
+    const body: Record<string, unknown> = {
+      user_api_key: userApiKey,
+      mint_id: mintId,
+    };
+    if (options?.project_id != null) {
+      body.project_id = options.project_id;
+    }
+
+    const loginTimeoutMs = 60_000;
+    const maxMintPolls = 20;
+    const mintDeadline = Date.now() + loginTimeoutMs;
+    let lastErr: unknown = null;
+    for (let attempt = 0; attempt < maxMintPolls; attempt++) {
+      if (Date.now() >= mintDeadline) break;
+      try {
+        const response = await this.client.post('/auth/login-by-key', body, {
+          skipAuthStateCheck: true,
+          timeout: Math.max(5_000, mintDeadline - Date.now()),
+          headers: {
+            'Idempotency-Key': mintId,
+            'X-Mint-Id': mintId,
+          },
+        });
+        const code =
+          (response?.data as any)?.code || (response?.data as any)?.detail?.code;
+        if (
+          code === 'auth_mint_in_progress' ||
+          code === 'login_capacity' ||
+          code === 'project_key_unavailable' ||
+          code === 'auth_mint_timeout' ||
+          (response as any)?.status === 503
+        ) {
+          const retryAfterRaw =
+            (response as any)?.headers?.['retry-after'] ||
+            (response as any)?.headers?.['Retry-After'] ||
+            '2';
+          const retryAfterSec = Math.max(1, parseInt(String(retryAfterRaw), 10) || 2);
+          const sleepMs = Math.min(
+            retryAfterSec * 1000,
+            Math.max(0, mintDeadline - Date.now()),
+          );
+          if (sleepMs <= 0) break;
+          await new Promise((r) => setTimeout(r, sleepMs));
+          continue;
+        }
+        const data = response.data as Record<string, unknown>;
+        if (data?.success && data?.session) {
+          await this.persistSessionFromLoginResponse(data);
+        }
+        return data;
+      } catch (err: any) {
+        lastErr = err;
+        const detailCode =
+          err?.response?.data?.code || err?.response?.data?.detail?.code;
+        const status = err?.response?.status || err?.status;
+        if (
+          detailCode === 'auth_mint_in_progress' ||
+          detailCode === 'login_capacity' ||
+          detailCode === 'project_key_unavailable' ||
+          detailCode === 'auth_mint_timeout' ||
+          status === 503
+        ) {
+          const retryAfterSec = Math.max(
+            1,
+            parseInt(String(err?.response?.headers?.['retry-after'] || '2'), 10) || 2,
+          );
+          const sleepMs = Math.min(
+            retryAfterSec * 1000,
+            Math.max(0, mintDeadline - Date.now()),
+          );
+          if (sleepMs <= 0) break;
+          await new Promise((r) => setTimeout(r, sleepMs));
+          continue;
+        }
+        throw this.transformError(err);
+      }
+    }
+    throw this.transformError(lastErr);
+  }
+
+  /**
+   * Attach mint/login JSON to SDK client + auth state (password login + login-by-key).
+   */
+  async persistSessionFromLoginResponse(data: Record<string, unknown>): Promise<AuthTokens> {
+    const session = data.session as Record<string, unknown>;
+    if (!session || typeof session !== 'object') {
+      throw new Error('Login failed: missing session');
+    }
+    const rawAccessToken =
+      (data.access_token as string) ||
+      (session.user_token as string) ||
+      (data.hybrid_key as string) ||
+      (session.api_key as string);
+    if (!rawAccessToken || typeof rawAccessToken !== 'string') {
+      throw new Error('Login failed: No access token received from server');
+    }
+    const accessToken = rawAccessToken
+      .trim()
+      .replace(/^[,\s\n\r]+/g, '')
+      .replace(/[,\s\n\r]+$/g, '')
+      .replace(/\s+/g, '');
+    const authTokens: AuthTokens = {
+      access_token: accessToken,
+      refresh_token: String(session.api_key || session.user_token || accessToken),
+      token_type: 'Bearer',
+      expires_in: 86400,
+      user_id: String(session.user_id ?? data.user_id ?? ''),
+      project_id: String(session.project_id ?? data.project_id ?? ''),
+      permissions: (session.permissions as string[]) || [],
+      mint_id: typeof data.mint_id === 'string' ? data.mint_id : undefined,
+      jti: typeof data.jti === 'string' ? data.jti : (session.jti as string | undefined),
+      authz_generation:
+        typeof data.authz_generation === 'number'
+          ? data.authz_generation
+          : typeof session.authz_generation === 'number'
+            ? session.authz_generation
+            : undefined,
+    };
+    this.setTokens(authTokens);
+    const sessionApiKey = session.api_key;
+    if (sessionApiKey && typeof sessionApiKey === 'string') {
+      const cleanApiKey = sessionApiKey.trim().replace(/\s+/g, '');
+      if (cleanApiKey.length > 0) {
+        this.client.setApiKey(cleanApiKey);
+      }
+    }
+    this.authStateStore?.setState({
+      state: 'authenticated',
+      reason: 'login_success',
+      user: {
+        id: session.user_id as number,
+        user_id: session.user_id as number,
+        project_id: session.project_id as number,
+        role: session.role as string,
+      },
+      tokens: {
+        accessToken: authTokens.access_token,
+        refreshToken: authTokens.refresh_token,
+        apiKey: (session.api_key as string) || null,
+        projectId: session.project_id as number,
+      },
+    });
+    this.client.markRecentLoginSuccess();
+    const sessionProjectId = normalizeProjectId(session.project_id);
+    if (sessionProjectId) {
+      this.client.updateConfig({ projectId: sessionProjectId });
+    }
+    this.emit('auth:login', authTokens);
+    return authTokens;
+  }
+
+  /** Headless integrator — set API key (+ optional project) without password mint. */
+  useApiKey(apiKey: string, projectId?: number): void {
+    this.client.setApiKey(apiKey);
+    if (projectId != null) {
+      this.client.updateConfig({ projectId });
+    }
+  }
+
+  /**
+   * Device Code grant wrapper — POST /oauth2/device/authorize then poll token endpoint.
+   * Returns issued tokens / key metadata from the token response.
+   */
+  async loginWithDeviceCode(body: {
+    client_id: string;
+    scope?: string;
+  }): Promise<Record<string, unknown>> {
     return this.errorHandler.executeWithErrorHandling(async () => {
-      const response = await this.client.post(
-        '/auth/login-by-key',
-        { user_api_key: userApiKey },
+      const authRes = await this.client.post(
+        '/oauth2/device/authorize',
+        { client_id: body.client_id, scope: body.scope || 'mcp:execute agents:run' },
         { skipAuthStateCheck: true },
       );
-      return response.data as Record<string, unknown>;
-    }, { operation: 'login_by_user_api_key' }) as Promise<Record<string, unknown>>;
+      const device = authRes.data as Record<string, unknown>;
+      const deviceCode = String(device.device_code || '');
+      const interval = Math.max(2, Number(device.interval) || 5);
+      const expiresIn = Math.max(30, Number(device.expires_in) || 600);
+      const deadline = Date.now() + expiresIn * 1000;
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, interval * 1000));
+        try {
+          const tokenRes = await this.client.post(
+            '/oauth2/token',
+            {
+              grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+              device_code: deviceCode,
+              client_id: body.client_id,
+            },
+            { skipAuthStateCheck: true },
+          );
+          return tokenRes.data as Record<string, unknown>;
+        } catch (pollErr: any) {
+          const errCode = pollErr?.response?.data?.error;
+          if (errCode === 'authorization_pending' || errCode === 'slow_down') {
+            continue;
+          }
+          throw pollErr;
+        }
+      }
+      throw new Error('Device Code authorization timed out');
+    }, { operation: 'login_with_device_code' }) as Promise<Record<string, unknown>>;
   }
 
   /** Convert anonymous account created via login-by-key to a full user. */
@@ -517,12 +944,59 @@ export class AgentAuth extends SimpleEventEmitter {
    */
   async refresh(refreshToken: string): Promise<AuthTokens> {
     try {
-      const response = await this.client.post('/auth/refresh', {
-        refresh_token: refreshToken
-      }, { skipAuthStateCheck: true });
+      const mintId =
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `mint-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      const response = await this.client.post(
+        '/auth/refresh',
+        { refresh_token: refreshToken, mint_id: mintId },
+        {
+          skipAuthStateCheck: true,
+          headers: {
+            'Idempotency-Key': mintId,
+            'X-Mint-Id': mintId,
+          },
+        }
+      );
       this.emit('auth:refresh', response.data);
 
-      const tokens = response.data as AuthTokens;
+      const data = response.data as Record<string, unknown> | null;
+      if (!data || typeof data !== 'object') {
+        throw new UnauthorizedError('Refresh failed: empty token response');
+      }
+      const access =
+        (typeof data.access_token === 'string' && data.access_token) ||
+        (typeof (data.session as { user_token?: string } | undefined)?.user_token === 'string'
+          ? (data.session as { user_token: string }).user_token
+          : null);
+      if (!access) {
+        throw new UnauthorizedError('Refresh failed: empty token response');
+      }
+      const tokens: AuthTokens = {
+        access_token: access,
+        refresh_token:
+          (typeof data.refresh_token === 'string' && data.refresh_token) ||
+          access,
+        token_type:
+          (typeof data.token_type === 'string' && data.token_type) || 'Bearer',
+        expires_in:
+          typeof data.expires_in === 'number' ? data.expires_in : 86400,
+        user_id:
+          typeof data.user_id === 'string' || typeof data.user_id === 'number'
+            ? String(data.user_id)
+            : undefined,
+        project_id:
+          typeof data.project_id === 'string' || typeof data.project_id === 'number'
+            ? String(data.project_id)
+            : undefined,
+        mint_id: typeof data.mint_id === 'string' ? data.mint_id : mintId,
+        jti: typeof data.jti === 'string' ? data.jti : undefined,
+        authz_generation:
+          typeof data.authz_generation === 'number'
+            ? data.authz_generation
+            : undefined,
+      };
       this.authStateStore?.setState({
         state: 'authenticated',
         reason: 'refresh_success',
@@ -534,7 +1008,7 @@ export class AgentAuth extends SimpleEventEmitter {
         }
       });
 
-      return response.data;
+      return tokens;
     } catch (error) {
       this.authStateStore?.setState({
         state: 'session_expired',
@@ -553,9 +1027,8 @@ export class AgentAuth extends SimpleEventEmitter {
    * Выход из системы
    */
   async logout(): Promise<void> {
+    this.invalidateSessionBootstrap('logout');
     this.getCurrentUserInFlight = null;
-    this.sessionBootstrapInFlight = null;
-    this.lastSessionBootstrap = null;
     try {
       this.authStateStore?.setState({
         state: 'logging_out',
@@ -603,18 +1076,30 @@ export class AgentAuth extends SimpleEventEmitter {
   /**
    * Получение текущего пользователя (single-flight per SDK instance).
    */
-  async getCurrentUser(): Promise<UserProfile> {
-    if (this.getCurrentUserInFlight) {
+  async getCurrentUser(options?: { force?: boolean }): Promise<UserProfile> {
+    // H3b-02 / D5: reuse bootstrap user unless force (avoids duplicate /auth/me).
+    if (!options?.force && this.lastSessionBootstrap?.user) {
+      return this.lastSessionBootstrap.user;
+    }
+    if (!options?.force && this.getCurrentUserInFlight) {
       return this.getCurrentUserInFlight;
+    }
+    if (options?.force && this.getCurrentUserInFlight) {
+      try {
+        await this.getCurrentUserInFlight;
+      } catch {
+        /* prior flight failed — continue with refresh */
+      }
     }
     const work = this.fetchCurrentUserOnce();
     this.getCurrentUserInFlight = work;
-    work.finally(() => {
+    try {
+      return await work;
+    } finally {
       if (this.getCurrentUserInFlight === work) {
         this.getCurrentUserInFlight = null;
       }
-    });
-    return work;
+    }
   }
 
   /**
@@ -632,44 +1117,94 @@ export class AgentAuth extends SimpleEventEmitter {
 
   /**
    * Cold-start session restore: user + settings_summary + accessible_project_ids in one GET.
+   * ``force: true`` discards any in-flight bootstrap (abort) and never awaits the stale flight —
+   * critical after mint when prior JTIs are terminated (AUTH-RACE-02 / Incident 21:37).
    */
   async getSessionBootstrapPayload(options?: { force?: boolean }): Promise<SessionBootstrapPayload> {
-    if (this.sessionBootstrapInFlight) {
+    if (!options?.force && this.sessionBootstrapInFlight) {
       return this.sessionBootstrapInFlight;
     }
     if (!options?.force && this.lastSessionBootstrap) {
       return this.lastSessionBootstrap;
     }
+    if (options?.force) {
+      // Never await stale in-flight — mint terminates other JTIs; awaiting old bootstrap = 401.
+      this.invalidateSessionBootstrap('force_login');
+    }
     const work = this.fetchSessionBootstrapPayloadOnce();
     this.sessionBootstrapInFlight = work;
-    work.finally(() => {
+    try {
+      return await work;
+    } finally {
       if (this.sessionBootstrapInFlight === work) {
         this.sessionBootstrapInFlight = null;
       }
-    });
-    return work;
+    }
   }
 
   private async fetchSessionBootstrapPayloadOnce(): Promise<SessionBootstrapPayload> {
-    const response = await this.client.get('/auth/me/bootstrap', undefined, {
-      skipBatching: true,
-      skipCache: true,
-    });
+    const ac = new AbortController();
+    this.sessionBootstrapAbort = ac;
+    let response;
+    try {
+      response = await this.client.get('/auth/me/bootstrap', undefined, {
+        skipBatching: true,
+        skipCache: true,
+        signal: ac.signal,
+      });
+      if (ac.signal.aborted) {
+        throw new Error('Session bootstrap aborted (stale jti discarded)');
+      }
+      if (this.sessionBootstrapAbort === ac) {
+        this.sessionBootstrapAbort = null;
+      }
+    } catch (err) {
+      if (this.sessionBootstrapAbort === ac) {
+        this.sessionBootstrapAbort = null;
+      }
+      if (ac.signal.aborted) {
+        throw new Error('Session bootstrap aborted (stale jti discarded)');
+      }
+      if (err instanceof UnauthorizedError) {
+        this.lastSessionBootstrap = null;
+        throw err;
+      }
+      throw err;
+    }
+    if (response.status === 401) {
+      this.lastSessionBootstrap = null;
+      throw new UnauthorizedError('Session bootstrap failed', {
+        status: 401,
+        code: 'session_expired',
+        traceId: response.traceId,
+      });
+    }
     const body = response.data as {
       success?: boolean;
       data?: Record<string, unknown>;
       settings_summary?: SessionBootstrapSettingsSummary;
       accessible_project_ids?: number[];
+      accessible_project_ids_digest?: string;
+      membership_generation?: number;
     };
     if (!body?.success || !body.data) {
-      throw new Error('Session bootstrap failed');
+      throw new UnauthorizedError('Session bootstrap failed', {
+        status: response.status || 401,
+        code: 'session_expired',
+        traceId: response.traceId,
+      });
     }
     const user = this.mapUserProfileFromMePayload(body.data);
     const payload: SessionBootstrapPayload = {
       user,
       settings_summary: body.settings_summary,
       accessible_project_ids: body.accessible_project_ids,
+      accessible_project_ids_digest: body.accessible_project_ids_digest,
+      membership_generation: body.membership_generation,
     };
+    if (ac.signal.aborted) {
+      throw new Error('Session bootstrap aborted (stale jti discarded)');
+    }
     this.lastSessionBootstrap = payload;
     return payload;
   }
@@ -707,40 +1242,63 @@ export class AgentAuth extends SimpleEventEmitter {
       authState: authState,
     });
 
-    const response = await this.client.get('/auth/me', undefined, {
-      skipBatching: true,
-      skipCache: true,
-    });
-
+    let response;
+    try {
+      response = await this.client.get('/auth/me', undefined, {
+        skipBatching: true,
+        skipCache: true,
+      });
+    } catch (err) {
+      if (err instanceof UnauthorizedError) {
+        throw err;
+      }
+      throw err;
+    }
+    if (response.status === 401) {
+      throw new UnauthorizedError('Failed to get current user', {
+        status: 401,
+        code: 'session_expired',
+        traceId: response.traceId,
+      });
+    }
     const data = response.data;
     if (data?.success && data.data) {
       return this.mapUserProfileFromMePayload(data.data as Record<string, unknown>);
     }
-    throw new Error('Failed to get current user');
+    throw new UnauthorizedError('Failed to get current user', {
+      status: response.status || 401,
+      code: 'session_expired',
+      traceId: response.traceId,
+    });
   }
 
   /**
-   * Установка токенов аутентификации
-   * ✅ CRITICAL FIX: Save tokens directly to localStorage WITHOUT prefix for reliability
-   * This ensures tokens are always found after page reload, regardless of environment detection
+   * Persist mint tokens: sessionStorage (tab-scoped SPA) + localStorage (legacy mirror).
+   * Session OS V3.3 / FLOW-06 — FE getAccessToken is session-first.
    */
-  setTokens(tokens: AuthTokens): void {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      // ✅ CRITICAL: Save tokens directly to localStorage WITHOUT prefix
-      // This ensures tokens are always found, regardless of dev/prod environment detection
-      if (tokens.access_token) {
-        localStorage.setItem('access_token', tokens.access_token);
-        // Also save with prefix for compatibility
-        setStorageItem('access_token', tokens.access_token);
-      }
-      if (tokens.refresh_token) {
-        localStorage.setItem('refresh_token', tokens.refresh_token);
-        setStorageItem('refresh_token', tokens.refresh_token);
-      }
+  setTokens(tokens: AuthTokens | null | undefined): void {
+    // Guard: aborted/OOM login historically yielded null →
+    // "can't access property access_token, a is null" in minified clients.
+    if (!tokens || typeof tokens !== 'object') {
+      throw new UnauthorizedError('setTokens: empty token payload');
     }
-    
+    if (typeof window !== 'undefined' && tokens.access_token) {
+      writeBrowserAccessToken(tokens.access_token);
+      // Prefixed key for older readers
+      setStorageItem('access_token', tokens.access_token);
+    }
+    if (typeof window !== 'undefined' && window.localStorage && tokens.refresh_token) {
+      try {
+        localStorage.setItem('refresh_token', tokens.refresh_token);
+        sessionStorage?.setItem('refresh_token', tokens.refresh_token);
+      } catch {
+        /* ignore */
+      }
+      setStorageItem('refresh_token', tokens.refresh_token);
+    }
+
     // Set token in HTTP client for immediate use
-    this.client.setAuthToken(tokens.access_token);
+    this.client.setAuthToken(tokens.access_token ?? null);
   }
 
 

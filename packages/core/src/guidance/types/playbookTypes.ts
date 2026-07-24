@@ -24,6 +24,13 @@ export const PlaybookIdSchema = z.enum([
   'grant-testnet-demo',
   'fabric-demo',
   'messaging-channel-bot',
+  'commerce-lite-surfaces',
+  'integrate-install-app',
+  'integrate-map-fields',
+  'integrate-replay-dlq',
+  'connect-api-key-60s',
+  'oauth-recover',
+  'alert-on-fail',
 ]);
 
 export type PlaybookId = z.infer<typeof PlaybookIdSchema>;
@@ -130,6 +137,8 @@ export const PlaybookSchema = z
     nodes: z.record(z.string(), PlaybookNodeSchema),
     executionRules: z.array(ExecutionStepRuleSchema).optional(),
     defaultExecutionSteps: z.array(z.string()).optional(),
+    /** When true, TASK_COMPLETE auto-focuses next step (legacy bots path). Default false = explicit Continue. */
+    autoAdvance: z.boolean().optional(),
   })
   .superRefine((playbook, ctx) => {
     for (const [nodeId, node] of Object.entries(playbook.nodes)) {
@@ -153,6 +162,8 @@ export type StepProgressEntry = {
   completedAt?: string;
   lastOpenedAt?: string;
   artifact?: { url?: string; count?: number; traceId?: string };
+  /** True after TASK_COMPLETE until STEP_CONTINUE when playbook.autoAdvance is false. */
+  awaitingContinue?: boolean;
 };
 
 export type PlaybookStateV2 = {
@@ -197,6 +208,7 @@ export type PlaybookEvent =
   | { type: 'TASK_COMPLETE'; nodeId: string; artifact?: Record<string, unknown> }
   | { type: 'STEP_FOCUS'; nodeId: string }
   | { type: 'STEP_OPEN'; nodeId: string }
+  | { type: 'STEP_CONTINUE' }
   | { type: 'VERIFY_OK'; nodeId: string; artifact?: StepProgressEntry['artifact'] }
   | { type: 'SKIP'; nodeId: string }
   | { type: 'RESET' };

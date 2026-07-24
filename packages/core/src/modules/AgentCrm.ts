@@ -32,6 +32,19 @@ export class AgentCrm {
     );
   }
 
+  listCompanies(projectId: number) {
+    return this.client.get<{ companies: unknown[]; total: number }>(
+      `/projects/${projectId}/crm/companies`,
+    );
+  }
+
+  createCompany(projectId: number, company: Record<string, unknown>) {
+    return this.client.post<{ success?: boolean; company: unknown }>(
+      `/projects/${projectId}/crm/companies`,
+      company,
+    );
+  }
+
   getContact360(projectId: number, contactId: string) {
     return this.client.get<{ contact: unknown; timeline: unknown[] }>(
       `/projects/${projectId}/crm/contacts/${contactId}/360`,

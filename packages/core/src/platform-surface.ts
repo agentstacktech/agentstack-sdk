@@ -50,6 +50,7 @@ import type {
   MessengerPublicUnpublishHttpOpts,
 } from './modules/Messenger';
 import type { APIResponse } from './types';
+import type { GuidancePlatformFacade } from './guidance/GuidancePlatformFacade';
 
 /** Same contract as `DNATableWrapper` on AgentStackSDK (projects / users). */
 export interface PlatformDNATableWrapper {
@@ -108,6 +109,8 @@ export interface AgentStackPlatformSurface {
   support: AgentSupport;
   /** Web Push VAPID subscription API */
   webPush: AgentWebPush;
+  /** Guided path REST (`/api/projects/{id}/guidance/*`) — {@link GuidanceClient} factory */
+  guidance: GuidancePlatformFacade;
   /**
    * Tab visibility coordinator (browser shells): pauses background polling / WS pokes when attached.
    * Optional — set by the host app (e.g. `sdk.activity = coordinator`).
@@ -400,6 +403,12 @@ const PLATFORM_CAPABILITY_SEED: Omit<SDKCapabilityEntry, 'enabled'>[] = [
   { id: 'social', layer: 'platform', group: 'social', description: 'AgentSocial messenger/friends/PAS' },
   { id: 'support', layer: 'platform', group: 'social', description: 'AgentSupport `/api/support/*` inbox & threads' },
   { id: 'webPush', layer: 'platform', group: 'notifications', description: 'AgentWebPush VAPID subscribe' },
+  {
+    id: 'guidance',
+    layer: 'platform',
+    group: 'ecosystem',
+    description: 'GuidancePlatformFacade — sdk.platform.guidance.forProject(id)',
+  },
   {
     id: 'activity',
     layer: 'platform',

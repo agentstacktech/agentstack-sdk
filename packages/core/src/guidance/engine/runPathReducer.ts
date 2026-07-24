@@ -140,6 +140,7 @@ export function runPathReducer(
         event.type === 'TASK_COMPLETE' && artifact && typeof artifact === 'object'
           ? { ...state.answers, ...artifact }
           : state.answers;
+      const autoAdvance = playbook.autoAdvance ?? false;
       let next = patchStep(
         { ...state, completedNodeIds: completed, answers },
         event.nodeId,
@@ -147,10 +148,30 @@ export function runPathReducer(
           status: 'done',
           completedAt: nowIso(),
           artifact,
+          awaitingContinue: !autoAdvance,
         },
       );
-      const plan = compilePathPlan(playbook, next);
-      return { ...next, currentNodeId: syncCurrentNodeId(plan, next) };
+      if (autoAdvance) {
+        const plan = compilePathPlan(playbook, next);
+        next = {
+          ...next,
+          currentNodeId: syncCurrentNodeId(plan, next),
+          stepProgress: {
+            ...next.stepProgress,
+            [event.nodeId]: {
+              ...next.stepProgress[event.nodeId],
+              awaitingContinue: false,
+            },
+          },
+        };
+      }
+      return next;
+    }
+    case 'STEP_CONTINUE': {
+      const plan = compilePathPlan(playbook, state);
+      const nextNodeId = syncCurrentNodeId(plan, state);
+      let next = patchStep(state, state.currentNodeId, { awaitingContinue: false });
+      return { ...next, currentNodeId: nextNodeId, updatedAt: nowIso() };
     }
     case 'ADVANCE':
     default:

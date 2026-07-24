@@ -30,6 +30,7 @@ import { AgentNotifications } from './modules/AgentNotifications';
 import { AgentSocial } from './modules/AgentSocial';
 import { AgentSupport } from './modules/AgentSupport';
 import { AgentWebPush } from './modules/AgentWebPush';
+import { GuidancePlatformFacade } from './guidance/GuidancePlatformFacade';
 import { AgentWallets } from './modules/AgentWallets';
 import { AgentInvoices } from './modules/AgentInvoices';
 import { AgentBilling } from './modules/AgentBilling';
@@ -217,6 +218,8 @@ export class AgentStackSDK extends SimpleEventEmitter {
   public support: AgentSupport;
   /** Web Push VAPID (`/api/push/*`). Also `sdk.notifications.webPush` and `sdk.platform.webPush`. */
   public webPush: AgentWebPush;
+  /** Guided paths REST facade — also `sdk.platform.guidance`. */
+  public readonly guidancePlatform: GuidancePlatformFacade;
   public wallets: AgentWallets;
   public invoices: AgentInvoices;
   public billing: AgentBilling;
@@ -419,6 +422,7 @@ export class AgentStackSDK extends SimpleEventEmitter {
     this.hosting = new AgentHosting(this.httpClient);
     this.scheduler = new AgentScheduler(this.httpClient);
     this.webPush = new AgentWebPush(this.httpClient);
+    this.guidancePlatform = new GuidancePlatformFacade(this.httpClient);
     this.social = new AgentSocial(this.httpClient);
     this.support = new AgentSupport(this.httpClient);
     this.notifications = new AgentNotifications(this.httpClient, this.webPush);
@@ -512,6 +516,7 @@ export class AgentStackSDK extends SimpleEventEmitter {
       social: this.social,
       support: this.support,
       webPush: this.webPush,
+      guidance: this.guidancePlatform,
       activity: undefined,
       createMessengerEmbed,
       fetchMessengerThreadHistory: (opts) => messengerFetchThreadHistory(this.social, opts),

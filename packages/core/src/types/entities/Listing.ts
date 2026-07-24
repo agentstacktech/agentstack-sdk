@@ -13,7 +13,7 @@ import { AssetInExchange } from './Asset';
  *     whitelist: { enabled: true, currencies: [...] }
  *   })
  * 
- * STORAGE: data_marketplace_listings (8DNA)
+ * STORAGE: data_projects_8dna.data.marketplace (project slice)
  */
 
 /**

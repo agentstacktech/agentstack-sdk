@@ -2,14 +2,20 @@
  * Integration Hub SDK — genetic: ``sdk.integrations.gen1``.
  *
  * REST surface: `/api/integrations/*` (this module). MCP parity (agents/MCP discovery):
- * `integrations.list_recipes`, `install_recipe`, `list_connections`, `test_hook`,
+ * Hub plumbing: `integrations.list_recipes`, `install_recipe`, `list_connections`, `test_hook`,
  * `export_connection`, `import_connection`, `rotate_secret`, `replay_delivery`,
- * `replay_delivery_url`, `connection_health`, `connector_schema`, `process_inbox_batch`,
- * `process_outbound_batch`, `list_inbox_events`, `generate_signing_secret`,
+ * `replay_delivery_url`, `connection_health`, `connector_schema` (SDK: `getConnectorSetupSchema`),
+ * `process_inbox_batch`, `process_outbound_batch`, `list_inbox_events`, `generate_signing_secret`,
  * `export_connection_manifest`, `import_zapier_preview`, `import_make_preview`,
  * `list_issues`, `get_diagnostics`, `migrate_legacy_webhooks`, `poll_connection`,
- * `oauth_begin`, `refresh_token`, `activate_webhook`, `update_connection`,
- * `list_apps`, `get_app`, `dynamic_fields`.
+ * `oauth_begin`, `refresh_token`, `activate_webhook` (SDK: `activateConnectionWebhook`),
+ * `update_connection`, `list_apps`, `get_app`, `dynamic_fields`,
+ * `hydrate_triggers`, `rebind_triggers`.
+ * iPaaS authoring (0.4.15): scenarios CRUD/publish/test-step/runs via REST+SDK
+ * (`listScenarios`, `saveScenarioDraft`, `publishScenario`, `unpublishScenario`, …);
+ * MCP: `integrations.create_scenario`, `save_scenario_draft`, `publish_scenario`,
+ * `unpublish_scenario`, `test_scenario_step`, `list_scenario_runs`.
+ * Ops-only OK: `integrations.get_hubspot_relay_stats` (no SDK wrapper).
  * See `docs/INTEGRATION_EVENT_CATALOG.md` and `agentstack-core/mcp/tools_integrations.py`.
  */
 
@@ -53,6 +59,8 @@ export {
   buildHookPath,
   buildHookUrl,
   buildIntegrateHref,
+  buildAgentAutomateHref,
+  buildIntegrateEventsHref,
   type IntegrateHrefSection,
 } from './integrationHookUrls';
 
@@ -140,9 +148,20 @@ export class AgentIntegrations {
       });
   }
 
-  installRecipe(recipeId: string, body: InstallRecipeBody) {
+  installRecipe(
+    recipeId: string,
+    body: InstallRecipeBody,
+    options?: { idempotencyKey?: string },
+  ) {
+    const { idempotency_key: bodyKey, ...rest } = body;
+    const idempotencyKey =
+      options?.idempotencyKey ?? bodyKey ?? `install-${recipeId}-${Date.now()}`;
     return this.client
-      .post<InstallRecipeResult>(`/integrations/recipes/${recipeId}/install`, body)
+      .post<InstallRecipeResult>(
+        `/integrations/recipes/${recipeId}/install`,
+        { ...rest, idempotency_key: idempotencyKey },
+        { idempotencyKey },
+      )
       .then((res) => {
         const parsed = InstallRecipeResultSchema.safeParse(res.data);
         if (parsed.success) {
@@ -161,10 +180,18 @@ export class AgentIntegrations {
     return integrationListConnections(this.client, params);
   }
 
-  createConnection(body: Record<string, unknown>) {
+  createConnection(
+    body: Record<string, unknown>,
+    options?: { idempotencyKey?: string },
+  ) {
+    const fromBody =
+      typeof body.idempotency_key === 'string' ? body.idempotency_key : undefined;
+    const idempotencyKey =
+      options?.idempotencyKey ?? fromBody ?? `conn-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     return this.client.post<{ success: boolean; connection: unknown }>(
       '/integrations/connections',
-      body,
+      { ...body, idempotency_key: idempotencyKey },
+      { idempotencyKey },
     );
   }
 
@@ -234,10 +261,13 @@ export class AgentIntegrations {
   }
 
   generateSigningSecret(connectionId: string) {
-    return this.client.post<{ success: boolean; connection_id: string; key?: string; generated?: boolean }>(
-      `/integrations/connections/${connectionId}/rotate-secret/generate`,
-      {},
-    );
+    return this.client.post<{
+      success: boolean;
+      connection_id: string;
+      key?: string;
+      generated?: boolean;
+      secret?: string | null;
+    }>(`/integrations/connections/${connectionId}/rotate-secret/generate`, {});
   }
 
   pollConnection(connectionId: string) {
@@ -514,11 +544,17 @@ export class AgentIntegrations {
     );
   }
 
-  publishScenario(scenarioId: string, projectId: number) {
+  publishScenario(
+    scenarioId: string,
+    projectId: number,
+    options?: { idempotencyKey?: string },
+  ) {
+    const idempotencyKey =
+      options?.idempotencyKey ?? `publish-${scenarioId}-${Date.now()}`;
     return this.client.post<Record<string, unknown>>(
       `/integrations/scenarios/${scenarioId}/publish`,
       {},
-      { params: { project_id: projectId } },
+      { params: { project_id: projectId }, idempotencyKey },
     );
   }
 

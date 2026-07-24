@@ -85,4 +85,16 @@ export {
   type SocialPublicCardAvatar,
 } from './socialPublicAvatar';
 
+/** Auth transport / typed 503 classifier (DNA timeout cascade L3-01). */
+export {
+  classifyAuthFailure,
+  extractAuthErrorFields,
+  isNonRetryableAuthOrShed,
+  isTypedDna503Code,
+  TYPED_DNA_503_CODES,
+  BATCH_TRANSPORT_SHED_CODES,
+  type TransportKind,
+  type TypedDna503Code,
+} from './classifyAuthFailure';
+
 

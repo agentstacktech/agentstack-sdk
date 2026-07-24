@@ -1,6 +1,7 @@
 # @agentstack/react — AI index
 
-**Genetic tags:** `sdk.react.invalidation.gen1`, `sdk.react.capability.gen1`, `sdk.react.entity.gen1`, `sdk.react.entity_query.gen1`  
+**Genetic code:** `sdk.react.query.gen1`  
+**Also:** `sdk.react.invalidation.gen1`, `sdk.react.capability.gen1`, `sdk.react.entity.gen1`  
 **Parent:** [agentstack-unified-sdk/AI_INDEX.md](../../AI_INDEX.md)
 
 ## Hot files

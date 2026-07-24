@@ -5,6 +5,7 @@ const STATUS_TO_CODE: Record<number, CommerceErrorCode> = {
   402: 'INSUFFICIENT_BALANCE',
   404: 'SESSION_NOT_FOUND',
   409: 'CHECKOUT_FAILED',
+  410: 'CHECKOUT_SESSION_EXPIRED',
 };
 
 const KNOWN_CODES = new Set<CommerceErrorCode>([
@@ -13,6 +14,7 @@ const KNOWN_CODES = new Set<CommerceErrorCode>([
   'RAIL_UNAVAILABLE',
   'CHECKOUT_FAILED',
   'SESSION_NOT_FOUND',
+  'CHECKOUT_SESSION_EXPIRED',
   'CART_EMPTY',
   'PRICE_CHANGED',
   'SLICE_MISSING',
@@ -66,6 +68,13 @@ export function mapCommerceHttpError(
   if (detail.includes('sync') && status >= 400) code = 'MERCHANT_SYNC_FAILED';
   if (detail.includes('guidance') || detail.includes('grant_failed')) {
     code = 'GUIDANCE_UNAVAILABLE';
+  }
+  if (
+    detail.includes('checkout_session_expired') ||
+    detail.includes('session expired') ||
+    status === 410
+  ) {
+    code = 'CHECKOUT_SESSION_EXPIRED';
   }
   const message = bodyText(body) || `HTTP ${status}`;
   return new CommerceError(code, message);

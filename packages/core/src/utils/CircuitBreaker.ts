@@ -8,6 +8,9 @@
  * Biological Parallel: Immune System Fatigue Prevention!
  */
 
+import { isAuthTransientRetryError } from '../client/apiWarming';
+import { isTypedDna503Code } from './classifyAuthFailure';
+
 export type CircuitState = 'closed' | 'open' | 'half_open';
 
 export interface CircuitBreakerConfig {
@@ -171,17 +174,32 @@ export class CircuitBreaker {
   }
 
   /**
-   * Check if error is expected and shouldn't trigger circuit breaker
-   * 401, 403 are normal for unauthenticated requests
+   * Check if error is expected and shouldn't trigger circuit breaker.
+   * 401/403 = normal auth misses; warm-up / mint-busy 503 / login timeouts = retry, don't trip CB.
    */
   private isExpectedError(error: Error): boolean {
     if (this.isAbortLikeError(error)) return true;
+    if (isAuthTransientRetryError(error)) return true;
+    const apiCode = (error as { apiCode?: string }).apiCode;
+    if (apiCode && isTypedDna503Code(apiCode)) return true;
     const message = (error.message || '').toLowerCase();
     const expectedPatterns = [
       'unauthorized',
       'forbidden',
       '401',
-      '403'
+      '403',
+      'warming up',
+      'retry shortly',
+      'auth_mint',
+      'project_key_unavailable',
+      'dna_timeout',
+      'dna_overloaded',
+      'dna_router_unavailable',
+      'auth_me_db_timeout',
+      'batch_sub_timeout',
+      'timeout',
+      'entity not found',
+      'dna_router_unavailable',
     ];
 
     return expectedPatterns.some((pattern) => message.includes(pattern));
@@ -192,7 +210,20 @@ export class CircuitBreaker {
    * For user-triggered retry buttons!
    */
   reset() {
-    console.info(`🛡️ Circuit Breaker [${this.config.name}]: Manual reset!`);
+    if (this.state === 'closed' && this.failures === 0) {
+      return;
+    }
+    const wasOpen = this.state !== 'closed';
+    const isProd =
+      typeof import.meta !== 'undefined' && Boolean((import.meta as { env?: { PROD?: boolean } }).env?.PROD);
+    if (wasOpen || !isProd) {
+      const msg = `Circuit Breaker [${this.config.name}]: Manual reset!`;
+      if (isProd) {
+        console.debug(msg);
+      } else {
+        console.info(msg);
+      }
+    }
     this.state = 'closed';
     this.failures = 0;
     this.errorCache = null;
@@ -277,6 +308,19 @@ export class CircuitBreakerManager {
     this.getCircuit(key).reset();
   }
   
+  /**
+   * Reset circuits whose key contains any of the substrings (auth-scoped; G-16).
+   */
+  resetMatching(substrings: string[]) {
+    const needles = substrings.map((s) => s.toLowerCase());
+    this.breakers.forEach((circuit, key) => {
+      const k = key.toLowerCase();
+      if (needles.some((n) => k.includes(n))) {
+        circuit.reset();
+      }
+    });
+  }
+
   /**
    * Reset all circuits
    */

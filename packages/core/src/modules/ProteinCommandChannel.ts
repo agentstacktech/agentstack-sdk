@@ -4,6 +4,11 @@
  */
 
 import { HTTPClient } from '../client/http-client';
+import {
+  buildProteinDeltaExecuteBody,
+  type ProteinCommitMode,
+  type ProteinDraftDomain,
+} from '../protocol/proteinDraft';
 
 /** Request body for POST /commands/execute */
 export interface ProteinCommandExecuteRequest {
@@ -19,6 +24,23 @@ export interface ProteinBatchCommandRequest {
   commands: ProteinCommandExecuteRequest[];
   execute_parallel?: boolean;
   fail_fast?: boolean;
+}
+
+/** R32/R35 — HTTP 200 with ``success: false`` or dirty unflushed must not ACK. */
+export function assertProteinCommandResponseOk(data: unknown): void {
+  if (data == null || typeof data !== 'object') return;
+  const d = data as Record<string, unknown>;
+  if (d.success === false) {
+    throw new Error(String(d.error ?? 'protein_command_failed'));
+  }
+  const payload =
+    d.result != null && typeof d.result === 'object'
+      ? (d.result as Record<string, unknown>)
+      : d;
+  const mode = String(payload.commit_mode ?? '');
+  if (payload.flushed === false && (mode === 'dirty' || payload.dirty === true)) {
+    throw new Error('protein_delta_not_flushed');
+  }
 }
 
 export class ProteinCommandChannel {
@@ -44,7 +66,37 @@ export class ProteinCommandChannel {
     const res = await this.http.post<T>('/commands/execute', request, {
       headers: this.supplementalHeaders(),
     });
+    assertProteinCommandResponseOk(res.data);
     return res.data;
+  }
+
+  /**
+   * DNA DELTA via protein bus — supports ``commit_mode`` immediate|dirty|working_set.
+   * Genetic: shared.organelles.protein_commit.gen1
+   */
+  async deltaUpdate<T = unknown>(args: {
+    targetEntity: string;
+    updates: Record<string, unknown>;
+    domain?: ProteinDraftDomain | string;
+    commitMode?: ProteinCommitMode;
+    opId?: string;
+    entityUuid?: string;
+    entityId?: string | number;
+    projectId?: number;
+    userId?: number;
+  }): Promise<T> {
+    const body = buildProteinDeltaExecuteBody({
+      targetEntity: args.targetEntity,
+      updates: args.updates,
+      domain: (args.domain || 'config') as ProteinDraftDomain,
+      commitMode: args.commitMode,
+      opId: args.opId,
+      entityUuid: args.entityUuid,
+      entityId: args.entityId,
+      projectId: args.projectId,
+      userId: args.userId,
+    });
+    return this.executeCommand<T>(body as ProteinCommandExecuteRequest);
   }
 
   async executeDNAOperation<T = unknown>(
@@ -55,6 +107,7 @@ export class ProteinCommandChannel {
     const res = await this.http.post<T>(`/commands/dna/${entityType}/${operation}`, data, {
       headers: this.supplementalHeaders(),
     });
+    assertProteinCommandResponseOk(res.data);
     return res.data;
   }
 
@@ -62,6 +115,7 @@ export class ProteinCommandChannel {
     const res = await this.http.post<T>('/commands/batch', request, {
       headers: this.supplementalHeaders(),
     });
+    assertProteinCommandResponseOk(res.data);
     return res.data;
   }
 
@@ -79,6 +133,7 @@ export class ProteinCommandChannel {
     const res = await this.http.post<T>(`/commands/entities/${entityType}`, data, {
       headers: this.supplementalHeaders(),
     });
+    assertProteinCommandResponseOk(res.data);
     return res.data;
   }
 

@@ -7,6 +7,10 @@ export type CreateCheckoutSessionRequest = {
   rail?: string;
   buyer_project_id?: number;
   lines?: Array<{ listing_uuid: string; quantity: number }>;
+  /** Link paid order to CRM deal (DOCS-G8 / PE crm_lead_to_cash). */
+  crm_deal_id?: string;
+  crm_project_id?: number;
+  metadata?: Record<string, unknown>;
 };
 
 function mapCheckoutHttpError(err: unknown): never {
@@ -36,7 +40,7 @@ export class CheckoutClient {
       const response = await this.http.post(
         '/commerce/checkout/sessions',
         body,
-        { headers },
+        { headers, timeout: 60_000 },
       );
       return response.data ?? response;
     } catch (err) {
@@ -59,7 +63,7 @@ export class CheckoutClient {
       const response = await this.http.post(
         `/commerce/checkout/sessions/${sessionId}/confirm`,
         {},
-        { headers },
+        { headers, timeout: 60_000 },
       );
       return response.data ?? response;
     } catch (err) {
@@ -68,16 +72,28 @@ export class CheckoutClient {
   }
 
   /** Create checkout from server cart (wallet confirms inline; fiat awaits external pay). */
-  async createFromCart(rail = 'wallet_internal', idempotencyKey?: string) {
+  async createFromCart(
+    rail = 'wallet_internal',
+    idempotencyKey?: string,
+    opts?: {
+      crm_deal_id?: string;
+      crm_project_id?: number;
+      metadata?: Record<string, unknown>;
+    },
+  ) {
     const headers = idempotencyKey
       ? { 'Idempotency-Key': idempotencyKey }
       : undefined;
+    const body: Record<string, unknown> = {};
+    if (opts?.crm_deal_id) body.crm_deal_id = opts.crm_deal_id;
+    if (opts?.crm_project_id) body.crm_project_id = opts.crm_project_id;
+    if (opts?.metadata) body.metadata = opts.metadata;
     try {
-      const response = await this.http.post(
-        '/commerce/cart/checkout',
-        {},
-        { params: { rail }, headers },
-      );
+      const response = await this.http.post('/commerce/cart/checkout', body, {
+        params: { rail },
+        headers,
+        timeout: 60_000,
+      });
       return response.data ?? response;
     } catch (err) {
       mapCheckoutHttpError(err);

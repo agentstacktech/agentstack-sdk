@@ -17,7 +17,35 @@ const sdk = new AgentStackSDK({ apiBase: resolveAgentStackApiBase() });
 const catalog = sdk.getModuleCatalog();
 const matrix = sdk.getCapabilityMatrix();
 
-// 2) Auth
+// 2) Auth — headless agent (preferred for scripts)
+sdk.platform.auth.useApiKey(process.env.AGENTSTACK_API_KEY!, Number(process.env.AGENTSTACK_PROJECT_ID!));
+
+// Human SPA alternative:
+// await sdk.platform.auth.login({ email, password });
+
+// 3) Discover + first MCP-shaped call
+await sdk.platform.protocol.execute?.({ action: 'discovery.list', params: {} } as any);
+```
+
+**15-line agent script (copy-paste):**
+
+```typescript
+import { AgentStackSDK } from '@agentstack/sdk';
+const sdk = new AgentStackSDK({
+  apiBase: 'https://agentstack.tech/api',
+  apiKey: process.env.AGENTSTACK_API_KEY!,
+  projectId: Number(process.env.AGENTSTACK_PROJECT_ID!),
+});
+sdk.platform.auth.useApiKey(process.env.AGENTSTACK_API_KEY!, Number(process.env.AGENTSTACK_PROJECT_ID!));
+const matrix = await sdk.getCapabilityMatrix();
+console.log('caps', matrix.platform?.length);
+const discovery = await sdk.platform.protocol.execute?.({ action: 'discovery.list', params: {} } as any);
+console.log('tools', discovery);
+```
+
+**Previous human bootstrap (SPA):**
+
+```typescript
 await sdk.platform.auth.login({
   email: process.env.AGENTSTACK_EMAIL!,
   password: process.env.AGENTSTACK_PASSWORD!,

@@ -8,6 +8,7 @@
  */
 
 import { logger } from './logger';
+import { BATCH_TRANSPORT_SHED_CODES } from './classifyAuthFailure';
 
 /**
  * Ensure batch sub-request paths include ``/api`` (mirrors backend ``apply_batch_internal_api_prefix``).
@@ -50,6 +51,9 @@ export function normalizeBatchSubUrl(url: string): string {
     '/support',
     '/discovery',
     '/fabric',
+    '/capabilities',
+    '/cost',
+    '/shell',
   ];
   for (const prefix of prefixes) {
     if (url === prefix || url.startsWith(`${prefix}/`)) {
@@ -59,7 +63,31 @@ export function normalizeBatchSubUrl(url: string): string {
   return url;
 }
 
-/** Stable key for collapsing identical GET sub-requests inside one HTTP batch (singleflight). */
+function emitBatchTransportShedEvent(codes: string[], urls: string[] = []): void {
+  if (typeof window === 'undefined' || codes.length === 0) return;
+  try {
+    const primary =
+      codes.find((c) => c === 'dna_overloaded') ??
+      codes.find((c) => c === 'batch_sub_timeout') ??
+      codes[0];
+    const url = urls.find((u) => u.includes('/projects')) ?? urls[0];
+    window.dispatchEvent(
+      new CustomEvent('agentstack.batch.sub_timeout', {
+        detail: { codes, code: primary, url, urls },
+      }),
+    );
+    if (codes.includes('dna_overloaded')) {
+      window.dispatchEvent(
+        new CustomEvent('agentstack.dna.degraded', {
+          detail: { code: 'dna_overloaded' },
+        }),
+      );
+    }
+  } catch {
+    /* ignore — never block batch fan-out */
+  }
+}
+
 export function batchGetDedupeKey(
   method: string,
   url: string,
@@ -88,6 +116,8 @@ export interface RequestConfig {
   headers?: Record<string, string>;
   body?: any;
   params?: Record<string, any>;
+  /** When aborted, queued batch sub-requests reject without waiting for flush. */
+  signal?: AbortSignal;
 }
 
 export interface QueuedRequest {
@@ -162,12 +192,35 @@ export class RequestBatcher {
    */
   async add<T = any>(config: RequestConfig): Promise<T> {
     return new Promise<T>((resolve, reject) => {
+      const external = config.signal;
+      if (external?.aborted) {
+        reject(external.reason ?? new DOMException('Aborted', 'AbortError'));
+        return;
+      }
+
+      const onAbort = () => {
+        this.queue.delete(config.id);
+        reject(external?.reason ?? new DOMException('Aborted', 'AbortError'));
+      };
+      if (external) {
+        external.addEventListener('abort', onAbort, { once: true });
+      }
+
+      const finish = (fn: () => void) => {
+        if (external) {
+          external.removeEventListener('abort', onAbort);
+        }
+        fn();
+      };
+
       // Проверка на критичные запросы (не батчим)
       const isCritical = config.headers?.['X-No-Batch'] === 'true';
       
       if (isCritical) {
         // Выполнить сразу без батчинга
-        this.executeImmediate(config).then(resolve).catch(reject);
+        this.executeImmediate(config)
+          .then((v) => finish(() => resolve(v)))
+          .catch((e) => finish(() => reject(e)));
         return;
       }
 
@@ -175,8 +228,8 @@ export class RequestBatcher {
       // Добавить в очередь
       this.queue.set(config.id, {
         config,
-        resolve: resolve as (value: any) => void,
-        reject,
+        resolve: (value) => finish(() => resolve(value as T)),
+        reject: (error) => finish(() => reject(error)),
         timestamp: Date.now()
       });
 
@@ -302,13 +355,20 @@ export class RequestBatcher {
       // Remove trailing slash and ensure /api/batch path (avoid /api/api/batch)
       const baseUrl = this.baseUrl.replace(/\/$/, '');
       const batchUrl = baseUrl.endsWith('/api') ? `${baseUrl}/batch` : `${baseUrl}/api/batch`;
+      const timeoutHeader = batchPayload[0]?.headers?.['X-Request-Timeout-Ms'];
+      const timeoutMs = timeoutHeader ? Number(timeoutHeader) : undefined;
+      const batchSignal =
+        timeoutMs && Number.isFinite(timeoutMs) && timeoutMs > 0
+          ? AbortSignal.timeout(timeoutMs)
+          : undefined;
       const response = await fetch(batchUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...authHeaders
         },
-        body: JSON.stringify(batchRequest)
+        body: JSON.stringify(batchRequest),
+        signal: batchSignal,
       });
 
       if (!response.ok) {
@@ -321,6 +381,33 @@ export class RequestBatcher {
       const resultsMap = new Map(
         batchResponse.results.map(result => [result.id, result])
       );
+
+      const shedCodes = new Set<string>();
+      const shedUrls: string[] = [];
+      const idToUrl = new Map(
+        batchPayload.map((item) => [item.id, String(item.url || '')]),
+      );
+      for (const result of batchResponse.results) {
+        const resultUrl =
+          (result as { url?: string }).url || idToUrl.get(result.id) || '';
+        if (result.error && BATCH_TRANSPORT_SHED_CODES.has(result.error)) {
+          shedCodes.add(result.error);
+          if (resultUrl) shedUrls.push(resultUrl);
+        }
+        const dataCode =
+          result.data &&
+          typeof result.data === 'object' &&
+          'code' in (result.data as object)
+            ? String((result.data as { code?: string }).code || '')
+            : '';
+        if (dataCode && BATCH_TRANSPORT_SHED_CODES.has(dataCode)) {
+          shedCodes.add(dataCode);
+          if (resultUrl) shedUrls.push(resultUrl);
+        }
+      }
+      if (shedCodes.size > 0) {
+        emitBatchTransportShedEvent([...shedCodes], shedUrls);
+      }
 
       for (const queuedRequest of requests) {
         const cfg = queuedRequest.config;
@@ -337,6 +424,7 @@ export class RequestBatcher {
         if (result.error || result.status >= 400) {
           const error = new Error(result.error || `Request failed with status ${result.status}`);
           (error as any).status = result.status;
+          (error as any).apiCode = result.error;
           queuedRequest.reject(error);
         } else {
           queuedRequest.resolve(result.data);
@@ -371,7 +459,8 @@ export class RequestBatcher {
         ...authHeaders,
         ...config.headers
       },
-      body: config.body ? JSON.stringify(config.body) : undefined
+      body: config.body ? JSON.stringify(config.body) : undefined,
+      signal: config.signal,
     });
 
     if (!response.ok) {

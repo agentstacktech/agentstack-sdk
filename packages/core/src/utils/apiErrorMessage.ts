@@ -17,8 +17,11 @@ export function getApiErrorMessage(err: unknown): string {
   if (err == null) return 'Unknown error';
   if (typeof err === 'string') return err;
   const ax = err as {
-    response?: { data?: { detail?: unknown; message?: string } };
+    response?: { data?: { detail?: unknown; message?: string; code?: string } };
     message?: string;
+    apiCode?: string;
+    code?: string;
+    name?: string;
   };
   const data = ax.response?.data;
   if (data?.detail != null) {
@@ -33,6 +36,21 @@ export function getApiErrorMessage(err: unknown): string {
     }
   }
   if (typeof data?.message === 'string') return data.message;
+  const apiCode =
+    (typeof ax.apiCode === 'string' && ax.apiCode) ||
+    (typeof ax.code === 'string' && ax.code) ||
+    (typeof data?.code === 'string' && data.code) ||
+    '';
+  if (
+    apiCode === 'dna_timeout' ||
+    apiCode === 'dna_overloaded' ||
+    apiCode === 'auth_me_db_timeout'
+  ) {
+    return 'Server is busy — please try again shortly.';
+  }
+  if (ax.name === 'TimeoutError' || /timeout/i.test(String(ax.message || ''))) {
+    return 'Request timed out — please try again.';
+  }
   if (err instanceof Error && err.message) return err.message;
   if (typeof ax.message === 'string' && ax.message) return ax.message;
   return 'Request failed';

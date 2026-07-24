@@ -167,13 +167,16 @@ export class CartFacade {
     return this.getCartView();
   }
 
-  async mergeGuestLines(lines?: GuestCartLine[]): Promise<CartView | unknown> {
+  async mergeGuestLines(
+    lines?: GuestCartLine[],
+    idempotencyKey?: string,
+  ): Promise<CartView | unknown> {
     const merged = lines ?? this.storage.readGuestLines();
     if (this.mode === 'guest') {
       writeGuestCart(merged);
       return this.getCartView();
     }
-    await this.client.mergeGuestLines(merged);
+    await this.client.mergeGuestLines(merged, undefined, idempotencyKey);
     this.storage.clearGuest();
     return this.getCartView();
   }

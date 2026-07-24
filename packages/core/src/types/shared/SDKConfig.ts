@@ -54,6 +54,20 @@ export interface SDKConfig {
   
   /** Request timeout in milliseconds */
   timeout?: number;
+
+  /**
+   * Optional long timeout for AI / builder streams (ms).
+   * SPA shell/catalog should use `timeout` (≤15s); callers opt into `aiTimeout`.
+   * Session OS V3.2 P8 TimeoutClass.
+   */
+  aiTimeout?: number;
+
+  /**
+   * When true, never hydrate Bearer/API key from browser storage.
+   * Hosted `/s/{pid}` guest storefront must not inherit ecosystem SPA tokens.
+   * Session OS V3.2 Hosted Contour.
+   */
+  skipStorageTokenHydration?: boolean;
   
   /** Number of retry attempts for failed requests */
   retryAttempts?: number;
@@ -160,6 +174,12 @@ export interface RequestConfig {
    * (useful for login/refresh/public endpoints)
    */
   skipAuthStateCheck?: boolean;
+
+  /**
+   * Allow request during AuthCriticalSection (default: telemetry is deferred).
+   * Session OS V3.3 Z7.
+   */
+  skipAuthCriticalDefer?: boolean;
   
   /** Request headers */
   headers: Record<string, string>;
@@ -172,11 +192,20 @@ export interface RequestConfig {
   
   /** Request timeout */
   timeout?: number;
+
+  /**
+   * When true, use SDKConfig.aiTimeout (default 180s) instead of timeout.
+   * Session OS V3.2 P8 TimeoutClass — AI / builder streams only.
+   */
+  useAiTimeout?: boolean;
   
   /** Retry configuration */
   retry?: RetryConfig;
-  
-  /** Idempotency key */
+
+  /**
+   * Idempotency key — sent as `Idempotency-Key` on mutating methods when set.
+   * Prefer explicit keys for commerce mutations; omit on idempotent GETs.
+   */
   idempotencyKey?: string;
   
   /** Skip cache for this request */

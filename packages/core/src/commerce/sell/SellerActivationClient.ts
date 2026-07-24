@@ -30,6 +30,11 @@ export type ShareKit = {
   copy_link?: string;
   qr_data_url?: string;
   social?: Record<string, string>;
+  /** Public lite gallery (`frontend.commerce.pages_gallery.gen1`). */
+  gallery_url?: string;
+  /** Deep link to CDN buy-button spoke on the gallery. */
+  cdn_snippet_hint?: string;
+  sdk_cdn_version?: string;
 };
 
 export type ActivationResult = {
@@ -80,11 +85,29 @@ function flattenChecklist(
   };
 }
 
+function pickShareExtra(
+  primary: Record<string, unknown> | undefined,
+  fallback: Record<string, unknown> | undefined,
+): Pick<ShareKit, 'gallery_url' | 'cdn_snippet_hint' | 'sdk_cdn_version'> {
+  const src = { ...(fallback ?? {}), ...(primary ?? {}) };
+  return {
+    gallery_url:
+      src.gallery_url != null ? String(src.gallery_url) : '/commerce/lite',
+    cdn_snippet_hint:
+      src.cdn_snippet_hint != null
+        ? String(src.cdn_snippet_hint)
+        : '/commerce/lite/lite:cdn:buy-button',
+    sdk_cdn_version:
+      src.sdk_cdn_version != null ? String(src.sdk_cdn_version) : undefined,
+  };
+}
+
 function mapShareKit(
   shareKit: Record<string, unknown> | undefined,
   share: Record<string, unknown> | undefined,
   projectId?: number,
 ): ShareKit {
+  const extra = pickShareExtra(share, shareKit);
   if (share?.store_url) {
     return {
       store_url: String(share.store_url),
@@ -93,6 +116,7 @@ function mapShareKit(
       qr_data_url:
         share.qr_data_url != null ? String(share.qr_data_url) : undefined,
       social: share.social as Record<string, string> | undefined,
+      ...extra,
     };
   }
   const shop =
@@ -104,6 +128,7 @@ function mapShareKit(
     qr_data_url:
       shareKit?.qr_data_url != null ? String(shareKit.qr_data_url) : undefined,
     social: shareKit?.social as Record<string, string> | undefined,
+    ...extra,
   };
 }
 

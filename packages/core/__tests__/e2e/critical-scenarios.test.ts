@@ -1,16 +1,20 @@
 /**
- * End-to-End tests for critical AgentStack scenarios
- * Tests complete user workflows and critical business logic
+ * End-to-End tests for critical AgentStack scenarios (live stack only).
+ * @plane dev.e2e_live — run: E2E_BASE_URL=... SDK_E2E_LIVE=1 jest __tests__/e2e
+ * Excluded from default `npm test` via jest testPathIgnorePatterns.
  */
 
 import { AgentStackSDK } from '../../src/sdk';
 
-describe('AgentStack Critical E2E Scenarios', () => {
+const LIVE_E2E = Boolean(process.env.E2E_BASE_URL || process.env.SDK_E2E_LIVE);
+const describeLive = LIVE_E2E ? describe : describe.skip;
+
+describeLive('AgentStack Critical E2E Scenarios', () => {
   let sdk: AgentStackSDK;
   
   // Real test configuration - adjust for your environment
   const testConfig = {
-    apiBase: 'http://localhost:8000', // Adjust to your backend URL
+    apiBase: process.env.E2E_BASE_URL || 'http://localhost:8000',
     apiKey: 'test-api-key',
     projectId: 1,
     timeout: 15000,
@@ -84,15 +88,11 @@ describe('AgentStack Critical E2E Scenarios', () => {
           console.log('Logout successful');
 
         } catch (error: any) {
-          console.log('Login flow failed:', error.message);
-          // This is expected if backend is not available
-          expect(true).toBe(true);
+          throw new Error(`Login flow failed: ${error?.message || error}`);
         }
 
       } catch (error: any) {
-        console.log('E2E registration flow failed:', error.message);
-        // This is expected if backend is not available
-        expect(true).toBe(true);
+        throw new Error(`E2E registration flow failed: ${error?.message || error}`);
       }
     }, 30000);
 
@@ -106,10 +106,9 @@ describe('AgentStack Critical E2E Scenarios', () => {
             project_id: 1,
           });
           console.log('Login successful for payment flow');
-        } catch (error) {
-          console.log('Login failed, skipping payment flow');
-          expect(true).toBe(true);
-          return;
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          throw new Error(`Login required for payment flow: ${msg}`);
         }
 
         // Step 2: Get payment methods
@@ -157,9 +156,7 @@ describe('AgentStack Critical E2E Scenarios', () => {
         }
 
       } catch (error: any) {
-        console.log('E2E payment flow failed:', error.message);
-        // This is expected if backend is not available
-        expect(true).toBe(true);
+        throw new Error(`E2E payment flow failed: ${error?.message || error}`);
       }
     }, 30000);
 
@@ -173,10 +170,9 @@ describe('AgentStack Critical E2E Scenarios', () => {
             project_id: 1,
           });
           console.log('Login successful for analytics flow');
-        } catch (error) {
-          console.log('Login failed, skipping analytics flow');
-          expect(true).toBe(true);
-          return;
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          throw new Error(`Login required for analytics flow: ${msg}`);
         }
 
         // Step 2: Track test events
@@ -258,9 +254,7 @@ describe('AgentStack Critical E2E Scenarios', () => {
         }
 
       } catch (error: any) {
-        console.log('E2E analytics flow failed:', error.message);
-        // This is expected if backend is not available
-        expect(true).toBe(true);
+        throw new Error(`E2E analytics flow failed: ${error?.message || error}`);
       }
     }, 30000);
 
@@ -274,10 +268,9 @@ describe('AgentStack Critical E2E Scenarios', () => {
             project_id: 1,
           });
           console.log('Login successful for project flow');
-        } catch (error) {
-          console.log('Login failed, skipping project flow');
-          expect(true).toBe(true);
-          return;
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          throw new Error(`Login required for project flow: ${msg}`);
         }
 
         // Step 2: Get projects
@@ -321,9 +314,7 @@ describe('AgentStack Critical E2E Scenarios', () => {
         }
 
       } catch (error: any) {
-        console.log('E2E project flow failed:', error.message);
-        // This is expected if backend is not available
-        expect(true).toBe(true);
+        throw new Error(`E2E project flow failed: ${error?.message || error}`);
       }
     }, 30000);
   });
@@ -394,8 +385,7 @@ describe('AgentStack Critical E2E Scenarios', () => {
         expect(results.length).toBe(5);
         console.log('Concurrent requests handled');
       } catch (error: any) {
-        console.log('Concurrent request test failed:', error.message);
-        expect(true).toBe(true); // Pass if backend is not available
+        throw new Error(`Concurrent request test failed: ${error?.message || error}`);
       }
     }, 20000);
 
@@ -411,8 +401,7 @@ describe('AgentStack Critical E2E Scenarios', () => {
         expect(payments).toBeDefined();
         console.log('Large data response handled');
       } catch (error: any) {
-        console.log('Large data test failed:', error.message);
-        expect(true).toBe(true); // Pass if backend is not available
+        throw new Error(`Large data test failed: ${error?.message || error}`);
       }
     }, 20000);
   });

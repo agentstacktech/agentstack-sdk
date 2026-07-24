@@ -10,6 +10,7 @@ import {
   type QueryFunctionContext,
 } from '@tanstack/react-query';
 import type { AgentStackSDK } from '@agentstack/sdk';
+import { isNonRetryableAuthOrShed } from '@agentstack/sdk';
 import { useEffect, useRef, useState } from 'react';
 
 export interface SDKQueryOptions<T> {
@@ -56,14 +57,7 @@ function isAdminOverviewUnavailable(error: unknown): boolean {
 }
 
 function is401Error(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  const anyErr = error as Error & { status?: number; statusCode?: number };
-  return (
-    error.message.includes('401') ||
-    error.message.includes('Unauthorized') ||
-    anyErr.status === 401 ||
-    anyErr.statusCode === 401
-  );
+  return isNonRetryableAuthOrShed(error);
 }
 
 /** Fetch/React Query cancellation — not a user-visible failure. */
@@ -170,7 +164,7 @@ export function useSDKQuery<T = unknown>(
     refetchOnMount: options?.refetchOnMount,
     refetchOnWindowFocus: options?.refetchOnWindowFocus,
     retry: (failureCount, error) => {
-      if (is401Error(error)) return false;
+      if (isNonRetryableAuthOrShed(error)) return false;
       if (isAbortLikeError(error)) return false;
       return failureCount < 2;
     },

@@ -86,18 +86,20 @@ export {
 
 export { CheckoutClient } from './checkout/CheckoutClient';
 
-
+export {
+  CommerceSurfaceClient,
+  CommerceIntentClient,
+  stableCommerceIdempotencyKey,
+  type CommerceSurfaceKind,
+  type CreateSurfaceSessionInput,
+  type CreateIntentInput,
+} from './surfaces';
 
 export {
-
   registerRail,
-
   listRails,
-
   type CheckoutRailAdapter,
-
   type RailContext,
-
 } from './checkout/railRegistry';
 
 

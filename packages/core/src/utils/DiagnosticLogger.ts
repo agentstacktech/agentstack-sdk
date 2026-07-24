@@ -43,7 +43,14 @@ export class DiagnosticLogger {
       this.logs = this.logs.slice(-this.maxLogs);
     }
 
-    // Console output for debugging
+    // Console output for debugging — suppress noisy info in production (AgentDNA:list spam).
+    const isProd =
+      typeof import.meta !== 'undefined' &&
+      Boolean((import.meta as { env?: { PROD?: boolean } }).env?.PROD);
+    if (isProd && status === 'info' && component === 'AgentDNA' && operation === 'list') {
+      return;
+    }
+
     const emoji = this.getStatusEmoji(status);
     const time = new Date(log.timestamp).toLocaleTimeString();
     

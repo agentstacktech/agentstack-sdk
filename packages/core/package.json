@@ -1,6 +1,6 @@
 {
   "name": "@agentstack/sdk",
-  "version": "0.4.14",
+  "version": "0.4.15",
   "description": "AgentStack-SDK - Universal API client with modular architecture and Neural integration",
   "readme": "README.en.md",
   "type": "module",
@@ -43,6 +43,18 @@
       "import": "./dist/fabric/index.esm.js",
       "require": "./dist/fabric/index.js",
       "default": "./dist/fabric/index.esm.js"
+    },
+    "./cost": {
+      "types": "./dist/cost/index.d.ts",
+      "import": "./dist/cost/index.esm.js",
+      "require": "./dist/cost/index.js",
+      "default": "./dist/cost/index.esm.js"
+    },
+    "./cost/explorer": {
+      "types": "./dist/cost/explorer.d.ts",
+      "import": "./dist/cost/explorer.esm.js",
+      "require": "./dist/cost/explorer.js",
+      "default": "./dist/cost/explorer.esm.js"
     },
     "./guidance": {
       "types": "./dist/guidance/index.d.ts",
@@ -156,6 +168,12 @@
       "require": "./dist/commerce/refund/index.js",
       "default": "./dist/commerce/refund/index.esm.js"
     },
+    "./commerce/surfaces": {
+      "types": "./dist/commerce/surfaces/index.d.ts",
+      "import": "./dist/commerce/surfaces/index.esm.js",
+      "require": "./dist/commerce/surfaces/index.js",
+      "default": "./dist/commerce/surfaces/index.esm.js"
+    },
     "./commerce": {
       "types": "./dist/commerce/index.d.ts",
       "import": "./dist/commerce/index.esm.js",
@@ -221,6 +239,7 @@
     "check:economy-parity": "node ../../scripts/check-sdk-economy-parity.mjs",
     "check:finance-parity": "node ../../scripts/check-sdk-finance-parity.mjs",
     "check:commerce-assets-parity": "node ../../scripts/check-sdk-commerce-assets-parity.mjs",
+    "check:agents-fleet-parity": "node ../../scripts/check-sdk-agents-fleet-parity.mjs",
     "check:commerce-marketplace-parity": "node ../../scripts/check-sdk-commerce-marketplace-parity.mjs",
     "check:commerce-shop-parity": "node ../../scripts/check-commerce-shop-parity.mjs",
     "check:docs-urls": "node ./scripts/check-docs-urls.mjs",

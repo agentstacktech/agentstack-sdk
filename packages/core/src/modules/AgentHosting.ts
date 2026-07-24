@@ -27,6 +27,27 @@ export interface QuickStartResult {
   manifest_hash?: string | null;
 }
 
+/** Single file row from `GET /hosting/buckets/{id}/files` (LITE-GAP-L11). */
+export interface HostingBucketFileRow {
+  path: string;
+  bytes: number;
+}
+
+/** Paginated bucket file list response. */
+export interface HostingBucketFilesList {
+  files: HostingBucketFileRow[];
+  next_cursor?: string | null;
+  total?: number;
+}
+
+export type ListBucketFilesOptions = {
+  prefix?: string;
+  limit?: number;
+  cursor?: string;
+  /** Case-insensitive path substring (LITE-GAP-L7 `?q=`). */
+  q?: string;
+};
+
 /** Known hosting API `detail` codes (see docs/api/HOSTING_ERROR_CODES.md). */
 export type HostingApiErrorCode =
   | 'slug_exists'
@@ -262,20 +283,27 @@ export class AgentHosting {
   listFiles(
     projectId: number,
     bucketId: string,
-    options?: { prefix?: string; limit?: number; cursor?: string },
+    options?: ListBucketFilesOptions,
   ) {
-    return this.client.get<{
-      files: { path: string; bytes: number }[];
-      next_cursor?: string | null;
-      total?: number;
-    }>(`/hosting/buckets/${bucketId}/files`, {
+    const q = options?.q?.trim();
+    return this.client.get<HostingBucketFilesList>(`/hosting/buckets/${bucketId}/files`, {
       params: {
         project_id: projectId,
         ...(options?.prefix ? { prefix: options.prefix } : {}),
         ...(options?.limit != null ? { limit: options.limit } : {}),
         ...(options?.cursor ? { cursor: options.cursor } : {}),
+        ...(q ? { q } : {}),
       },
     });
+  }
+
+  /** Alias for {@link listFiles} — typed bucket explorer list (LITE-GAP-L11). */
+  listBucketFiles(
+    projectId: number,
+    bucketId: string,
+    options?: ListBucketFilesOptions,
+  ) {
+    return this.listFiles(projectId, bucketId, options);
   }
 
   getFile(projectId: number, bucketId: string, path: string) {

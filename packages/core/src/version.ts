@@ -35,9 +35,19 @@ export interface SDKVersion {
  * Current SDK Version Information
  * Philosophy v0.2.11: URL Minimalism + v0.1.16: Elegant Minimalism
  */
+/** Build hash from CI / Vite define when present. */
+const BUILD_HASH: string =
+  typeof process !== 'undefined' && typeof process.env?.AGENTSTACK_BUILD_HASH === 'string'
+    ? process.env.AGENTSTACK_BUILD_HASH
+    : typeof import.meta !== 'undefined' &&
+        typeof (import.meta as { env?: { VITE_APP_BUILD_ID?: string } }).env?.VITE_APP_BUILD_ID ===
+          'string'
+      ? (import.meta as { env: { VITE_APP_BUILD_ID: string } }).env.VITE_APP_BUILD_ID
+      : 'dev-local';
+
 export const SDK_VERSION: SDKVersion = {
   semantic: AGENTSTACK_CORE_VERSION,
-  buildHash: "a1b2c3d4e5f6", // Will be replaced by build process
+  buildHash: BUILD_HASH,
   generation: "Gen2",
   features: {
     urlMinimalism: true,        // v0.2.11: URL Minimalism applied

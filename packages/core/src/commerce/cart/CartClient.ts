@@ -34,23 +34,42 @@ export class CartClient {
   async mergeGuestLines(
     lines: { listing_uuid: string; quantity: number; variant?: Record<string, string> }[],
     couponCode?: string,
+    idempotencyKey?: string,
   ) {
-    const response = await this.http.post('/commerce/cart/merge', {
-      lines,
-      ...(couponCode?.trim() ? { coupon_code: couponCode.trim() } : {}),
-    });
-    return response.data ?? response;
-  }
-
-  async checkout(rail = 'wallet_internal', idempotencyKey?: string) {
     const headers = idempotencyKey
       ? { 'Idempotency-Key': idempotencyKey }
       : undefined;
     const response = await this.http.post(
-      '/commerce/cart/checkout',
-      {},
-      { params: { rail }, headers },
+      '/commerce/cart/merge',
+      {
+        lines,
+        ...(couponCode?.trim() ? { coupon_code: couponCode.trim() } : {}),
+      },
+      { headers },
     );
+    return response.data ?? response;
+  }
+
+  async checkout(
+    rail = 'wallet_internal',
+    idempotencyKey?: string,
+    opts?: {
+      crm_deal_id?: string;
+      crm_project_id?: number;
+      metadata?: Record<string, unknown>;
+    },
+  ) {
+    const headers = idempotencyKey
+      ? { 'Idempotency-Key': idempotencyKey }
+      : undefined;
+    const body: Record<string, unknown> = {};
+    if (opts?.crm_deal_id) body.crm_deal_id = opts.crm_deal_id;
+    if (opts?.crm_project_id) body.crm_project_id = opts.crm_project_id;
+    if (opts?.metadata) body.metadata = opts.metadata;
+    const response = await this.http.post('/commerce/cart/checkout', body, {
+      params: { rail },
+      headers,
+    });
     return response.data ?? response;
   }
 

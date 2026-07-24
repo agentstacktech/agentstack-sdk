@@ -1,16 +1,19 @@
 /**
- * Integration tests for AgentAuth module with real API
- * Tests actual communication with backend services
+ * Integration tests for AgentAuth module with real API (live stack only).
+ * @plane dev.e2e_live — run: E2E_BASE_URL=... SDK_E2E_LIVE=1 jest __tests__/integration
  */
 
 import { AgentStackSDK } from '../../src/sdk';
 
-describe('AgentAuth Integration Tests', () => {
+const LIVE_E2E = Boolean(process.env.E2E_BASE_URL || process.env.SDK_E2E_LIVE);
+const describeLive = LIVE_E2E ? describe : describe.skip;
+
+describeLive('AgentAuth Integration Tests', () => {
   let sdk: AgentStackSDK;
   
   // Real test configuration - adjust for your environment
   const testConfig = {
-    apiBase: 'http://localhost:8000', // Adjust to your backend URL
+    apiBase: process.env.E2E_BASE_URL || 'http://localhost:8000',
     apiKey: 'test-api-key',
     projectId: 1,
     timeout: 10000,
@@ -24,15 +27,8 @@ describe('AgentAuth Integration Tests', () => {
 
   describe('Authentication Flow', () => {
     it('should connect to auth service', async () => {
-      try {
-        // Test basic connectivity
-        const response = await sdk.ping();
-        expect(response).toBeDefined();
-      } catch (error) {
-        // If service is not available, skip test
-        console.warn('Auth service not available, skipping integration test');
-        expect(true).toBe(true); // Pass the test
-      }
+      const response = await sdk.ping();
+      expect(response).toBeDefined();
     }, 15000);
 
     it('should handle login with invalid credentials gracefully', async () => {
@@ -173,15 +169,9 @@ describe('AgentAuth Integration Tests', () => {
 
   describe('OAuth Operations', () => {
     it('should get OAuth providers', async () => {
-      try {
-        const providers = await sdk.auth.getOAuthProviders();
-        expect(providers).toBeDefined();
-        expect(providers.providers).toBeInstanceOf(Array);
-      } catch (error) {
-        // Service might not be available
-        console.warn('OAuth service not available');
-        expect(true).toBe(true);
-      }
+      const providers = await sdk.auth.getOAuthProviders();
+      expect(providers).toBeDefined();
+      expect(providers.providers).toBeInstanceOf(Array);
     }, 15000);
 
     it('should handle OAuth connect when not authenticated', async () => {

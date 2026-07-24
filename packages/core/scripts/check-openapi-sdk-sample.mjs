@@ -14,6 +14,7 @@ const required = [
   'AgentHosting.ts',
   'AgentIntegrations.ts',
   'AgentSupport.ts',
+  'AgentCrm.ts',
 ];
 
 const missing = required.filter((f) => !existsSync(join(src, f)));

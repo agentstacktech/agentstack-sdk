@@ -75,9 +75,22 @@ describe('AgentAuth', () => {
 
       const result = await auth.login(loginData);
 
-      expect(mockHttpClient.post).toHaveBeenCalledWith('/auth/login', loginData, {
-        skipAuthStateCheck: true,
-      });
+      expect(mockHttpClient.post).toHaveBeenCalledWith(
+        '/auth/login',
+        expect.objectContaining({
+          email: loginData.email,
+          password: loginData.password,
+          project_id: loginData.project_id,
+          mint_id: expect.any(String),
+        }),
+        expect.objectContaining({
+          skipAuthStateCheck: true,
+          headers: expect.objectContaining({
+            'Idempotency-Key': expect.any(String),
+            'X-Mint-Id': expect.any(String),
+          }),
+        })
+      );
       expect(result).toEqual(expectedResponse);
     });
 
@@ -92,6 +105,23 @@ describe('AgentAuth', () => {
       mockHttpClient.post.mockRejectedValueOnce(new UnauthorizedError('Invalid credentials'));
 
       await expect(auth.login(loginData)).rejects.toThrow(UnauthorizedError);
+    });
+
+    it('should throw on 502 gateway errors instead of returning null', async () => {
+      const loginData = {
+        email: 'test@example.com',
+        password: 'password',
+        project_id: 1438,
+      };
+
+      const axiosLike = {
+        response: { status: 502, data: { detail: 'Bad Gateway' } },
+        message: 'Request failed with status code 502',
+      };
+      mockHttpClient.post.mockRejectedValueOnce(axiosLike);
+
+      // Must reject (never return null) when the API is unavailable.
+      await expect(auth.login(loginData)).rejects.toThrow();
     });
 
     it('should logout successfully', async () => {
@@ -173,6 +203,77 @@ describe('AgentAuth', () => {
       });
       await auth.getSessionBootstrapPayload({ force: true });
       expect(mockHttpClient.get).toHaveBeenCalledTimes(1);
+    });
+
+    it('force discards stale in-flight bootstrap (never awaits old payload)', async () => {
+      let resolveStale!: (v: unknown) => void;
+      const stalePromise = new Promise((resolve) => {
+        resolveStale = resolve;
+      });
+      mockHttpClient.get.mockImplementationOnce(() => stalePromise);
+      mockHttpClient.get.mockResolvedValueOnce({
+        data: {
+          success: true,
+          data: { ...testUser, user_id: 99, email: 'fresh@example.com' },
+          settings_summary: { theme: 'light', language: 'en', timezone: 'UTC' },
+        },
+      });
+
+      const staleFlight = auth.getSessionBootstrapPayload();
+      const forceFlight = auth.getSessionBootstrapPayload({ force: true });
+
+      resolveStale({
+        data: {
+          success: true,
+          data: { ...testUser, user_id: 1, email: 'stale@example.com' },
+          settings_summary: { theme: 'dark', language: 'ru', timezone: 'UTC' },
+        },
+      });
+
+      const forceResult = await forceFlight;
+      expect(forceResult.user.email).toBe('fresh@example.com');
+      expect(forceResult.user.user_id).toBe(99);
+      // Stale flight should reject after abort (or be discarded); force must not return stale.
+      await expect(staleFlight).rejects.toThrow(/aborted|stale/i);
+      expect(mockHttpClient.get).toHaveBeenCalledWith(
+        '/auth/me/bootstrap',
+        undefined,
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
+    });
+
+    it('invalidateSessionBootstrap clears cache', async () => {
+      mockHttpClient.get.mockResolvedValueOnce({
+        data: {
+          success: true,
+          data: testUser,
+          settings_summary: { theme: 'dark', language: 'ru', timezone: 'UTC' },
+        },
+      });
+      await auth.getSessionBootstrapPayload();
+      auth.invalidateSessionBootstrap('manual');
+      expect(auth.getLastSessionBootstrap()).toBeNull();
+      mockHttpClient.get.mockResolvedValueOnce({
+        data: {
+          success: true,
+          data: testUser,
+          settings_summary: { theme: 'light', language: 'en', timezone: 'UTC' },
+        },
+      });
+      await auth.getSessionBootstrapPayload();
+      expect(mockHttpClient.get).toHaveBeenCalledTimes(2);
+    });
+
+    it('throws UnauthorizedError on empty bootstrap body (no generic Error)', async () => {
+      const { UnauthorizedError } = require('../../src/types/shared/HTTPTypes');
+      mockHttpClient.get.mockResolvedValueOnce({
+        data: null,
+        status: 401,
+        traceId: 'trace-1',
+      });
+      await expect(auth.getSessionBootstrapPayload({ force: true })).rejects.toBeInstanceOf(
+        UnauthorizedError,
+      );
     });
 
     it('should refresh token', async () => {

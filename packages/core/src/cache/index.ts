@@ -41,3 +41,10 @@ export {
   loadPersistedSnapshotEnvelope,
 } from './snapshot-persistence';
 export type { SnapshotPersistencePolicy } from './snapshot-persistence';
+
+export {
+  ReadThroughCache,
+  createReadThroughCache,
+  entityCacheKey,
+} from './readThroughCache';
+export type { ReadThroughCacheOptions, EntityLoader } from './readThroughCache';
