@@ -7,6 +7,9 @@
  * Prefer vault Bearer for route pid, else guest (omit Bearer).
  */
 
+import { isEcosystemScopedApiPath } from './routeScopeClassifier';
+import { ECOSYSTEM_PROJECT_ID } from '../config/ecosystemProject';
+
 export type ProjectBindingMode = 'hosted' | 'shell' | 'guest';
 
 export type ResolveRequestProjectContextInput = {
@@ -16,6 +19,8 @@ export type ResolveRequestProjectContextInput = {
   headerProjectId?: number | null;
   /** Vault (or memory) token for route/active project when known */
   vaultToken?: string | null;
+  /** Request URL/path for ecosystem vs hosted classifier (shell finance/profile). */
+  requestPath?: string | null;
 };
 
 export type ResolveRequestProjectContextResult = {
@@ -74,11 +79,21 @@ export function resolveRequestProjectContext(
     return { mode: 'guest', projectId: routePid };
   }
 
-  const shellPid = headerPid ?? jwtPid ?? 1;
+  const shellPid = headerPid ?? jwtPid ?? ECOSYSTEM_PROJECT_ID;
   if (vault && jwtProjectIdFromToken(vault) === shellPid) {
     return { mode: 'shell', projectId: shellPid, bearer: vault };
   }
   if (jwtPid != null && headerPid != null && jwtPid !== headerPid) {
+    const vaultPid = vault ? jwtProjectIdFromToken(vault) : null;
+    if (vaultPid === headerPid) {
+      return { mode: 'shell', projectId: headerPid, bearer: vault };
+    }
+    const ecosystemRoute =
+      input.requestPath != null && isEcosystemScopedApiPath(input.requestPath);
+    if (ecosystemRoute && headerPid === ECOSYSTEM_PROJECT_ID) {
+      // Shell personal finance/profile — never guest-strip; bridge must remint vault[1].
+      return { mode: 'shell', projectId: headerPid };
+    }
     // Honor header project as guest rather than rewriting header to JWT
     return { mode: 'guest', projectId: headerPid };
   }

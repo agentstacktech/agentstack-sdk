@@ -1,0 +1,119 @@
+[
+  {
+    "id": "hosted-vault-match",
+    "input": { "routeProjectId": 1438, "jwtProjectId": 1, "headerProjectId": 1438, "vaultToken": "h.eyJwcm9qZWN0X2lkIjoxNDM4fQ==.s" },
+    "expect": { "mode": "hosted", "projectId": 1438, "hasBearer": true }
+  },
+  {
+    "id": "hosted-guest-wrong-vault",
+    "input": { "routeProjectId": 1438, "jwtProjectId": 1, "headerProjectId": 1438 },
+    "expect": { "mode": "guest", "projectId": 1438, "hasBearer": false }
+  },
+  {
+    "id": "shell-ecosystem-finance",
+    "input": { "headerProjectId": 1, "jwtProjectId": 1444, "requestPath": "/api/profile/wallets" },
+    "expect": { "mode": "shell", "projectId": 1, "hasBearer": false }
+  },
+  {
+    "id": "shell-workspace-mismatch",
+    "input": { "headerProjectId": 1438, "jwtProjectId": 1, "requestPath": "/api/projects/1438/crm/contacts" },
+    "expect": { "mode": "guest", "projectId": 1438, "hasBearer": false }
+  },
+  {
+    "id": "shell-vault-ecosystem-match",
+    "input": {
+      "headerProjectId": 1,
+      "jwtProjectId": 1444,
+      "vaultToken": "h.eyJwcm9qZWN0X2lkIjoxfQ==.s"
+    },
+    "expect": { "mode": "shell", "projectId": 1, "hasBearer": true }
+  },
+  {
+    "id": "shell-aligned-no-vault",
+    "input": { "headerProjectId": 2, "jwtProjectId": 2 },
+    "expect": { "mode": "shell", "projectId": 2, "hasBearer": false }
+  },
+  {
+    "id": "shell-header-only",
+    "input": { "headerProjectId": 5 },
+    "expect": { "mode": "shell", "projectId": 5, "hasBearer": false }
+  },
+  {
+    "id": "shell-jwt-only",
+    "input": { "jwtProjectId": 3 },
+    "expect": { "mode": "shell", "projectId": 3, "hasBearer": false }
+  },
+  {
+    "id": "shell-default-ecosystem",
+    "input": {},
+    "expect": { "mode": "shell", "projectId": 1, "hasBearer": false }
+  },
+  {
+    "id": "ecosystem-finance-me",
+    "input": { "headerProjectId": 1, "jwtProjectId": 99, "requestPath": "/api/finance/me" },
+    "expect": { "mode": "shell", "projectId": 1, "hasBearer": false }
+  },
+  {
+    "id": "ecosystem-payments",
+    "input": { "headerProjectId": 1, "jwtProjectId": 99, "requestPath": "/api/payments/checkout" },
+    "expect": { "mode": "shell", "projectId": 1, "hasBearer": false }
+  },
+  {
+    "id": "project-overview-mismatch",
+    "input": { "headerProjectId": 2, "jwtProjectId": 1, "requestPath": "/api/projects/2/overview" },
+    "expect": { "mode": "guest", "projectId": 2, "hasBearer": false }
+  },
+  {
+    "id": "shell-vault-header-match",
+    "input": {
+      "headerProjectId": 7,
+      "jwtProjectId": 1,
+      "vaultToken": "h.eyJwcm9qZWN0X2lkIjo3fQ==.s"
+    },
+    "expect": { "mode": "shell", "projectId": 7, "hasBearer": true }
+  },
+  {
+    "id": "hosted-no-route-shell-fallback",
+    "input": { "headerProjectId": 4, "jwtProjectId": 4, "vaultToken": "h.eyJwcm9qZWN0X2lkIjo0fQ==.s" },
+    "expect": { "mode": "shell", "projectId": 4, "hasBearer": true }
+  },
+  {
+    "id": "wallets-ecosystem-vault-bridge",
+    "input": {
+      "headerProjectId": 1,
+      "jwtProjectId": 1444,
+      "vaultToken": "h.eyJwcm9qZWN0X2lkIjoxfQ==.s",
+      "requestPath": "/api/profile/wallets"
+    },
+    "expect": { "mode": "shell", "projectId": 1, "hasBearer": true }
+  },
+  {
+    "id": "crm-mismatch-no-ecosystem",
+    "input": { "headerProjectId": 10, "jwtProjectId": 11, "requestPath": "/api/projects/10/crm/deals" },
+    "expect": { "mode": "guest", "projectId": 10, "hasBearer": false }
+  },
+  {
+    "id": "storage-hosted-guest",
+    "input": { "routeProjectId": 2001, "jwtProjectId": 1, "headerProjectId": 2001, "requestPath": "/api/storage/list" },
+    "expect": { "mode": "guest", "projectId": 2001, "hasBearer": false }
+  },
+  {
+    "id": "profile-settings-ecosystem",
+    "input": { "headerProjectId": 1, "jwtProjectId": 50, "requestPath": "/api/profile/settings" },
+    "expect": { "mode": "shell", "projectId": 1, "hasBearer": false }
+  },
+  {
+    "id": "wallets-mismatch-vault-workspace",
+    "input": {
+      "headerProjectId": 1,
+      "jwtProjectId": 1444,
+      "requestPath": "/api/profile/wallets"
+    },
+    "expect": { "mode": "shell", "projectId": 1, "hasBearer": false }
+  },
+  {
+    "id": "agents-project-scoped",
+    "input": { "headerProjectId": 6, "jwtProjectId": 1, "requestPath": "/api/projects/6/agents" },
+    "expect": { "mode": "guest", "projectId": 6, "hasBearer": false }
+  }
+]

@@ -32,7 +32,9 @@ import {
   clearBrowserAccessTokenIfJtiPrefix,
 } from '../utils/browserAccessToken';
 import { AGENTSTACK_DEV_API_BASE } from '../config/agentstackEndpoints';
+import { ECOSYSTEM_PROJECT_ID } from '../config/ecosystemProject';
 import {
+  isMissingAuthHeadersDetail,
   isTransientBrowserNetworkError,
   noteTransientNetworkError,
 } from './networkErrors';
@@ -55,6 +57,11 @@ import {
   jwtProjectIdFromToken,
   resolveRequestProjectContext,
 } from './resolveRequestProjectContext';
+import { isEcosystemScopedApiPath } from './routeScopeClassifier';
+import {
+  isSessionAuthEndpoint,
+  isSwitchProjectEndpoint,
+} from './authEndpointClassifier';
 import {
   SDKConfig,
   RequestConfig,
@@ -68,6 +75,7 @@ import {
   ConflictError,
   RateLimitError,
   ServerError,
+  ServerBusyError,
   TimeoutError,
   DemoReadOnlyError,
   BudgetExceededError,
@@ -851,7 +859,7 @@ export class HTTPClient extends SimpleEventEmitter {
     const url = this.buildURL(interceptedConfig.url, interceptedConfig.params);
     
     // Build headers
-    const headers = this.buildHeaders(interceptedConfig.headers, url);
+    const headers = this.buildHeaders(interceptedConfig.headers, url, interceptedConfig);
 
     const effectiveTimeout =
       interceptedConfig.timeout ??
@@ -925,6 +933,11 @@ export class HTTPClient extends SimpleEventEmitter {
 
     this.authToken = isValidToken ? cleanToken : null;
 
+    if (!isValidToken) {
+      this.postLoginGraceUntil = 0;
+      this.mintFloorIat = 0;
+    }
+
     // If we acquired a token, align SDK auth state so skipAuthStateCheck:false requests
     // (non-social paths) are not stuck after session_expired until the SPA calls login().
     if (isValidToken) {
@@ -955,6 +968,40 @@ export class HTTPClient extends SimpleEventEmitter {
   /** Active X-Project-ID header source (mint pid after login). */
   public getProjectId(): number | string | undefined {
     return this.config.projectId;
+  }
+
+  /** Notify shell diagnostics bridge (429 / admission shed) without importing frontend. */
+  private notifyShellHttpResilience(
+    status: number,
+    url: string | undefined,
+    err: AgentStackError,
+  ): void {
+    if (typeof window === 'undefined') return;
+    const apiCode =
+      (err as { apiCode?: string }).apiCode ||
+      (err as { code?: string }).code ||
+      '';
+    const retryAfterSec = (err as { retryAfterSec?: number }).retryAfterSec;
+    const requestId = (err as { requestId?: string }).requestId;
+    const shedCodes = new Set(['server_busy', 'dna_overloaded', 'admission_shed']);
+    const isRateLimit = status === 429;
+    const isShed = status === 503 && shedCodes.has(apiCode);
+    if (!isRateLimit && !isShed) return;
+    try {
+      window.dispatchEvent(
+        new CustomEvent('agentstack.http.resilience', {
+          detail: {
+            status,
+            route: url || '',
+            code: apiCode || (isRateLimit ? 'rate_limit_exceeded' : 'server_busy'),
+            retryAfterSec,
+            requestId,
+          },
+        }),
+      );
+    } catch {
+      /* ignore */
+    }
   }
 
   public setProjectId(projectId: number | string | null | undefined): void {
@@ -1281,51 +1328,47 @@ export class HTTPClient extends SimpleEventEmitter {
           : api304;
       }
 
-      // ✅ CRITICAL FIX: Clone response BEFORE reading to handle Content-Length errors
-      // When response is compressed, browser auto-decompresses but Content-Length
-      // header may refer to compressed size, causing "Content-Length exceeds Body" error
-      // Solution: Clone response before reading so we can retry if needed
+      // Clone before read — Content-Length mismatch recovery only (not brotli decode).
       const clonedResponse = response.clone();
       
       let responseData: T;
       try {
         responseData = await this.parseResponse<T>(response);
       } catch (error: any) {
-        // If Content-Length error, try to read from cloned response
-        if (error?.message?.includes('Content-Length') || 
-            (error?.name === 'TypeError' && error?.message?.includes('exceeds')) ||
-            (error?.message?.includes('Body has already been consumed'))) {
+        const msg = String(error?.message ?? '');
+        const isDecodeFailure =
+          error?.name === 'TypeError' &&
+          (/Decoding failed/i.test(msg) || /Body has already been consumed/i.test(msg));
+        const isContentLengthMismatch =
+          msg.includes('Content-Length') ||
+          (error?.name === 'TypeError' && msg.includes('exceeds'));
+
+        if (isDecodeFailure && !(config as RequestConfig & { __bodyDecodeRetry?: boolean }).__bodyDecodeRetry) {
+          logger.warn('parseResponse decode failed, retrying full HTTP request once', {
+            url,
+            error: msg,
+          });
+          return this._executeRequest<T>(url, headers, {
+            ...config,
+            __bodyDecodeRetry: true,
+          } as RequestConfig);
+        }
+
+        if (isContentLengthMismatch || isDecodeFailure) {
           logger.warn('Content-Length error in parseResponse, attempting recovery with cloned response', {
             url,
-            error: error.message
+            error: msg,
           });
-          // Try to read from cloned response which hasn't been consumed
           try {
             responseData = await this.parseResponse<T>(clonedResponse);
           } catch (cloneError: any) {
-            // If cloned response also fails, try text() as last resort
-            logger.warn('Cloned response parse also failed, trying text() as fallback', {
-              error: cloneError.message
+            logger.error('Cloned response parse also failed', {
+              originalError: msg,
+              cloneError: cloneError?.message,
             });
-            try {
-              const text = await clonedResponse.text();
-              try {
-                responseData = JSON.parse(text) as T;
-              } catch {
-                // If not JSON, return as text
-                responseData = text as any;
-              }
-            } catch (textError: any) {
-              logger.error('All recovery methods failed for Content-Length error', {
-                originalError: error.message,
-                cloneError: cloneError.message,
-                textError: textError.message
-              });
-              throw error; // Throw original error
-            }
+            throw error;
           }
         } else {
-          // Re-throw if it's not a Content-Length error
           throw error;
         }
       }
@@ -2130,19 +2173,87 @@ export class HTTPClient extends SimpleEventEmitter {
         break;
       case 401: {
         const url = config?.url || 'unknown';
-        const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/me');
+        const isAuthEndpoint = isSessionAuthEndpoint(url);
         const isSettingsFieldGet = url.includes('/auth/settings/get');
         const sessionMissEarly =
           HTTPClient.isSessionNotFoundDetail(rawDetail) ||
           HTTPClient.isCacheEpochStaleDetail(rawDetail);
+        const detailObj401 =
+          rawDetail && typeof rawDetail === 'object' && !Array.isArray(rawDetail)
+            ? (rawDetail as { jti_prefix?: string; reason?: string })
+            : null;
+        const hasBearer = Boolean(this.getAuthToken()?.trim());
+        const inMintGuard =
+          this.isInPostLoginGrace() || this.isInAuthCriticalSection();
+        // Stale in-flight 401s (pre-mint JTI) must not tear down a fresh mint (log 2026-08-08 / project 1444).
+        if (
+          inMintGuard &&
+          sessionMissEarly &&
+          detailObj401?.jti_prefix &&
+          hasBearer
+        ) {
+          const prefix = String(detailObj401.jti_prefix).replace(/-/g, '').slice(0, 12);
+          const memJti = HTTPClient.jwtClaim(this.getAuthToken() || '', 'jti');
+          if (memJti && !memJti.startsWith(prefix)) {
+            logger.debug(
+              `Mint guard: ignoring stale 401 jti_prefix=${prefix} for ${url}`,
+            );
+            error = new UnauthorizedError(message || 'Unauthorized', {
+              status: 401,
+              code: 'stale_jti_discarded',
+              traceId,
+            });
+            break;
+          }
+        }
         if (sessionMissEarly) {
           this.purgeDeadSessionFromClient(rawDetail);
         }
+        const guestMismatch401 =
+          config?.omittedBearerForMismatch === true &&
+          (isMissingAuthHeadersDetail(rawDetail) ||
+            message.toLowerCase().includes('missing required authentication'));
+        if (guestMismatch401) {
+          if (typeof window !== 'undefined') {
+            const headerPid = Number(
+              config?.headers?.['X-Project-ID'] ||
+                config?.headers?.['x-project-id'] ||
+                this.config.projectId ||
+                0,
+            );
+            if (Number.isFinite(headerPid) && headerPid > 0) {
+              window.dispatchEvent(
+                new CustomEvent('agentstack.auth.project_session_required', {
+                  detail: { project_id: headerPid },
+                }),
+              );
+              try {
+                window.dispatchEvent(
+                  new CustomEvent('agentstack.auth.beacon', {
+                    detail: {
+                      name: 'auth.sdk.missing_auth_recovery',
+                      project_id: headerPid,
+                    },
+                  }),
+                );
+              } catch {
+                /* ignore */
+              }
+            }
+          }
+          error = new UnauthorizedError(message || 'Project session required', {
+            status: 401,
+            code: 'project_session_required',
+            traceId,
+          });
+          break;
+        }
         const shouldMarkSessionExpired =
+          hasBearer &&
           !config?.skipAuthStateCheck &&
           !isAuthEndpoint &&
           !isSettingsFieldGet &&
-          !this.isInPostLoginGrace();
+          !inMintGuard;
 
         if (shouldMarkSessionExpired) {
           this.authStateStore.setState({
@@ -2235,7 +2346,11 @@ export class HTTPClient extends SimpleEventEmitter {
           logger.debug(`Post-login grace: refreshed tokens from storage after 401 on ${url}`);
         }
 
-        if (sessionExpiredByCode) {
+        if (
+          sessionExpiredByCode &&
+          !this.isInPostLoginGrace() &&
+          !this.isInAuthCriticalSection()
+        ) {
           logger.debug(`Session expired (token_expired) for ${url} — clearing auth without retry storm`);
           HTTPClient.dispatchAuthExpiredOnProtectedPage();
           error = new UnauthorizedError(message || 'Session expired');
@@ -2465,10 +2580,33 @@ export class HTTPClient extends SimpleEventEmitter {
       case 423:
         error = new DemoReadOnlyError(message || 'Demo Read Only');
         break;
-      case 429:
-        const retryAfter = response.headers.get('Retry-After');
-        error = new RateLimitError(message || 'Rate Limit Exceeded');
+      case 429: {
+        const root429 = (data && typeof data === 'object' ? data : null) as Record<string, unknown> | null;
+        const detail429 =
+          root429?.detail && typeof root429.detail === 'object'
+            ? (root429.detail as Record<string, unknown>)
+            : null;
+        const apiCode429 =
+          (typeof root429?.code === 'string' && root429.code) ||
+          (typeof detail429?.code === 'string' && detail429.code) ||
+          undefined;
+        const requestId429 =
+          typeof root429?.request_id === 'string'
+            ? root429.request_id
+            : typeof (errorData as { request_id?: string })?.request_id === 'string'
+              ? (errorData as { request_id: string }).request_id
+              : undefined;
+        const retryAfterHdr429 = response.headers.get('Retry-After');
+        const retryAfterSec429 = retryAfterHdr429
+          ? Math.max(1, parseInt(retryAfterHdr429, 10) || 60)
+          : undefined;
+        error = new RateLimitError(message || 'Rate Limit Exceeded', {
+          apiCode: apiCode429,
+          requestId: requestId429,
+          retryAfterSec: retryAfterSec429,
+        });
         break;
+      }
       case 500:
       case 502:
       case 503:
@@ -2525,11 +2663,20 @@ export class HTTPClient extends SimpleEventEmitter {
             { retryAfterSec, message: message?.slice(0, 120) },
           );
         }
-        error = new ServerError(message || 'Server Error', response.status, {
-          apiCode: apiCode || undefined,
-          requestId,
-          retryAfterSec,
-        });
+        if (response.status === 503 && apiCode === 'server_busy') {
+          error = new ServerBusyError(message || 'Server busy', response.status, {
+            apiCode,
+            requestId,
+            retryAfterSec,
+            retryAfterMs: retryAfterSec != null ? retryAfterSec * 1000 : 1000,
+          });
+        } else {
+          error = new ServerError(message || 'Server Error', response.status, {
+            apiCode: apiCode || undefined,
+            requestId,
+            retryAfterSec,
+          });
+        }
         break;
       }
       default:
@@ -2541,12 +2688,17 @@ export class HTTPClient extends SimpleEventEmitter {
       throw await this.config.errorInterceptor(error);
     }
 
+    this.notifyShellHttpResilience(response.status, config?.url, error);
+
     throw error;
   }
 
   private shouldNotRetry(error: AgentStackError, config?: RequestConfig): boolean {
     // Nginx warm-up 503 — retry even on POST (login / mint) while edge recovers.
     if (isApiWarmingUpError(error)) {
+      return false;
+    }
+    if (error instanceof ServerBusyError) {
       return false;
     }
     if (
@@ -3139,7 +3291,7 @@ export class HTTPClient extends SimpleEventEmitter {
     this.cacheEpoch = null;
   }
 
-  private buildHeaders(customHeaders: Record<string, string>, url?: string): Record<string, string> {
+  private buildHeaders(customHeaders: Record<string, string>, url?: string, config?: RequestConfig): Record<string, string> {
     // ✅ CRITICAL FIX: Загружаем токены из localStorage, если они отсутствуют
     // Hosted guest (skipStorageTokenHydration): never inherit SPA ecosystem JWT.
     if (
@@ -3293,7 +3445,8 @@ export class HTTPClient extends SimpleEventEmitter {
     // Add project context
     // ✅ CRITICAL: For login endpoint, always use project_id=1 (ecosystem)
     // Authorization is always through ecosystem, then session is created for target project based on API key
-    const isAuthEndpoint = url ? (url.includes('/auth/login') || url.includes('/auth/me')) : false;
+    const isAuthEndpoint = url ? isSessionAuthEndpoint(url) : false;
+    const isSwitchProject = url ? isSwitchProjectEndpoint(url) : false;
     const hasProjectIdHeader = Boolean(headers['X-Project-ID'] || headers['x-project-id']);
 
     // Storage routes often pass explicit project_id in the query (e.g. ecosystem PID for messenger).
@@ -3311,8 +3464,26 @@ export class HTTPClient extends SimpleEventEmitter {
     }
 
     if (isAuthEndpoint && url && url.includes('/auth/login')) {
-      // Always use ecosystem project_id=1 for authentication
-      headers['X-Project-ID'] = '1';
+      headers['X-Project-ID'] = String(ECOSYSTEM_PROJECT_ID);
+    } else if (isSwitchProject && this.authToken?.trim()) {
+      const switchPid = jwtProjectIdFromToken(this.authToken);
+      headers['X-Project-ID'] = String(
+        switchPid != null && Number.isFinite(switchPid) ? switchPid : ECOSYSTEM_PROJECT_ID,
+      );
+      if (headers['Authorization'] && typeof window !== 'undefined') {
+        try {
+          window.dispatchEvent(
+            new CustomEvent('agentstack.auth.beacon', {
+              detail: {
+                name: 'auth.sdk.switch_bearer_preserved',
+                project_id: switchPid ?? ECOSYSTEM_PROJECT_ID,
+              },
+            }),
+          );
+        } catch {
+          /* ignore */
+        }
+      }
     } else if (storageUrlProjectId) {
       headers['X-Project-ID'] = storageUrlProjectId;
     } else if (!hasProjectIdHeader && this.config.projectId) {
@@ -3327,28 +3498,56 @@ export class HTTPClient extends SimpleEventEmitter {
         headerProjectId: headerPidRaw ? Number(headerPidRaw) : null,
         jwtProjectId: jwtProjectIdFromToken(this.authToken),
         vaultToken: this.authToken,
+        requestPath: url || '',
       });
       if (binding.mode === 'guest' || !binding.bearer) {
         const tokenPid = String(jwtProjectIdFromToken(this.authToken) ?? '');
         const headerPid = String(headerPidRaw);
         if (tokenPid && headerPid && tokenPid !== headerPid) {
-          const warnKey = `${tokenPid}->${headerPid}`;
-          if (!(HTTPClient as unknown as { _mismatchWarnKeys?: Set<string> })._mismatchWarnKeys) {
-            (HTTPClient as unknown as { _mismatchWarnKeys: Set<string> })._mismatchWarnKeys =
-              new Set();
+          if (isEcosystemScopedApiPath(url || '') && headerPid === String(ECOSYSTEM_PROJECT_ID)) {
+            if (tokenPid === String(ECOSYSTEM_PROJECT_ID)) {
+              // Finance/ecosystem contour — vault[eco] bearer matches header
+            } else {
+              omittedBearerForMismatch = true;
+              if (config) {
+                config.omittedBearerForMismatch = true;
+              }
+              delete headers['Authorization'];
+              delete headers['authorization'];
+              if (typeof window !== 'undefined') {
+                try {
+                  window.dispatchEvent(
+                    new CustomEvent('agentstack.auth.project_session_required', {
+                      detail: { project_id: ECOSYSTEM_PROJECT_ID },
+                    }),
+                  );
+                } catch {
+                  /* ignore */
+                }
+              }
+            }
+          } else {
+            const warnKey = `${tokenPid}->${headerPid}`;
+            if (!(HTTPClient as unknown as { _mismatchWarnKeys?: Set<string> })._mismatchWarnKeys) {
+              (HTTPClient as unknown as { _mismatchWarnKeys: Set<string> })._mismatchWarnKeys =
+                new Set();
+            }
+            const keys = (HTTPClient as unknown as { _mismatchWarnKeys: Set<string> })
+              ._mismatchWarnKeys;
+            if (!keys.has(warnKey)) {
+              keys.add(warnKey);
+              logger.warn(
+                'Bearer project_id mismatch with X-Project-ID — omitting Bearer to honor header',
+                { tokenPid, headerPid },
+              );
+            }
+            delete headers['Authorization'];
+            delete headers['authorization'];
+            omittedBearerForMismatch = true;
+            if (config) {
+              config.omittedBearerForMismatch = true;
+            }
           }
-          const keys = (HTTPClient as unknown as { _mismatchWarnKeys: Set<string> })
-            ._mismatchWarnKeys;
-          if (!keys.has(warnKey)) {
-            keys.add(warnKey);
-            logger.warn(
-              'Bearer project_id mismatch with X-Project-ID — omitting Bearer to honor header',
-              { tokenPid, headerPid },
-            );
-          }
-          delete headers['Authorization'];
-          delete headers['authorization'];
-          omittedBearerForMismatch = true;
         }
       }
     }
@@ -3412,20 +3611,26 @@ export class HTTPClient extends SimpleEventEmitter {
   }
 
   private async parseResponse<T>(response: Response): Promise<T> {
-    const contentType = response.headers.get('content-type');
-    
-    try {
-    if (contentType?.includes('application/json')) {
-        // ✅ CRITICAL FIX: Try json() first - if Content-Length error occurs,
-        // _executeRequest will handle it with cloned response
-      return await response.json();
+    const contentType = response.headers.get('content-type') ?? '';
+    // Single-read body parse — avoids json()+text() double-consume (switch-project / brotli).
+    const buf = await response.arrayBuffer();
+    if (buf.byteLength === 0) {
+      if (contentType.includes('application/json')) {
+        return null as T;
+      }
+      return '' as T;
     }
-    
-    return await response.text() as any;
-    } catch (error: any) {
-      // Re-throw error - _executeRequest will handle Content-Length errors with cloned response
-      throw error;
+    const text = new TextDecoder('utf-8', { fatal: false }).decode(buf);
+    if (contentType.includes('application/json')) {
+      try {
+        return JSON.parse(text) as T;
+      } catch (parseErr) {
+        throw parseErr instanceof Error
+          ? parseErr
+          : new SyntaxError('Invalid JSON response body');
+      }
     }
+    return text as T;
   }
 
   private parseHeaders(headers: Headers): Record<string, string> {
