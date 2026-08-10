@@ -33,7 +33,7 @@ export {
 } from './orientation';
 
 export type { DeviceCapabilityProfile } from './deviceCapability';
-export { getDeviceCapabilityProfile } from './deviceCapability';
+export { getDeviceCapabilityProfile, isInAppBrowserUa } from './deviceCapability';
 export type { NetworkPolicy } from './networkPolicy';
 export { getNetworkPolicy } from './networkPolicy';
 export type { WorkPriority, ScheduledWork } from './cooperativeQueue';
