@@ -27,6 +27,7 @@ import type { AgentWebPush } from './modules/AgentWebPush';
 import type { AgentsFleet } from './modules/AgentsFleet';
 import type { AgentEconomyFacade } from './economy/AgentEconomyFacade';
 import type { AgentFinanceFacade } from './finance/AgentFinanceFacade';
+import type { EnergyClient } from './energy';
 import type { AuthStateStore } from './utils/auth-state';
 import type { ITabActivitySurface } from './modules/TabActivitySurface';
 import type {
@@ -103,6 +104,8 @@ export interface AgentStackPlatformSurface {
   economy: AgentEconomyFacade;
   /** Finance Hub BFF (`/api/finance/*`) — portfolio, swap, project fund */
   finance: AgentFinanceFacade;
+  /** LLM prepaid energy (`/api/energy/*`) */
+  energy: EnergyClient;
   /** AgentSocial messenger / friends / PAS */
   social: AgentSocial;
   /** Project support REST facade (`/api/support/*`). */

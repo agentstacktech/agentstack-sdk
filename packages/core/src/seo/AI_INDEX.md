@@ -8,6 +8,7 @@
 |--------|------|
 | `@agentstack/sdk/seo` | `AgentSeo`, `getMeta`, `getHostingFunnelCopy` |
 | `HOSTING_FUNNEL_PATHS` | G1–G4 marketing paths |
+| `HostingFunnelPath` | Union type of `HOSTING_FUNNEL_PATHS` |
 
 ## Hot files
 

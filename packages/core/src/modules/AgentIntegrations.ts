@@ -517,6 +517,14 @@ export class AgentIntegrations {
     });
   }
 
+  getScenario(scenarioId: string, projectId: number) {
+    return this.client.get<{
+      success?: boolean;
+      scenario?: Record<string, unknown>;
+      epoch?: number;
+    }>(`/integrations/scenarios/${scenarioId}`, { project_id: projectId });
+  }
+
   createScenario(body: {
     owner_kind?: IntegrationOwnerKind;
     project_id: number;

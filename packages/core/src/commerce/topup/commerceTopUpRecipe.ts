@@ -36,6 +36,24 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Shared POST /payments body for intent=top_up (DRY with commerceTopUpRecipe). */
+export function buildTopUpCreateBody(input: TopUpRecipeInput): Record<string, unknown> {
+  return {
+    amount: input.amount,
+    currency: input.currency ?? 'USD',
+    description: input.description ?? 'Commerce wallet top-up',
+    intent: 'top_up',
+    ...(input.destination_wallet ? { destination_wallet: input.destination_wallet } : {}),
+    ...(input.project_id != null ? { recipient_project_id: input.project_id } : {}),
+    ...(input.preferred_method ? { preferred_method: input.preferred_method } : {}),
+    metadata: {
+      ...(input.project_id != null
+        ? { recipient_project_id: input.project_id, funding_lane: 'treasury' }
+        : { funding_lane: 'personal' }),
+    },
+  };
+}
+
 function normalizePayment(raw: Record<string, unknown>, fallbackId: string) {
   return {
     id: String(raw.payment_id ?? raw.id ?? fallbackId),
@@ -86,15 +104,7 @@ export async function commerceTopUpRecipe(
     ? { 'Idempotency-Key': opts.idempotencyKey }
     : undefined;
 
-  const createBody = {
-    amount: input.amount,
-    currency: input.currency ?? 'USD',
-    description: input.description ?? 'Commerce wallet top-up',
-    intent: 'top_up',
-    ...(input.destination_wallet ? { destination_wallet: input.destination_wallet } : {}),
-    ...(input.project_id != null ? { recipient_project_id: input.project_id } : {}),
-    ...(input.preferred_method ? { preferred_method: input.preferred_method } : {}),
-  };
+  const createBody = buildTopUpCreateBody(input);
 
   const createRes = await http.post('/payments', createBody, { headers });
   const createData = (createRes.data ?? createRes) as {

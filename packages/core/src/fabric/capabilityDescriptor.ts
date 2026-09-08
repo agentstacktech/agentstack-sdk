@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 export const capabilitySurfaceSchema = z.enum([
   'mcp',
+  'rest',
   'ui_form',
   'compass',
   'ptc',
@@ -83,4 +84,48 @@ export function parseCapabilityDescriptor(input: unknown): CapabilityDescriptor 
 
 export function parseCapabilityDescriptorFixture(input: unknown): CapabilityDescriptorFixture {
   return capabilityDescriptorFixtureSchema.parse(input);
+}
+
+/** Slim MCP catalog enrichment — parity with Python ``slim_capability_from_descriptor``. */
+export const mcpCapabilityDescriptorSourceSchema = z.enum([
+  'fixture',
+  'overlay',
+  'handler',
+  'live',
+  'mcp_tool',
+]);
+
+export const mcpCapabilityDescriptorSlimSchema = z.object({
+  id: z.string().min(1),
+  domain: z.string().min(1),
+  complexity: z.enum(['simple', 'intermediate', 'advanced']),
+  source: mcpCapabilityDescriptorSourceSchema,
+  genetic_tags: z.array(z.string()).optional(),
+  when_to_use: z.string().optional(),
+  related_tools: z.array(z.string()).optional(),
+});
+
+export type McpCapabilityDescriptorSource = z.infer<typeof mcpCapabilityDescriptorSourceSchema>;
+export type McpCapabilityDescriptorSlim = z.infer<typeof mcpCapabilityDescriptorSlimSchema>;
+
+export function parseMcpCapabilityDescriptorSlim(input: unknown): McpCapabilityDescriptorSlim {
+  return mcpCapabilityDescriptorSlimSchema.parse(input);
+}
+
+/** Row shape from GET /mcp/actions (enriched catalog entry). */
+export const mcpCatalogActionRowSchema = z
+  .object({
+    action: z.string().min(1),
+    safe_action: z.string().optional(),
+    summary: z.string().optional(),
+    when_to_use: z.string().optional(),
+    required_cap: z.string().optional(),
+    capability_descriptor: mcpCapabilityDescriptorSlimSchema.optional(),
+  })
+  .passthrough();
+
+export type McpCatalogActionRow = z.infer<typeof mcpCatalogActionRowSchema>;
+
+export function parseMcpCatalogActionRow(input: unknown): McpCatalogActionRow {
+  return mcpCatalogActionRowSchema.parse(input);
 }

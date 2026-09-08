@@ -393,6 +393,186 @@ export class AgentStorage {
     return (res.data ?? {}) as Record<string, unknown>;
   }
 
+  /** Project RBAC: scan disk↔8DNA drift for resolved row (scope=user|project). */
+  async scanStorageReconcile(opts?: {
+    projectId?: number;
+    scope?: StorageScope;
+  }): Promise<Record<string, unknown>> {
+    const res = await this.client.get(`/storage/reconcile/scan${storageQuery(opts)}`);
+    return (res.data ?? {}) as Record<string, unknown>;
+  }
+
+  /** Project RBAC: reconcile disk↔8DNA drift (dry_run default true). */
+  async reconcileStorage(
+    body: {
+      delete_disk_orphans?: boolean;
+      purge_dna_ghosts?: boolean;
+      index_disk_orphans?: boolean;
+      recalculate_quota?: boolean;
+      dry_run?: boolean;
+    },
+    opts?: { projectId?: number; scope?: StorageScope },
+  ): Promise<Record<string, unknown>> {
+    const res = await this.client.post(`/storage/reconcile${storageQuery(opts)}`, body);
+    return (res.data ?? {}) as Record<string, unknown>;
+  }
+
+  async adminScanStorage(
+    projectId: number,
+    dnaUserId: number,
+  ): Promise<Record<string, unknown>> {
+    const q = `?project_id=${encodeURIComponent(String(projectId))}&dna_user_id=${encodeURIComponent(String(dnaUserId))}`;
+    const res = await this.client.get(`/admin/storage/scan${q}`);
+    return (res.data ?? {}) as Record<string, unknown>;
+  }
+
+  async adminListStorageRows(opts?: {
+    projectId?: number;
+    sliceFilter?: 'all' | 'nonempty' | 'project' | 'user';
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{
+    ok: boolean;
+    items: Array<{
+      project_id: number;
+      dna_user_id: number;
+      slice: string;
+      permanent_file_count: number;
+      temp_file_count: number;
+      permanent_used_bytes: number;
+      temp_used_bytes: number;
+      folder_count: number;
+    }>;
+    total: number;
+    limit: number;
+    offset: number;
+  }> {
+    const parts: string[] = [];
+    if (opts?.projectId != null) {
+      parts.push(`project_id=${encodeURIComponent(String(opts.projectId))}`);
+    }
+    if (opts?.sliceFilter) {
+      parts.push(`slice_filter=${encodeURIComponent(opts.sliceFilter)}`);
+    }
+    if (opts?.search) {
+      parts.push(`search=${encodeURIComponent(opts.search)}`);
+    }
+    if (opts?.limit != null) {
+      parts.push(`limit=${encodeURIComponent(String(opts.limit))}`);
+    }
+    if (opts?.offset != null) {
+      parts.push(`offset=${encodeURIComponent(String(opts.offset))}`);
+    }
+    const q = parts.length ? `?${parts.join('&')}` : '';
+    const res = await this.client.get(`/admin/storage/rows${q}`);
+    return res.data as {
+      ok: boolean;
+      items: Array<{
+        project_id: number;
+        dna_user_id: number;
+        slice: string;
+        permanent_file_count: number;
+        temp_file_count: number;
+        permanent_used_bytes: number;
+        temp_used_bytes: number;
+        folder_count: number;
+      }>;
+      total: number;
+      limit: number;
+      offset: number;
+    };
+  }
+
+  /** Ecosystem admin: hub quota + hosting sites for one project. */
+  async adminGetProjectFootprint(projectId: number): Promise<{
+    ok: boolean;
+    project_id?: number;
+    owner_user_id?: number | null;
+    project_pool_limit_bytes?: number;
+    usage?: Record<string, unknown>;
+    quota?: {
+      permanent_bytes?: number;
+      temp_bytes?: number;
+      hosting_bytes?: number;
+      pool_limit_bytes?: number;
+      hosting_cap_bytes?: number;
+      hosting_fraction?: number;
+      tier_label?: string;
+      tier_basis?: string;
+      sites_count?: number;
+    };
+    hosting?: {
+      sites?: Array<Record<string, unknown>>;
+      quota?: Record<string, unknown>;
+      primary_site_bucket_id?: string | null;
+    };
+  }> {
+    const res = await this.client.get(
+      `/admin/storage/project-footprint?project_id=${encodeURIComponent(String(projectId))}`,
+    );
+    return res.data as {
+      ok: boolean;
+      project_id?: number;
+      owner_user_id?: number | null;
+      project_pool_limit_bytes?: number;
+      usage?: Record<string, unknown>;
+      quota?: Record<string, unknown>;
+      hosting?: Record<string, unknown>;
+    };
+  }
+
+  async adminReconcileStorage(
+    projectId: number,
+    dnaUserId: number,
+    body: {
+      delete_disk_orphans?: boolean;
+      purge_dna_ghosts?: boolean;
+      index_disk_orphans?: boolean;
+      recalculate_quota?: boolean;
+      dry_run?: boolean;
+    },
+  ): Promise<Record<string, unknown>> {
+    const q = `?project_id=${encodeURIComponent(String(projectId))}&dna_user_id=${encodeURIComponent(String(dnaUserId))}`;
+    const res = await this.client.post(`/admin/storage/reconcile${q}`, body);
+    return (res.data ?? {}) as Record<string, unknown>;
+  }
+
+  async adminRecalculateStorageQuota(
+    projectId: number,
+    dnaUserId: number,
+  ): Promise<Record<string, unknown>> {
+    const q = `?project_id=${encodeURIComponent(String(projectId))}&dna_user_id=${encodeURIComponent(String(dnaUserId))}`;
+    const res = await this.client.post(`/admin/storage/recalculate-quota${q}`);
+    return (res.data ?? {}) as Record<string, unknown>;
+  }
+
+  async adminListTempFiles(
+    projectId: number,
+    dnaUserId: number,
+    opts?: { includeExpired?: boolean },
+  ): Promise<{
+    ok: boolean;
+    files: StorageTempListItem[];
+    project_id?: number;
+    dna_user_id?: number;
+  }> {
+    const parts = [
+      `project_id=${encodeURIComponent(String(projectId))}`,
+      `dna_user_id=${encodeURIComponent(String(dnaUserId))}`,
+    ];
+    if (opts?.includeExpired) {
+      parts.push('include_expired=1');
+    }
+    const res = await this.client.get(`/admin/storage/temp?${parts.join('&')}`);
+    return res.data as {
+      ok: boolean;
+      files: StorageTempListItem[];
+      project_id?: number;
+      dna_user_id?: number;
+    };
+  }
+
   async uploadFile(
     file: File | Blob,
     options?: { folder?: string; category?: string; filename?: string; projectId?: number; scope?: StorageScope }

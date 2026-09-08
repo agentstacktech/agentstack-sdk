@@ -6,6 +6,8 @@
 
 Одна страница: **каждый поддерживаемый способ** зависимости, когда выбирать, что запустить после установки.
 
+> **По умолчанию сегодня (до npm):** **Flow B** — клон [agentstack-sdk](https://github.com/agentstacktech/agentstack-sdk) и `file:` deps. Flow A — после публикации на npm.
+
 ---
 
 ## Дерево решений
@@ -69,9 +71,9 @@ sdk.updateProjectId(/* активный проект */);
 ```bash
 git submodule add https://github.com/agentstacktech/agentstack-sdk.git vendor/agentstack-sdk
 git submodule update --init
-cd vendor/agentstack-sdk && git checkout v0.4.13
+cd vendor/agentstack-sdk && git checkout v0.4.18
 
-node vendor/agentstack-sdk/scripts/bootstrap-submodule-consumer.mjs --target . --tag v0.4.13
+node vendor/agentstack-sdk/scripts/bootstrap-submodule-consumer.mjs --target . --tag v0.4.18
 npm install
 ```
 

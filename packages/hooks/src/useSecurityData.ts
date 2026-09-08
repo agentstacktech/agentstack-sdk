@@ -11,7 +11,7 @@
 import { UseQueryResult } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import type { AgentStackSDK } from '@agentstack/sdk';
-import { useSDKQuery } from '@agentstack/react';
+import { useSDKQuery, stableKeyPart } from '@agentstack/react';
 import type {
   SecurityEvent,
   SecurityFilters,
@@ -103,7 +103,7 @@ export function useSecurityData(
 
   const queryResult = useSDKQuery<SecurityEvent[]>(
     sdk,
-    ['security-events', filters],
+    ['security-events', stableKeyPart(filters)],
     async (signal) => {
       try {
         const params = Object.entries(filters)

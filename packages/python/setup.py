@@ -20,10 +20,9 @@ def read_requirements():
         with open(requirements_path, 'r', encoding='utf-8') as f:
             return [line.strip() for line in f if line.strip() and not line.startswith('#')]
     return [
-        'aiohttp>=3.8.0',
-        'asyncio-mqtt>=0.11.0',
-        'python-dateutil>=2.8.0',
-        'typing-extensions>=4.0.0'
+        'httpx>=0.28.1',
+        'python-dateutil>=2.9.0',
+        'typing-extensions>=4.12.0'
     ]
 
 setup(
@@ -83,7 +82,7 @@ setup(
         "modular",
         "python",
         "async",
-        "aiohttp"
+        "httpx"
     ],
     project_urls={
         "Homepage": "https://agentstack.tech",
@@ -94,7 +93,9 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "agentstack=agentstack_sdk.cli:main",
+            # Deprecated stub — product CLI is npm @agentstack/cli (repo.tooling.user_cli.gen1).
+            # Kept name would collide; use a loud shim module if re-enabled.
+            # "agentstack=agentstack_sdk.cli:main",
         ],
     },
     include_package_data=True,

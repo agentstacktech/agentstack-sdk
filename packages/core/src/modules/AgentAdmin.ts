@@ -7,6 +7,7 @@
  * Gene: `core.economy.agentnet.gen1` (table names remain `data_agentcoin_*`)
  */
 
+import { AdminGrantsClient } from '../admin/grants';
 import { HTTPClient } from '../client/http-client';
 import { ChainSurfaceClient } from '../economy/clients/ChainSurfaceClient';
 import { TestnetClient } from '../economy/clients/TestnetClient';
@@ -159,10 +160,13 @@ export interface AgentcoinAdminOverviewPayload {
 export class AgentAdmin {
   readonly testnet: TestnetClient;
   readonly chainSurface: ChainSurfaceClient;
+  /** Grant OS CRM (`/api/admin/grants/*`) — ecosystem owner only. */
+  readonly grants: AdminGrantsClient;
 
   constructor(private readonly http: HTTPClient) {
     this.testnet = new TestnetClient(http);
     this.chainSurface = new ChainSurfaceClient(http);
+    this.grants = new AdminGrantsClient(http);
   }
 
   // --- AgentCoin ledger admin ---

@@ -4,6 +4,7 @@
  */
 
 import type { HTTPClient } from '../client/http-client';
+import { submitChainIntent } from '../economy/agentnet/chainControl';
 
 export type SolanaChainStatus = {
   enabled?: boolean;
@@ -61,7 +62,6 @@ export class AgentNetSolana {
       evidence_tier?: 'none' | 'l0_batch' | 'chain_anchor';
     },
   ) {
-    const { submitChainIntent } = await import('../economy/agentnet/chainControl');
     return submitChainIntent(this.http, projectId, {
       ...body,
       intent_type: 'fleet.run',

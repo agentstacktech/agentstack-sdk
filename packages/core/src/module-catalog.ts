@@ -13,6 +13,7 @@ import {
 } from './platform-surface';
 import type { SDKAudience } from './config/integratorScope';
 import { TASK_CATALOG_METADATA } from './capability-tasks/taskCatalogMetadata';
+import type { OrganDescriptor } from './fabric/organDescriptor';
 
 /** Repo-root relative doc paths (monorepo) or stable URLs. */
 export type SDKDocRef = string;
@@ -292,4 +293,17 @@ export function buildModuleCatalog(
     modules,
     tasks: [...TASK_CATALOG_METADATA],
   };
+}
+
+/** Organ descriptors projection (`core.composition.organ_descriptor.gen1`). */
+export function getOrganDescriptors(): OrganDescriptor[] {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const raw = require('../../../../../docs/_generated/organ-descriptors.json') as {
+      descriptors?: OrganDescriptor[];
+    };
+    return raw.descriptors ?? [];
+  } catch {
+    return [];
+  }
 }

@@ -23,25 +23,32 @@ sdk.platform.auth.useApiKey(process.env.AGENTSTACK_API_KEY!, Number(process.env.
 // Human SPA alternative:
 // await sdk.platform.auth.login({ email, password });
 
-// 3) Discover + first MCP-shaped call
-await sdk.platform.protocol.execute?.({ action: 'discovery.list', params: {} } as any);
+// 3) First REST call (projects) — or MCP via sdk.mcp.execute / CLI
+const projects = await sdk.platform.api.getProjects();
 ```
 
 **15-line agent script (copy-paste):**
 
 ```typescript
-import { AgentStackSDK } from '@agentstack/sdk';
+import { AgentStackSDK, mcpExecute, resolveMcpUrl } from '@agentstack/sdk';
+const apiKey = process.env.AGENTSTACK_API_KEY!;
+const projectId = Number(process.env.AGENTSTACK_PROJECT_ID!);
 const sdk = new AgentStackSDK({
   apiBase: 'https://agentstack.tech/api',
-  apiKey: process.env.AGENTSTACK_API_KEY!,
-  projectId: Number(process.env.AGENTSTACK_PROJECT_ID!),
+  apiKey,
+  projectId,
 });
-sdk.platform.auth.useApiKey(process.env.AGENTSTACK_API_KEY!, Number(process.env.AGENTSTACK_PROJECT_ID!));
-const matrix = await sdk.getCapabilityMatrix();
+sdk.platform.auth.useApiKey(apiKey, projectId);
+const matrix = sdk.getCapabilityMatrix();
 console.log('caps', matrix.platform?.length);
-const discovery = await sdk.platform.protocol.execute?.({ action: 'discovery.list', params: {} } as any);
+const discovery = await mcpExecute(
+  [{ action: 'discovery.list', params: {} }],
+  { token: apiKey, projectId, mcpUrl: resolveMcpUrl('https://agentstack.tech/api') },
+);
 console.log('tools', discovery);
 ```
+
+**Product CLI:** `npx @agentstack/cli` — gene `repo.tooling.user_cli.gen1` · [docs/CLI_QUICKSTART.md](../docs/CLI_QUICKSTART.md)
 
 **Previous human bootstrap (SPA):**
 
@@ -87,7 +94,8 @@ Full recipes: [docs/AI_APPLICATION_FACTORY.md](docs/AI_APPLICATION_FACTORY.md)
 - **DNA command bus** → `sdk.platform.protocol.executeCommand` (not raw `/commands` fetch; prefer protocol over legacy `sdk.protein.*` for new code — [docs/PROTEIN_SYSTEM_GUIDE.md](docs/PROTEIN_SYSTEM_GUIDE.md))
 - **Rules engine** → `sdk.platform.command` or `protocol.executeRulesCommand`
 - **Cached read model** → `sdk.platform.protocol.readThroughSnapshot`
-- **MCP automation** → `https://agentstack.tech/mcp` (`agentstack.execute`) — mirror of platform actions
+- **MCP automation** → `sdk.mcp.execute` / `mcpExecute()` · subpath `@agentstack/sdk/mcp` · `sdk.mcp.discoverByIntent()` · `sdk.mcp.getDiscovery()` → JSON-RPC + REST discover (not `protocol.execute`)
+- **Terminal / CI** → `@agentstack/cli` (`repo.tooling.user_cli.gen1`) — curated SDK verbs + MCP escape hatch
 - **Tenant apps** → never `sdk.admin` / `sdk.platform.adminData` ([docs/INTEGRATOR_SCOPE.md](docs/INTEGRATOR_SCOPE.md))
 
 ---

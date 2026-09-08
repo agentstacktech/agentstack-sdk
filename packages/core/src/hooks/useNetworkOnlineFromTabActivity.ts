@@ -1,9 +1,20 @@
-import { useSyncExternalStore } from 'use-sync-external-store/shim';
+import * as React from 'react';
 import type { ITabActivitySurface } from '../modules/TabActivitySurface';
 
 function noopSubscribe(): () => void {
   return () => {};
 }
+
+/** React 18+ hook; named import can fail when `@types/react` is only hoisted. */
+const useSyncExternalStore = (
+  React as typeof React & {
+    useSyncExternalStore: <T>(
+      subscribe: (onStoreChange: () => void) => () => void,
+      getSnapshot: () => T,
+      getServerSnapshot?: () => T,
+    ) => T;
+  }
+).useSyncExternalStore;
 
 /**
  * Subscribe to navigator on-line state via an {@link ITabActivitySurface} that implements

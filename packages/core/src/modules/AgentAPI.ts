@@ -290,6 +290,19 @@ export class AgentAPI {
     return response.data;
   }
 
+  async repairProjectMembership(projectId: number): Promise<{
+    success: boolean;
+    project_id: number;
+    owner_user_id: number;
+    membership_verified: boolean;
+  }> {
+    const response = await this.client.post(
+      `/projects/${projectId}/membership/repair`,
+      {},
+    );
+    return response.data;
+  }
+
   async getProjectUsers(projectId: number, params?: {
     is_active?: boolean;
     role?: string;

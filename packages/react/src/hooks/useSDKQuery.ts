@@ -12,6 +12,7 @@ import {
 import type { AgentStackSDK } from '@agentstack/sdk';
 import { isNonRetryableAuthOrShed } from '@agentstack/sdk';
 import { useEffect, useRef, useState } from 'react';
+import { assertSerializableQueryKey } from '../lib/queryKeyUtils';
 
 export interface SDKQueryOptions<T> {
   enabled?: boolean;
@@ -87,6 +88,7 @@ export function useSDKQuery<T = unknown>(
   queryFn: (signal: AbortSignal) => Promise<T>,
   options?: SDKQueryOptions<T>
 ): UseQueryResult<T, Error> {
+  assertSerializableQueryKey(key);
   const queryKey = Array.isArray(key) ? key : [key];
   const keyStr = keyStringFromKey(key);
   const adminOrOAuth = isAdminOrOAuthKeyString(keyStr);

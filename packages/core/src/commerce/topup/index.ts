@@ -1,4 +1,4 @@
-export { commerceTopUpRecipe } from './commerceTopUpRecipe';
+export { commerceTopUpRecipe, buildTopUpCreateBody } from './commerceTopUpRecipe';
 export type {
   TopUpRecipeInput,
   TopUpRecipeOptions,

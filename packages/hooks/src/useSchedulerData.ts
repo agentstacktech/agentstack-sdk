@@ -10,7 +10,7 @@
 
 import { UseQueryResult } from '@tanstack/react-query';
 import type { AgentStackSDK } from '@agentstack/sdk';
-import { useSDKQuery } from '@agentstack/react';
+import { useSDKQuery, stableKeyPart } from '@agentstack/react';
 
 /**
  * Scheduled task structure
@@ -137,7 +137,7 @@ export function useSchedulerData(
 
   const queryResult = useSDKQuery<ScheduledTask[]>(
     sdk,
-    ['scheduler-tasks', projectId, filters],
+    ['scheduler-tasks', projectId ?? '', stableKeyPart(filters)],
     async (signal) => {
       try {
         const params = Object.entries(filters)

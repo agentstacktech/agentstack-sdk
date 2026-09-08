@@ -57,11 +57,13 @@ import {
   jwtProjectIdFromToken,
   resolveRequestProjectContext,
 } from './resolveRequestProjectContext';
-import { isEcosystemScopedApiPath } from './routeScopeClassifier';
+import { isEcosystemScopedApiPath, isIdentityScopedApiPath, isUserScopedSessionPath } from './routeScopeClassifier';
 import {
+  isExpectedAuthMintPollResponse,
   isSessionAuthEndpoint,
   isSwitchProjectEndpoint,
 } from './authEndpointClassifier';
+import { attemptSavedCredentialRelogin } from './savedCredentialRelogin';
 import {
   SDKConfig,
   RequestConfig,
@@ -365,7 +367,10 @@ export class HTTPClient extends SimpleEventEmitter {
       enableBatching: config.enableBatching !== false,
       shouldDeferBatchUrl: config.shouldDeferBatchUrl ?? (() => false),
       sdkAudience: config.sdkAudience ?? 'integrator',
-    };
+      sandboxEnv: config.sandboxEnv ?? '',
+      aiTimeout: config.aiTimeout ?? 180_000,
+      skipStorageTokenHydration: config.skipStorageTokenHydration ?? false,
+    } as Required<SDKConfig>;
 
     this.metrics = this.initializeMetrics();
     this.authStateStore = authStateStore || new AuthStateStore();
@@ -381,7 +386,18 @@ export class HTTPClient extends SimpleEventEmitter {
     if (this.config.enableBatching !== false) {
       this.requestBatcher = new RequestBatcher(
         this.config.baseUrl,
-        () => this.buildHeaders({}),
+        async () => {
+          if (this.config.requestInterceptor) {
+            await this.config.requestInterceptor({
+              url: '/api/batch',
+              method: HTTPMethod.POST,
+              headers: {},
+              skipAuthStateCheck: true,
+              skipBatching: true,
+            });
+          }
+          return this.buildHeaders({}, '/api/batch');
+        },
         {
           batchTimeout: this.config.batchTimeout,
           maxBatchSize: this.config.maxBatchSize,
@@ -523,6 +539,16 @@ export class HTTPClient extends SimpleEventEmitter {
     const pathOnly = url.split('?')[0] || '';
     assertIntegratorMayCallAdminApi(this.config, pathOnly);
 
+    // Identity PAT CRUD — never batch/cache; don't deadlock on auth-state during switch.
+    if (isIdentityScopedApiPath(url) || isIdentityScopedApiPath(pathOnly)) {
+      requestConfig.skipCache = true;
+      requestConfig.skipBatching = true;
+      if (this.authToken || this.apiKey) {
+        requestConfig.skipAuthStateCheck = true;
+        requestConfig.skipAuthCriticalDefer = true;
+      }
+    }
+
     // ✅ Philosophy: No-cache for admin/builder settings and highly user-specific GETs
     const isSessionsPath =
       pathOnly === '/sessions' || pathOnly.startsWith('/sessions/');
@@ -545,6 +571,8 @@ export class HTTPClient extends SimpleEventEmitter {
       // Project-scoped hubs: DNA/config writes must not read stale GET cache on refetch.
       pathOnly.includes('/hosting') ||
       url.includes('/hosting') ||
+      pathOnly.includes('/knowledge') ||
+      url.includes('/knowledge') ||
       pathOnly.includes('/integrations') ||
       url.includes('/integrations') ||
       pathOnly.includes('/support') ||
@@ -688,6 +716,12 @@ export class HTTPClient extends SimpleEventEmitter {
       }
     }
 
+    // Session bridge / vault sync must run before GET batch coalescing (batch POST auth uses buildHeaders).
+    let activeConfig = requestConfig;
+    if (this.config.requestInterceptor) {
+      activeConfig = await this.config.requestInterceptor(requestConfig);
+    }
+
     // Check for duplicate requests
     if (this.requestQueue.has(cacheKey)) {
       return this.requestQueue.get(cacheKey)!;
@@ -698,12 +732,12 @@ export class HTTPClient extends SimpleEventEmitter {
     // substitute or reorder user-specific responses.
     const hasAuth =
       Boolean(this.getAuthToken()) || Boolean(this.getApiKey());
-    const isBatchable = requestConfig.method === HTTPMethod.GET &&
+    const isBatchable = activeConfig.method === HTTPMethod.GET &&
                        hasAuth &&
-                       !requestConfig.skipCache &&
-                       !requestConfig.skipBatching &&
+                       !activeConfig.skipCache &&
+                       !activeConfig.skipBatching &&
                        this.requestBatcher &&
-                       !requestConfig.headers?.['X-No-Batch'];
+                       !activeConfig.headers?.['X-No-Batch'];
     
     if (isBatchable) {
       // Use batcher for GET requests
@@ -712,11 +746,11 @@ export class HTTPClient extends SimpleEventEmitter {
           const uniqueId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
           const batcherConfig = {
             id: uniqueId,
-            method: requestConfig.method,
-            url: requestConfig.url,
-            headers: requestConfig.headers,
-            params: requestConfig.params,
-            signal: requestConfig.signal,
+            method: activeConfig.method,
+            url: activeConfig.url,
+            headers: activeConfig.headers,
+            params: activeConfig.params,
+            signal: activeConfig.signal,
           };
           
           const batchedData = await this.requestBatcher!.add(batcherConfig);
@@ -732,7 +766,7 @@ export class HTTPClient extends SimpleEventEmitter {
         } catch (error) {
           // Fallback to normal request if batching fails (404 on /api/batch, rate limits, etc.)
           logger.debug('Batch request failed, falling back to normal request', error);
-          return this.executeRequest<T>(requestConfig, startTime);
+          return this.executeRequest<T>(activeConfig, startTime);
         }
       })();
       
@@ -759,7 +793,7 @@ export class HTTPClient extends SimpleEventEmitter {
   }
 
   // Create request promise (normal flow)
-    const requestPromise = this.executeRequest<T>(requestConfig, startTime);
+    const requestPromise = this.executeRequest<T>(activeConfig, startTime);
     // ✅ MEMORY LEAK FIX: Сохраняем время создания запроса
     this.requestQueue.set(cacheKey, requestPromise);
     this.requestQueueTimestamps.set(cacheKey, Date.now());
@@ -850,10 +884,12 @@ export class HTTPClient extends SimpleEventEmitter {
      * Adaptation: Integrated seamlessly!
      */
     
-    // Apply request interceptor
-    const interceptedConfig = this.config.requestInterceptor 
-      ? await this.config.requestInterceptor(config)
-      : config;
+    // Apply request interceptor (skip when session bridge already ran in request()).
+    const interceptedConfig = config._sessionOsBridged
+      ? config
+      : this.config.requestInterceptor
+        ? await this.config.requestInterceptor(config)
+        : config;
 
     // Build URL with query parameters
     const url = this.buildURL(interceptedConfig.url, interceptedConfig.params);
@@ -890,11 +926,19 @@ export class HTTPClient extends SimpleEventEmitter {
     
     // Circuit breaker key (v0.1.39: Per-endpoint isolation!)
     const circuitKey = `${interceptedConfig.method}:${url}`;
-    
+    const run = (): Promise<APIResponse<T>> =>
+      this._executeRequest<T>(url, headers, interceptedConfig);
+    // Identity PAT: never fail-closed behind CB. Edge 444 / SW abort was wrapping
+    // as Network error and locking Profile → API keys (G-A159).
+    if (
+      isIdentityScopedApiPath(url) ||
+      isIdentityScopedApiPath(interceptedConfig.url || '')
+    ) {
+      return run();
+    }
+
     // Execute through circuit breaker! (v0.1.40: Gene acquired!)
-    return this.circuitBreakers.execute(circuitKey, async () => {
-      return this._executeRequest(url, headers, interceptedConfig);
-    });
+    return this.circuitBreakers.execute(circuitKey, run);
   }
   
   public setAuthToken(token: string | null): void {
@@ -1112,6 +1156,8 @@ export class HTTPClient extends SimpleEventEmitter {
       'auth/register',
       '/login',
       'oauth2',
+      'user/api-keys',
+      'profile/api-keys',
     ]);
   }
 
@@ -1460,6 +1506,13 @@ export class HTTPClient extends SimpleEventEmitter {
                 /* ignore */
               }
             }
+          } else if (isExpectedAuthMintPollResponse(url, response.status, responseData)) {
+            const code =
+              (responseData as { code?: string; detail?: { code?: string } })?.code ??
+              (responseData as { detail?: { code?: string } })?.detail?.code;
+            logger.debug(
+              `HTTP ${response.status} (${code}) ${config.method} ${url} — auth mint poll (retry shortly)`,
+            );
           } else {
             logger.warn(`HTTP Error ${response.status} ${config.method} ${url}`, responseData);
           }
@@ -1694,17 +1747,13 @@ export class HTTPClient extends SimpleEventEmitter {
         if (savedEmail && savedPassword) {
           logger.debug('Attempting automatic re-login with saved credentials...');
 
-          // Импортируем AgentAuth для перелогинивания
-          const { AgentAuth } = await import('../modules/AgentAuth');
-          const auth = new AgentAuth(this);
-
-          const loginResult = await auth.login({
+          const loginResult = await attemptSavedCredentialRelogin({
             email: savedEmail,
             password: savedPassword,
-            project_id: parseInt(savedProjectId)
+            project_id: parseInt(savedProjectId, 10),
           });
 
-          if (loginResult && loginResult.access_token) {
+          if (loginResult?.access_token) {
             logger.info('Automatic re-login successful');
 
             // CRITICAL: Обновляем токены в httpClient после успешного логина
@@ -2714,7 +2763,8 @@ export class HTTPClient extends SimpleEventEmitter {
       (error.apiCode === 'AgentCoinSchemaMissing' ||
         error.apiCode === 'auth_mint_in_progress' ||
         error.apiCode === 'project_key_unavailable' ||
-        error.apiCode === 'auth_mint_timeout')
+        error.apiCode === 'auth_mint_timeout' ||
+        error.apiCode === 'economy_crypto_disabled')
     ) {
       return true;
     }
@@ -3095,6 +3145,9 @@ export class HTTPClient extends SimpleEventEmitter {
     if (!isFormData) {
       defaultHeaders['Content-Type'] = 'application/json';
     }
+    if (this.config.sandboxEnv) {
+      defaultHeaders['X-AgentStack-Env'] = String(this.config.sandboxEnv);
+    }
 
     return {
       url: config.url || '',
@@ -3269,6 +3322,26 @@ export class HTTPClient extends SimpleEventEmitter {
    * Headers for a browser `fetch`, matching auth/api-key behavior of the HTTP client.
    */
   public buildFetchHeaders(extra: Record<string, string> = {}, url?: string): Record<string, string> {
+    return this.buildHeaders(extra, url);
+  }
+
+  /**
+   * Run session interceptor (vault↔JWT) then build headers — use for SSE/blob fetch
+   * that bypasses HTTPClient.request (so GET batch 401 cannot reappear on streams).
+   */
+  public async alignSessionThenBuildHeaders(
+    extra: Record<string, string> = {},
+    url?: string,
+  ): Promise<Record<string, string>> {
+    if (this.config.requestInterceptor) {
+      await this.config.requestInterceptor({
+        url: url || '/',
+        method: HTTPMethod.GET,
+        headers: extra,
+        skipAuthStateCheck: true,
+        skipBatching: true,
+      } as RequestConfig);
+    }
     return this.buildHeaders(extra, url);
   }
 
@@ -3490,6 +3563,19 @@ export class HTTPClient extends SimpleEventEmitter {
       headers['X-Project-ID'] = String(this.config.projectId);
     }
 
+    // PAT / identity / user catalog: align header with JWT pid (G-A155 / G-A157).
+    if (
+      url &&
+      isUserScopedSessionPath(url) &&
+      this.authToken &&
+      this.authToken.trim().length > 0
+    ) {
+      const jwtPid = jwtProjectIdFromToken(this.authToken);
+      if (jwtPid != null && Number.isFinite(jwtPid) && jwtPid > 0) {
+        headers['X-Project-ID'] = String(jwtPid);
+      }
+    }
+
     // V3.2 H1: shared resolveRequestProjectContext — omit Bearer on JWT↔header mismatch.
     let omittedBearerForMismatch = false;
     if (this.authToken && this.authToken.trim().length > 0 && !isAuthEndpoint) {
@@ -3503,7 +3589,12 @@ export class HTTPClient extends SimpleEventEmitter {
       if (binding.mode === 'guest' || !binding.bearer) {
         const tokenPid = String(jwtProjectIdFromToken(this.authToken) ?? '');
         const headerPid = String(headerPidRaw);
-        if (tokenPid && headerPid && tokenPid !== headerPid) {
+        if (
+          tokenPid &&
+          headerPid &&
+          tokenPid !== headerPid &&
+          !isUserScopedSessionPath(url || '')
+        ) {
           if (isEcosystemScopedApiPath(url || '') && headerPid === String(ECOSYSTEM_PROJECT_ID)) {
             if (tokenPid === String(ECOSYSTEM_PROJECT_ID)) {
               // Finance/ecosystem contour — vault[eco] bearer matches header

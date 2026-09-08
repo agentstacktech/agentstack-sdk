@@ -88,6 +88,17 @@ const metadataComponentSchema = z
   })
   .passthrough();
 
+/** Agents Fleet commerce extension (`shared/atoms/asset_catalog_schema.py`). */
+export const agentFleetExtensionSchema = z
+  .object({
+    template_id: z.string().optional(),
+    spec_patch: z.record(z.unknown()).default({}),
+    input_schema: z.record(z.unknown()).default({}),
+    orchestration_pack: z.record(z.unknown()).optional(),
+    version: z.number().int().min(1).default(1),
+  })
+  .passthrough();
+
 export const assetComponentsSchema = z
   .object({
     properties: propertyComponentSchema.optional(),
@@ -95,6 +106,7 @@ export const assetComponentsSchema = z
     metadata: metadataComponentSchema.optional(),
     visual: visualComponentSchema.optional(),
     extensions: z.record(z.unknown()).optional(),
+    agent_fleet: agentFleetExtensionSchema.optional(),
   })
   .passthrough();
 
@@ -132,6 +144,7 @@ export type AssetsWizardStep = z.infer<typeof assetsWizardStepSchema>;
 export type PostCreateAction = z.infer<typeof postCreateActionSchema>;
 export type AssetPresetDefinition = z.infer<typeof assetPresetDefinitionSchema>;
 export type AssetPresetAnswers = z.infer<typeof assetPresetAnswersSchema>;
+export type AgentFleetExtension = z.infer<typeof agentFleetExtensionSchema>;
 export type AssetDraft = z.infer<typeof assetDraftSchema>;
 export type AssetPresetsFixture = z.infer<typeof assetPresetsFixtureSchema>;
 

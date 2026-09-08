@@ -31,7 +31,7 @@ export class DnaLineageClient {
     const response = await this.http.get<LineageGraphResponse>(
       `/dna/lineage/${table}/${uuid}?direction=ancestors&project_id=${projectId}&max_depth=${maxDepth}`,
     );
-    return (response as { data?: LineageGraphResponse }).data ?? (response as LineageGraphResponse);
+    return response.data ?? (response as unknown as LineageGraphResponse);
   }
 
   async getDescendants(
@@ -43,6 +43,6 @@ export class DnaLineageClient {
     const response = await this.http.get<LineageGraphResponse>(
       `/dna/lineage/${table}/${uuid}?direction=descendants&project_id=${projectId}&max_depth=${maxDepth}`,
     );
-    return (response as { data?: LineageGraphResponse }).data ?? (response as LineageGraphResponse);
+    return response.data ?? (response as unknown as LineageGraphResponse);
   }
 }

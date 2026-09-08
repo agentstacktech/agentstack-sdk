@@ -14,11 +14,11 @@ export const SDK_MARKETING_PUBLIC_ROUTES = [
   '/pricing',
   '/faq',
   '/grants',
+  '/services',
+  '/offers',
+  '/ru/services',
+  '/pt/services',
   '/showcase',
-  '/showcase/course-academy',
-  '/showcase/helpdesk-bot',
-  '/showcase/collectibles-bazaar',
-  '/showcase/creator-portfolio',
   '/api-docs',
   '/webhook-docs',
   '/ecosystem-docs',
@@ -46,6 +46,8 @@ export const SDK_MARKETING_PUBLIC_ROUTES = [
   '/pay',
   '/shop',
   '/activate',
+  '/set-password',
+  '/auth/confirm-email',
 ] as const;
 
 /** Hosted storefront / static sites (guest browse). */

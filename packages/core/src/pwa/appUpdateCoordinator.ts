@@ -404,7 +404,7 @@ export function createAppUpdateCoordinator(config: AppUpdateCoordinatorConfig): 
       ev.reason === 'build_id' &&
       ev.remoteBuildId &&
       state.remoteBuildId === ev.remoteBuildId &&
-      (state.status === 'pending' || state.status === 'snoozed' || state.status === 'applying')
+      (state.status === 'pending' || state.status === 'snoozed')
     ) {
       emitBeacon({ type: 'pwa.update.duplicate_suppressed', reason: 'build_id_same_remote' });
       return;

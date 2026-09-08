@@ -1,12 +1,12 @@
 {
-  "generatedAt": "2026-07-12T03:01:22.850Z",
+  "generatedAt": "2026-09-08T20:42:18.776Z",
   "entries": [
     {
       "path": "README.en.md",
       "lang": "en",
       "mirror": "README.md",
       "pairRole": "paired",
-      "lineCount": 670,
+      "lineCount": 674,
       "h2Count": 23,
       "h2Slugs": [
         "tutorial-first-call-15-min",
@@ -42,7 +42,7 @@
       "lang": "ru",
       "mirror": "README.en.md",
       "pairRole": "paired",
-      "lineCount": 677,
+      "lineCount": 684,
       "h2Count": 16,
       "h2Slugs": [
         "how-to-add-the-sdk-to-your-project",
@@ -62,7 +62,7 @@
         "contributing",
         "поддержка"
       ],
-      "codeFences": 54,
+      "codeFences": 56,
       "syncStatus": "legacy-ru-path",
       "diataxis": null
     },
@@ -223,7 +223,7 @@
       "h2Count": 11,
       "h2Slugs": [
         "decision-tree",
-        "flow-a-npm-default-for-apps",
+        "flow-a-npm-after-registry-publish",
         "flow-b-git-submodule-vendored-source",
         "flow-c-platform-submodule-full-agentstack",
         "flow-d-agentstack-monorepo-sibling-this-repo",
@@ -243,7 +243,7 @@
       "lang": "ru",
       "mirror": "docs/SDK_INTEGRATION_FLOWS.md",
       "pairRole": "paired",
-      "lineCount": 184,
+      "lineCount": 186,
       "h2Count": 11,
       "h2Slugs": [
         "дерево-решений",
@@ -297,12 +297,13 @@
       "lang": "en",
       "mirror": "docs/INTEGRATOR_SCOPE_ru.md",
       "pairRole": "paired",
-      "lineCount": 82,
-      "h2Count": 5,
+      "lineCount": 95,
+      "h2Count": 6,
       "h2Slugs": [
         "what-integrators-should-use-instead",
         "runtime-guards-typescript",
         "api-base-url",
+        "channel-decision-mcp-vs-rest-vs-openapi",
         "configuration",
         "discovery-for-ai-agents"
       ],
@@ -315,12 +316,13 @@
       "lang": "ru",
       "mirror": "docs/INTEGRATOR_SCOPE.md",
       "pairRole": "paired",
-      "lineCount": 81,
-      "h2Count": 5,
+      "lineCount": 94,
+      "h2Count": 6,
       "h2Slugs": [
         "чем-пользоваться-интеграторам",
         "защита-в-рантайме-typescript",
         "базовый-url-api",
+        "выбор-канала-mcp-vs-rest-vs-openapi",
         "конфигурация",
         "discovery-для-ai"
       ],
@@ -403,7 +405,7 @@
       "lang": "en",
       "mirror": "AGENTS_ru.md",
       "pairRole": "paired",
-      "lineCount": 102,
+      "lineCount": 138,
       "h2Count": 6,
       "h2Slugs": [
         "60-second-bootstrap",
@@ -413,8 +415,8 @@
         "anti-patterns",
         "links"
       ],
-      "codeFences": 2,
-      "syncStatus": "balanced",
+      "codeFences": 6,
+      "syncStatus": "ru-thin",
       "diataxis": null
     },
     {
@@ -433,7 +435,7 @@
         "ссылки"
       ],
       "codeFences": 2,
-      "syncStatus": "balanced",
+      "syncStatus": "ru-thin",
       "diataxis": null
     },
     {

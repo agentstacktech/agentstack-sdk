@@ -24,6 +24,71 @@ export type SupportEligibilityRow = {
   public_support_channel_title: string;
 };
 
+export type SupportEligibilityPayload = { projects: SupportEligibilityRow[] };
+
+/** TanStack key for ``GET /api/support/eligibility`` (SPA DualShell + ``useSupportEligibility``). */
+export function supportEligibilityQueryKey(projectIds: number | readonly number[]) {
+  const list = (Array.isArray(projectIds) ? projectIds : [projectIds]).filter(
+    (n): n is number => typeof n === 'number' && Number.isFinite(n) && n > 0,
+  );
+  const key = [...new Set(list)].sort((a, b) => a - b).join(',');
+  return ['support', 'eligibility', key] as const;
+}
+
+/** TanStack key for ``GET /api/support/my-thread``. */
+export function supportMyThreadQueryKey(projectId: number) {
+  return ['support', 'my-thread', projectId] as const;
+}
+
+/** Staff view of a user channel — ``GET /api/support/thread/:channelUserId``. */
+export function supportStaffThreadQueryKey(projectId: number, channelUserId: number) {
+  return ['support', 'user-app-thread', projectId, channelUserId] as const;
+}
+
+export type SupportInboxFilters = {
+  status?: string;
+  assignee_user_id?: number;
+  limit?: number;
+};
+
+/** TanStack key for ``GET /api/support/inbox``. */
+export function supportInboxQueryKey(projectId: number, filters: SupportInboxFilters = {}) {
+  const status = filters.status?.trim() ?? '';
+  const assignee = filters.assignee_user_id ?? '';
+  const limit = filters.limit ?? '';
+  return ['support', 'inbox', projectId, status, assignee, limit] as const;
+}
+
+/** Ticket status filter options (inbox UI). */
+export const SUPPORT_TICKET_STATUS_FILTER_OPTIONS = [
+  '',
+  'open',
+  'pending',
+  'resolved',
+  'closed',
+  'reopened',
+] as const;
+
+export function eligibilityRowForProject(
+  data: SupportEligibilityPayload | undefined,
+  projectId: number,
+): SupportEligibilityRow | undefined {
+  return (data?.projects ?? []).find((p) => p.project_id === projectId);
+}
+
+/** Map ``GET /api/support/eligibility`` rows by ``project_id`` (hub picker). */
+export function eligibilityRowsByProjectId(
+  data: SupportEligibilityPayload | undefined,
+): Map<number, SupportEligibilityRow> {
+  const m = new Map<number, SupportEligibilityRow>();
+  for (const row of data?.projects ?? []) {
+    if (row && typeof row.project_id === 'number') {
+      m.set(row.project_id, row);
+    }
+  }
+  return m;
+}
+
 export async function supportGetMeProjectRoles(client: HttpLike) {
   const r = await client.get<SupportProjectRolesResponse>(`${BASE}/me/project-roles`);
   return r.data;
@@ -59,8 +124,8 @@ export async function supportGetConfig(client: HttpLike, params: { project_id: n
 }
 
 export async function supportGetEligibility(client: HttpLike, params: { project_ids: number[] }) {
-  const csv = (params.project_ids ?? []).join(',');
-  const r = await client.get<{ projects: SupportEligibilityRow[] }>(`${BASE}/eligibility`, {
+  const csv = supportEligibilityQueryKey(params.project_ids ?? [])[2];
+  const r = await client.get<SupportEligibilityPayload>(`${BASE}/eligibility`, {
     project_ids: csv,
   });
   return r.data;
@@ -116,6 +181,18 @@ export async function supportAssignTicket(
   const r = await client.post<{ ticket?: Record<string, unknown> }>(
     `${BASE}/thread/${params.channel_user_id}/tickets/${encodeURIComponent(params.ticket_id)}/assign`,
     { assignee_user_id: params.assignee_user_id ?? null },
+    { params: { project_id: params.project_id } }
+  );
+  return r.data;
+}
+
+export async function supportSetMyThreadReaction(
+  client: HttpLike,
+  params: { project_id: number; message_id: string; helpful: boolean }
+) {
+  const r = await client.post<{ message?: Record<string, unknown> }>(
+    `${BASE}/my-thread/reaction`,
+    { message_id: params.message_id, helpful: params.helpful },
     { params: { project_id: params.project_id } }
   );
   return r.data;

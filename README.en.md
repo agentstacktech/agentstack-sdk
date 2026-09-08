@@ -1,6 +1,5 @@
 # AgentStack SDK
 
-[![npm version](https://img.shields.io/npm/v/@agentstack/sdk.svg)](https://www.npmjs.com/package/@agentstack/sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **Languages:** **English** (this file, canonical) · [Русский extended narrative](README.md)
@@ -13,9 +12,14 @@ Universal TypeScript/JavaScript SDK for the AgentStack ecosystem — modular API
 
 ## 🚀 Tutorial — first call (15 min)
 
+**Today (mirror clone):**
+
 ```bash
-npm install @agentstack/sdk
+git clone https://github.com/agentstacktech/agentstack-sdk.git vendor/agentstack-sdk
+cd vendor/agentstack-sdk && npm ci && npm run build
 ```
+
+**After npm publish:** `npm install @agentstack/sdk`
 
 ```typescript
 import { AgentStackSDK, resolveAgentStackApiBase } from '@agentstack/sdk';
@@ -65,7 +69,7 @@ Full tree: [docs/SDK_INTEGRATION_FLOWS.md](docs/SDK_INTEGRATION_FLOWS.md)
 
 ```bash
 git submodule add https://github.com/agentstacktech/agentstack-sdk.git vendor/agentstack-sdk
-node vendor/agentstack-sdk/scripts/bootstrap-submodule-consumer.mjs --target . --tag v0.4.13
+node vendor/agentstack-sdk/scripts/bootstrap-submodule-consumer.mjs --target . --tag v0.4.18
 ```
 
 Then `npm install` and set `projectId` — [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md).
@@ -197,7 +201,7 @@ Full tree: [docs/SDK_INTEGRATION_FLOWS.md](docs/SDK_INTEGRATION_FLOWS.md)
 
 ```bash
 git submodule add https://github.com/agentstacktech/agentstack-sdk.git vendor/agentstack-sdk
-node vendor/agentstack-sdk/scripts/bootstrap-submodule-consumer.mjs --target . --tag v0.4.13
+node vendor/agentstack-sdk/scripts/bootstrap-submodule-consumer.mjs --target . --tag v0.4.18
 ```
 
 ---

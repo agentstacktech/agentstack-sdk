@@ -79,6 +79,7 @@ export class CheckoutClient {
       crm_deal_id?: string;
       crm_project_id?: number;
       metadata?: Record<string, unknown>;
+      payment_source?: Record<string, unknown>;
     },
   ) {
     const headers = idempotencyKey
@@ -88,6 +89,7 @@ export class CheckoutClient {
     if (opts?.crm_deal_id) body.crm_deal_id = opts.crm_deal_id;
     if (opts?.crm_project_id) body.crm_project_id = opts.crm_project_id;
     if (opts?.metadata) body.metadata = opts.metadata;
+    if (opts?.payment_source) body.payment_source = opts.payment_source;
     try {
       const response = await this.http.post('/commerce/cart/checkout', body, {
         params: { rail },

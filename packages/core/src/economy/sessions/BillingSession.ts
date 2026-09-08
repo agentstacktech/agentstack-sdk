@@ -1,4 +1,5 @@
 import type { ComputeCreditsClient } from '../clients/ComputeCreditsClient';
+import type { PaymentSourceRef } from '../../finance/pay/types';
 import { EconomyError } from '../errors/EconomyError';
 import { ComputeCreditQuoteSchema, type ComputeCreditQuote } from '../schemas/computeCreditQuote';
 
@@ -9,7 +10,13 @@ export class BillingSession {
     private readonly projectId: number,
     private readonly credits: ComputeCreditsClient,
     private readonly buyerUserId: number,
+  /** Defaults to AGNT ledger path when omitted (`agnt_ledger`). Personal-wallet debits use `finance.pay` on the UI (PaySheet / executeWalletPayIntent), not this session's purchase(). */
+  private readonly paymentSource?: PaymentSourceRef,
   ) {}
+
+  getPaymentSource(): PaymentSourceRef | undefined {
+    return this.paymentSource;
+  }
 
   async quoteCredits(creditsAtomic: number): Promise<ComputeCreditQuote> {
     const { quote } = await this.credits.quote(this.projectId, {

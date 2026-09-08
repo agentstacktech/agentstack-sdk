@@ -13,7 +13,10 @@ export interface PaymentData {
   merchant_id?: number;
   customer_email?: string;
   customer_phone?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, any> & {
+    funding_lane?: 'personal' | 'treasury';
+    recipient_project_id?: number;
+  };
   /** intent: sale | top_up | subscription | energy_pack */
   intent?: string;
   /** preferred_method: wallet | card | stripe */

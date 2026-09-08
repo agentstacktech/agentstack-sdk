@@ -32,6 +32,7 @@ export type AssetsUrlState = {
   commerceTab: CommerceHubTab;
   commerceAssetId: string | null;
   studioTab: StudioTab;
+  pack: string | null;
 };
 
 const STEPS: AssetsWizardStep[] = ['intent', 'basics', 'media', 'publish', 'review'];
@@ -93,6 +94,7 @@ export function parseAssetsSearchParams(sp: URLSearchParams): AssetsUrlState {
     commerceTab: parseCommerceTab(sp.get('tab')),
     commerceAssetId: sp.get('assetId'),
     studioTab: parseStudioTab(sp.get('studioTab')),
+    pack: sp.get('pack'),
   };
 }
 
@@ -174,6 +176,9 @@ export function writeAssetsSearchParams(
       if (patch.studioTab === 'quick') sp.delete('studioTab');
       else sp.set('studioTab', patch.studioTab);
     }
+  }
+  if (patch.pack !== undefined) {
+    setOrDelete(sp, 'pack', patch.pack);
   }
 
   return sp;

@@ -107,6 +107,8 @@ export class AgentSocial {
 
   /**
    * Bundled chat index (+ reserved thread slots) for Local-First cold start.
+   * ``threads`` is an **empty stub** — never use it as the inbox SoT.
+   * Inbox = ``GET /api/social/chat/index`` (``chatIndexGet`` / ``useChatIndex``).
    * @see GET /api/social/initial-snapshot
    */
   messengerInitialSnapshot(

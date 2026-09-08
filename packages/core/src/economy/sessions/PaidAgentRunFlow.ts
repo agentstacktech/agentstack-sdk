@@ -16,6 +16,7 @@ export class PaidAgentRunFlow {
     idempotencyKey?: string;
     traceId?: string;
   }): Promise<Record<string, unknown>> {
+    // AGNT ledger quote preflight; insufficient builder energy is handled in UI via EnergyPurchaseModal → PaySheet.
     const quote = await this.billing.quoteCredits(params.creditsAtomic);
     const idempotencyKey =
       params.idempotencyKey ?? economyIdempotencyKey('paid-run', params.agentId);

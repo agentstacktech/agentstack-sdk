@@ -88,6 +88,7 @@ export interface AdminDataSnapshotResponse {
     user_count: number;
     users_returned: number;
   };
+  people?: AdminDataPeopleResponse;
   dna_list_samples: Record<string, { total: number; returned: number }>;
 }
 

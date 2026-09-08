@@ -47,6 +47,16 @@ export const HOSTING_FUNNEL_PATHS = ['/', '/host-site', '/demo', '/for-developer
 
 export type HostingFunnelPath = (typeof HOSTING_FUNNEL_PATHS)[number];
 
+export const SERVICES_HUB_PATH = '/services' as const;
+
+/** Hosting funnel + professional services hub for SEO health probes. */
+export const PRIORITY_SEO_PATHS = [
+  ...HOSTING_FUNNEL_PATHS,
+  SERVICES_HUB_PATH,
+] as const;
+
+export type PrioritySeoPath = (typeof PRIORITY_SEO_PATHS)[number];
+
 export class AgentSeo {
   constructor(private client: HTTPClient) {}
 
@@ -117,12 +127,17 @@ export class AgentSeo {
   /** Lightweight health snapshot for ops dashboards. */
   async healthCheck(signal?: AbortSignal): Promise<SeoHealthCheck> {
     const registry_version = (await this.getRegistryVersion(signal)) ?? 'unknown';
-    const funnel = await this.getMetaBatch(HOSTING_FUNNEL_PATHS, { signal });
+    const priority = await this.getMetaBatch(PRIORITY_SEO_PATHS, { signal });
     return {
       registry_version,
-      indexable_path_count: Object.keys(funnel).length,
-      funnel_paths: HOSTING_FUNNEL_PATHS.slice(),
+      indexable_path_count: Object.keys(priority).length,
+      funnel_paths: PRIORITY_SEO_PATHS.slice(),
     };
+  }
+
+  /** Fetch meta for the professional services hub. */
+  async getServicesHubMeta(locale?: string, signal?: AbortSignal): Promise<SeoMetaTags> {
+    return this.getMeta(SERVICES_HUB_PATH, { locale, signal });
   }
 
   /** Convenience: fetch meta for each hosting funnel path. */

@@ -39,6 +39,12 @@ export type MerchantListingRow = {
   visibility: 'public' | 'limited';
   shop_href: string;
   created_at?: string;
+  /** Denormalized storefront index card for thumb resolution. */
+  asset_card?: {
+    name?: string;
+    thumbnail_url?: string;
+    image_url?: string;
+  };
   /** Set when status is cancelled or listing was moderated. */
   status_reason?: string;
 };

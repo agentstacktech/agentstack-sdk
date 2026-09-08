@@ -20,6 +20,10 @@ const swapSrc = readFileSync(
   join(root, 'packages/core/src/finance/sessions/SwapSession.ts'),
   'utf8',
 );
+const paySrc = readFileSync(
+  join(root, 'packages/core/src/finance/pay/PayClient.ts'),
+  'utf8',
+);
 
 const required = [
   ['/api/finance/${projectId}/portfolio', portfolioSrc],
@@ -31,6 +35,8 @@ const required = [
   ['/api/finance/projects/${projectId}/contributions', projectSrc],
   ['/api/finance/${this.projectId}/swap/quote', swapSrc],
   ['/api/finance/${this.projectId}/swap/execute', swapSrc],
+  ['/finance/${projectId}/pay/quote', paySrc],
+  ['/finance/${projectId}/pay/execute', paySrc],
 ];
 
 for (const [fragment, src] of required) {

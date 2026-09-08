@@ -19,7 +19,9 @@ export function isTransientBrowserNetworkError(error: unknown): boolean {
   const msg = e.message ?? '';
   return (
     e.name === 'TypeError' &&
-    /NetworkError when attempting to fetch|Failed to fetch|Load failed|network/i.test(msg)
+    (/NetworkError when attempting to fetch|Failed to fetch|Load failed|network|Decoding failed|Body has already been consumed/i.test(
+      msg,
+    ))
   );
 }
 
@@ -31,6 +33,20 @@ export function noteTransientNetworkError(): void {
   } catch {
     /* ignore */
   }
+}
+
+/** FastAPI 401 when Bearer was omitted (guest / project mismatch). */
+export function isMissingAuthHeadersDetail(detail: unknown): boolean {
+  if (detail == null) return false;
+  if (typeof detail === 'string') {
+    return /missing required authentication/i.test(detail);
+  }
+  if (typeof detail === 'object') {
+    const d = detail as { detail?: unknown; message?: unknown };
+    const msg = d.detail ?? d.message ?? '';
+    return /missing required authentication/i.test(String(msg));
+  }
+  return false;
 }
 
 /** Host-side: deploy restart window when API/chunk fetch failed but asset may still exist. */

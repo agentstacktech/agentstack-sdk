@@ -1,7 +1,9 @@
 import type { AgentsFleet } from '../modules/AgentsFleet';
 import type { AgentEconomyFacade } from './AgentEconomyFacade';
+import type { PaymentSourceRef } from '../finance/pay/types';
 import { BillingSession } from './sessions/BillingSession';
 import { PaidAgentRunFlow } from './sessions/PaidAgentRunFlow';
+import { EconomyError } from './errors/EconomyError';
 
 export class ProjectLedgerScope {
   constructor(
@@ -16,7 +18,6 @@ export class ProjectLedgerScope {
   async ensureBalance(accountKey: string, minAtomic: bigint, assetCode = 'AGNT'): Promise<void> {
     const bal = await this.getBalance(accountKey, assetCode);
     if (BigInt(bal.balance_atomic) < minAtomic) {
-      const { EconomyError } = await import('./errors/EconomyError');
       throw new EconomyError(
         'INSUFFICIENT_AGNT',
         `balance ${bal.balance_atomic} < required ${minAtomic}`,
@@ -37,15 +38,23 @@ export class ProjectEconomyScope {
     this.ledger = new ProjectLedgerScope(projectId, facade);
   }
 
-  billing(buyerUserId: number): BillingSession {
-    return new BillingSession(this.projectId, this.facade.credits, buyerUserId);
+  billing(buyerUserId: number, opts?: { paymentSource?: PaymentSourceRef }) {
+    return new BillingSession(
+      this.projectId,
+      this.facade.credits,
+      buyerUserId,
+      opts?.paymentSource,
+    );
   }
 
-  paidRun(buyerUserId: number): PaidAgentRunFlow {
+  paidRun(
+    buyerUserId: number,
+    opts?: { paymentSource?: PaymentSourceRef },
+  ): PaidAgentRunFlow {
     return new PaidAgentRunFlow(
       this.projectId,
       this.agentsFleet,
-      this.billing(buyerUserId),
+      this.billing(buyerUserId, opts),
     );
   }
 }

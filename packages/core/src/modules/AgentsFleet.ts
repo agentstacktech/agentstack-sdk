@@ -298,6 +298,38 @@ export interface AgentTemplateDTO {
   tags?: string[];
 }
 
+/** ``GET .../agents/fleet/diagnostics`` (AO7 project RBAC). */
+export interface AgentFleetDiagnosticsDTO {
+  success: boolean;
+  project_id: number;
+  agents_total: number;
+  killswitch: boolean;
+  run_status_counts: Record<string, number>;
+  stuck_running_15m: number;
+  approval_wait_count: number;
+  approval_wait_avg_s: number;
+  worker_health: {
+    queue?: string;
+    status?: string;
+    queue_depth?: number;
+    queue_counts?: Record<string, number>;
+  };
+}
+
+export interface AgentFleetSweepStaleRunsOptions {
+  agent_uuid?: string;
+  limit?: number;
+}
+
+export interface AgentFleetReconcileRunResultDTO {
+  success: boolean;
+  project_id: number;
+  run_uuid: string;
+  action: string;
+  reason: string;
+  repaired: boolean;
+}
+
 /**
  * Deep merge for AgentSpec patches — mirrors
  * ``agentstack-frontend/src/lib/agents/mergeAgentSpec.ts``.
@@ -427,6 +459,77 @@ export class AgentsFleet {
   async listTemplates(projectId: number): Promise<{ success: boolean; templates: AgentTemplateDTO[] }> {
     const res = await this.client.get(`${this.base(projectId)}/templates`);
     return res.data as { success: boolean; templates: AgentTemplateDTO[] };
+  }
+
+  async automationMap(projectId: number): Promise<{ success: boolean; agents: unknown[]; total: number }> {
+    const res = await this.client.get(`${this.base(projectId)}/automation-map`);
+    return res.data as { success: boolean; agents: unknown[]; total: number };
+  }
+
+  async fleetDiagnostics(projectId: number): Promise<AgentFleetDiagnosticsDTO> {
+    const res = await this.client.get(`${this.base(projectId)}/fleet/diagnostics`);
+    return res.data as AgentFleetDiagnosticsDTO;
+  }
+
+  async reconcileRun(projectId: number, runUuid: string): Promise<AgentFleetReconcileRunResultDTO> {
+    const res = await this.client.post(`${this.base(projectId)}/runs/${runUuid}/reconcile`);
+    return res.data as AgentFleetReconcileRunResultDTO;
+  }
+
+  async sweepStaleRuns(
+    projectId: number,
+    options: AgentFleetSweepStaleRunsOptions = {},
+  ): Promise<{ success: boolean; project_id: number; scope: string; touched: number; limit: number }> {
+    const res = await this.client.post(`${this.base(projectId)}/fleet/sweep-stale-runs`, {
+      agent_uuid: options.agent_uuid,
+      limit: options.limit,
+    });
+    return res.data as {
+      success: boolean;
+      project_id: number;
+      scope: string;
+      touched: number;
+      limit: number;
+    };
+  }
+
+  async exportPack(
+    projectId: number,
+    agentId: string,
+  ): Promise<{ success: boolean; agent_spec: Record<string, unknown>; pack_version: number }> {
+    const res = await this.client.get(`${this.base(projectId)}/${agentId}/export-pack`);
+    return res.data;
+  }
+
+  async importPack(
+    projectId: number,
+    body: {
+      agent_spec: Record<string, unknown>;
+      template_id?: string;
+      name?: string;
+      fork_on_collision?: boolean;
+    },
+  ): Promise<{ success: boolean; agent: AgentRowDTO }> {
+    const res = await this.client.post(`${this.base(projectId)}/import-pack`, body);
+    return res.data as { success: boolean; agent: AgentRowDTO };
+  }
+
+  async importFromAsset(
+    projectId: number,
+    body: { asset: Record<string, unknown>; name?: string },
+  ): Promise<{ success: boolean; agent: AgentRowDTO; missing_resources?: string[] }> {
+    const res = await this.client.post(`${this.base(projectId)}/import-from-asset`, body);
+    return res.data as { success: boolean; agent: AgentRowDTO; missing_resources?: string[] };
+  }
+
+  async compileWorkflow(
+    projectId: number,
+    workflow: Record<string, unknown>,
+  ): Promise<{ success: boolean; compiled: Record<string, unknown> }> {
+    const res = await this.client.post(`${this.base(projectId)}/workflow/compile-preview`, {
+      workflow,
+    });
+    return res.data as { success: boolean; compiled: Record<string, unknown> };
   }
 
   async createFromTemplate(
@@ -638,6 +741,11 @@ export class AgentsFleet {
     return parseAgentRunSSE(source);
   }
 
+  /** Alias for ``parseRunEventStream`` (orchestration plan parity). */
+  streamRunEvents(source: Response | ReadableStream<Uint8Array>) {
+    return this.parseRunEventStream(source);
+  }
+
   /** Personal agents (``GET /api/users/me/agents``). */
   async listMine(): Promise<{ success: boolean; agents: AgentRowDTO[]; home_project_id?: number }> {
     const res = await this.client.get('/users/me/agents');
@@ -836,6 +944,16 @@ export class AgentsFleet {
       get: (agentId: string) => new AgentsFleet(c).get(projectId, agentId),
       create: (name?: string) => new AgentsFleet(c).create(projectId, name),
       listTemplates: () => new AgentsFleet(c).listTemplates(projectId),
+      automationMap: () => new AgentsFleet(c).automationMap(projectId),
+      fleetDiagnostics: () => new AgentsFleet(c).fleetDiagnostics(projectId),
+      reconcileRun: (runUuid: string) => new AgentsFleet(c).reconcileRun(projectId, runUuid),
+      sweepStaleRuns: (options?: AgentFleetSweepStaleRunsOptions) =>
+        new AgentsFleet(c).sweepStaleRuns(projectId, options),
+      exportPack: (agentId: string) => new AgentsFleet(c).exportPack(projectId, agentId),
+      importPack: (body: Parameters<AgentsFleet['importPack']>[1]) =>
+        new AgentsFleet(c).importPack(projectId, body),
+      compileWorkflow: (workflow: Record<string, unknown>) =>
+        new AgentsFleet(c).compileWorkflow(projectId, workflow),
       createFromTemplate: (body: Parameters<AgentsFleet['createFromTemplate']>[1]) =>
         new AgentsFleet(c).createFromTemplate(projectId, body),
       update: (agentId: string, spec: Record<string, unknown>) => new AgentsFleet(c).update(projectId, agentId, spec),
@@ -867,6 +985,8 @@ export class AgentsFleet {
         new AgentsFleet(c).runStreamPath(projectId, agentId, runId),
       parseRunEventStream: (source: Response | ReadableStream<Uint8Array>) =>
         new AgentsFleet(c).parseRunEventStream(source),
+      streamRunEvents: (source: Response | ReadableStream<Uint8Array>) =>
+        new AgentsFleet(c).streamRunEvents(source),
       attachSupportAiAgent: (p: Record<string, unknown>) => new AgentsFleet(c).attachSupportAiAgent(projectId, p),
       previewPolicy: (body: AgentPolicyPreviewBody) => new AgentsFleet(c).previewPolicy(projectId, body),
       previewTemplate: (body: AgentTemplatePreviewBody) => new AgentsFleet(c).previewTemplate(projectId, body),

@@ -5,6 +5,7 @@
 
 import { isChunkLikeErrorMessage } from './pwa/chunkErrors';
 import { HTTPClient } from './client/http-client';
+import { registerSavedCredentialRelogin } from './client/savedCredentialRelogin';
 import { AgentAuth } from './modules/AgentAuth';
 // AgentAdmin removed - use AgentAPI methods instead (Universal Naming)
 import { AgentNeural } from './modules/AgentNeural';
@@ -13,6 +14,7 @@ import { AgentPayments } from './modules/AgentPayments';
 import { AgentEconomyFacade } from './economy/AgentEconomyFacade';
 import { AgentPublicSurface } from './public';
 import { AgentFinanceFacade } from './finance/AgentFinanceFacade';
+import { AgentBusinessFacade } from './business/AgentBusinessFacade';
 import { AgentNetBnb } from './modules/AgentNetBnb';
 import { AgentNetSolana } from './modules/AgentNetSolana';
 import { AgentAdmin } from './modules/AgentAdmin';
@@ -22,8 +24,13 @@ import { AgentsFleet } from './modules/AgentsFleet';
 import { AgentWebhooks } from './modules/AgentWebhooks';
 import { AgentIntegrations } from './modules/AgentIntegrations';
 import { AgentBots } from './modules/AgentBots';
+import { AgentMentor } from './modules/AgentMentor';
+import { AgentKnowledge } from './modules/AgentKnowledge';
 import { AgentCrm } from './modules/AgentCrm';
+import { AgentRag } from './modules/AgentRag';
 import { AgentHosting } from './modules/AgentHosting';
+import { SandboxClient, GenerationsClient } from './sandbox';
+import { EnergyClient } from './energy';
 import { AgentScheduler } from './modules/AgentScheduler';
 import { AgentAPI } from './modules/AgentAPI';
 import { AgentNotifications } from './modules/AgentNotifications';
@@ -149,6 +156,7 @@ import type { MakeMessengerOpts, Messenger } from './modules/Messenger';
 import { buildMessengerClientConfigFromHttpClientConfig } from './messenger/buildMessengerClientConfig';
 import { assertPlatformOperatorSurface } from './config/integratorScope';
 import { normalizeProjectId, resolveEffectiveProjectId } from './config/projectContext';
+import { AgentMcp } from './mcp';
 
 export class AgentStackSDK extends SimpleEventEmitter {
   /** Explicit for rolled-up .d.ts — @agentstack/react telemetry hooks call `sdk.emit`. */
@@ -194,6 +202,10 @@ export class AgentStackSDK extends SimpleEventEmitter {
   public public: AgentPublicSurface;
   /** Finance Hub BFF (portfolio, project fund, swap). Prefer `sdk.finance` / `sdk.platform.finance`. */
   public finance: AgentFinanceFacade;
+  /** Business organism command center (`/api/projects/{id}/business/*`, `/org/*`). */
+  public business: AgentBusinessFacade;
+  /** LLM prepaid energy balance + packs (`/api/energy/*`). */
+  public energy: EnergyClient;
   /** BNB Chain BSC testnet rail (`/api/projects/{id}/agentnet/bnb/*`). */
   public agentnetBnb: AgentNetBnb;
   /** Solana devnet PTR attestation rail (`/api/projects/{id}/agentnet/sol/*`). */
@@ -206,10 +218,21 @@ export class AgentStackSDK extends SimpleEventEmitter {
   public integrations: AgentIntegrations;
   /** Bots Fleet — Telegram / WhatsApp / Instagram bots (`/api/projects/{id}/bots/*`). */
   public bots: AgentBots;
+  public mentor: AgentMentor;
+  /** Knowledge platform — assistant ops (`/api/projects/{id}/knowledge/*`). */
+  public knowledge: AgentKnowledge;
   /** CRM tissue — project-scoped contacts/deals (`/api/projects/{id}/crm/*`). */
   public crm: AgentCrm;
+  /** RAG platform — collections, ingest, search (`/api/rag/*`). */
+  public rag: AgentRag;
   /** Static bucket hosting (`/api/hosting/*`). */
   public hosting: AgentHosting;
+  /** MCP JSON-RPC `agentstack.execute` + Device Code form login (`sdk.mcp`). */
+  public mcp: AgentMcp;
+  /** Tenant 8DNA sandbox (`/api/sandbox/*`). */
+  public sandbox: SandboxClient;
+  /** Generation flow UI API (`/api/generations/*`). */
+  public generations: GenerationsClient;
   public scheduler: AgentScheduler;
   public notifications: AgentNotifications;
   /** Messenger / friends / PAS (`/api/social/*`, `/api/pas/*`). Also on `sdk.platform.social`. */
@@ -402,6 +425,18 @@ export class AgentStackSDK extends SimpleEventEmitter {
 
     // Инициализация модулей SDK
     this.auth = new AgentAuth(this.httpClient, this.authStateStore);
+    registerSavedCredentialRelogin(async (input) => {
+      const loginResult = await this.auth.login({
+        email: input.email,
+        password: input.password,
+        project_id: input.project_id,
+      });
+      if (!loginResult?.access_token) return null;
+      return {
+        access_token: loginResult.access_token,
+        refresh_token: loginResult.refresh_token,
+      };
+    });
     this.api = new AgentAPI(this.httpClient);
     this._admin = new AgentAdmin(this.httpClient);
     this._adminData = new AgentAdminData(this.httpClient);
@@ -412,14 +447,26 @@ export class AgentStackSDK extends SimpleEventEmitter {
     this.economy = new AgentEconomyFacade(this.httpClient, this.agentsFleet);
     this.public = new AgentPublicSurface(this.httpClient);
     this.finance = new AgentFinanceFacade(this.httpClient);
+    this.business = new AgentBusinessFacade(this.httpClient);
+    this.energy = new EnergyClient(this.httpClient);
     this.agentnetBnb = new AgentNetBnb(this.httpClient);
     this.agentnetSolana = new AgentNetSolana(this.httpClient);
     this.analytics = new AgentAnalytics(this.httpClient);
     this.webhooks = new AgentWebhooks(this.httpClient);
     this.integrations = new AgentIntegrations(this.httpClient);
     this.bots = new AgentBots(this.httpClient);
+    this.mentor = new AgentMentor(this.httpClient);
+    this.knowledge = new AgentKnowledge(this.httpClient);
     this.crm = new AgentCrm(this.httpClient);
+    this.rag = new AgentRag(this.httpClient);
     this.hosting = new AgentHosting(this.httpClient);
+    this.mcp = new AgentMcp(
+      () => String(this.getConfig().apiBase || this.httpClient.getConfig().apiBase || ''),
+      () => this.httpClient.getApiKey() || this.httpClient.getAuthToken() || undefined,
+      () => this.getProjectId(),
+    );
+    this.sandbox = new SandboxClient(this.httpClient);
+    this.generations = new GenerationsClient(this.httpClient);
     this.scheduler = new AgentScheduler(this.httpClient);
     this.webPush = new AgentWebPush(this.httpClient);
     this.guidancePlatform = new GuidancePlatformFacade(this.httpClient);
@@ -471,6 +518,7 @@ export class AgentStackSDK extends SimpleEventEmitter {
         http: this.httpClient,
         commands: this.proteinCommandChannel,
         snapshots: this.entitySnapshotRepository,
+        api: this.api,
         rulesCommand: this.command,
         protein: this.protein,
         dna: this.dna,
@@ -513,6 +561,7 @@ export class AgentStackSDK extends SimpleEventEmitter {
       agentsFleet: this.agentsFleet,
       economy: this.economy,
       finance: this.finance,
+      energy: this.energy,
       social: this.social,
       support: this.support,
       webPush: this.webPush,

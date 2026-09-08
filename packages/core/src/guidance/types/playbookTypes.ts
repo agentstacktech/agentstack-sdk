@@ -7,6 +7,8 @@ export const PlaybookIdSchema = z.enum([
   'host-static-site',
   'host-sell-scale-one-project',
   'host-and-sell-15',
+  'hosting-upgrade',
+  'host-automate',
   'start-selling',
   'try-hosting-demo-5',
   'first-integration',
@@ -22,6 +24,7 @@ export const PlaybookIdSchema = z.enum([
   'micropath-synthetic',
   'project-safe-exit',
   'grant-testnet-demo',
+  'grant-os-crm-ops',
   'fabric-demo',
   'messaging-channel-bot',
   'commerce-lite-surfaces',
@@ -31,6 +34,21 @@ export const PlaybookIdSchema = z.enum([
   'connect-api-key-60s',
   'oauth-recover',
   'alert-on-fail',
+  'storefront-studio-seed',
+  'project-first-value',
+  'rag-smoke',
+  'launch-mentor-bot',
+  'launch-knowledge-assistant',
+  'configure-email',
+  'check-delivery-logs',
+  'launch-sandbox-canary',
+  'setup-business-head',
+  'hire-agentstack-studio',
+  'crm-first',
+  'staff-project',
+  'business-operate',
+  'list-project-for-sale',
+  'llm-energy-setup',
 ]);
 
 export type PlaybookId = z.infer<typeof PlaybookIdSchema>;
@@ -54,6 +72,10 @@ const PlaybookNodeSchema = z.discriminatedUnion('kind', [
     capabilityHideOptionIds: z.array(z.string()).optional(),
     help: z.array(PathStepHelpBlockSchema).optional(),
     estimatedMin: z.number().optional(),
+    /** Default `discover` — entry-chain branching. `post_execute` requires `afterNodeId`. */
+    phase: z.enum(['discover', 'post_execute']).optional(),
+    /** Anchor task/capability/verify node that must complete before this question. */
+    afterNodeId: z.string().optional(),
   }),
   z.object({
     kind: z.literal('task'),

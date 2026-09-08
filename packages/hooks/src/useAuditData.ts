@@ -11,7 +11,7 @@
 import { UseQueryResult } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import type { AgentStackSDK } from '@agentstack/sdk';
-import { useSDKQuery } from '@agentstack/react';
+import { useSDKQuery, stableKeyPart } from '@agentstack/react';
 import type { AuditLog, AuditFilters, BaseHookOptions } from './types';
 
 /**
@@ -94,7 +94,7 @@ export function useAuditData(
 
   const queryResult = useSDKQuery<AuditLog[]>(
     sdk,
-    ['audit-logs', filters],
+    ['audit-logs', stableKeyPart(filters)],
     async (signal) => {
       try {
         const params = Object.entries(filters)

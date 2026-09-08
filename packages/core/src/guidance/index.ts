@@ -2,6 +2,11 @@ export * from './types/pathStepStatus';
 export * from './types/pathStepHelp';
 export * from './types/playbookTypes';
 export * from './domain/compilePathPlan';
+export {
+  isPostExecuteQuestion,
+  questionPhase,
+  postExecuteQuestionsAfter,
+} from './domain/postExecuteQuestions';
 export * from './domain/deriveStepStatuses';
 export * from './domain/pathProgressAggregate';
 export * from './domain/pathSessionViewModel';
@@ -11,6 +16,8 @@ export * from './domain/rebuildPathStateFromEvents';
 export * from './engine/runPathReducer';
 export * from './store/IPathStore';
 export * from './store/LocalPathStore';
+export * from './store/normalizePathSessionIndex';
+/** @deprecated Use `GuidanceClient` / `pathServerSync` — see `RemotePathStore` JSDoc. */
 export * from './store/RemotePathStore';
 export * from './store/migrateV1ToV2';
 export * from './validateDefinition';

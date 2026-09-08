@@ -23,6 +23,7 @@ export * from './updatePlaneDiagnostics';
 export * from './chunkErrors';
 export * from './hostedRecovery';
 export {
+  isMissingAuthHeadersDetail,
   isRecentTransientNetworkBlip,
   isTransientBrowserNetworkError,
   noteTransientNetworkError,

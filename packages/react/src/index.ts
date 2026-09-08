@@ -56,6 +56,11 @@ export {
   type EntityInvalidationConfig,
   type QueryKeyPrefix,
 } from './lib/invalidationRegistry';
+export {
+  SDK_ENTITY_LLM_ENERGY,
+  SDK_LLM_ENERGY_QUERY_PREFIXES,
+  SDK_LLM_ENERGY_INVALIDATION_CONFIG,
+} from './lib/llmEnergyInvalidation';
 
 // Hooks
 export { useAuth } from './hooks/useAuth';
@@ -80,6 +85,9 @@ export {
   useSupportProjectSearch,
   useSupportEligibility,
   useSupportInbox,
+  useSupportMyThread,
+  useSupportSendMessage,
+  useSupportLauncherState,
   type SupportInboxFilters,
   type SupportEligibilityResponse,
 } from './hooks/useSupport';
@@ -90,13 +98,26 @@ export { useAgentRun, type AgentRunState, type AgentRunStreamEvent } from './hoo
 export { useAgntBalance } from './hooks/useAgntBalance';
 export { usePaidAgentRun, type UsePaidAgentRunVariables } from './hooks/usePaidAgentRun';
 export { useEconomyCapability, type EconomyCapability } from './hooks/useEconomyCapability';
+export {
+  useEconomyCryptoEnabled,
+  isEconomyCryptoEnabledFromSlice,
+  type EconomyCryptoMode,
+} from './hooks/useEconomyCryptoEnabled';
 export { useTestnetProfiles } from './hooks/useTestnetProfiles';
 export { useScenarioRun } from './hooks/useScenarioRun';
 export { useChainSurface, type ChainSurfaceAudience, type UseChainSurfaceOptions } from './hooks/useChainSurface';
 export { economyKeys } from './economy/economyQueryKeys';
 export { testnetKeys } from './economy/testnetQueryKeys';
-export { commerceKeys } from './commerce/commerceQueryKeys';
 export type { StorefrontKeyParams } from './commerce/commerceQueryKeys';
+export { commerceKeys } from './commerce/commerceQueryKeys';
+export {
+  assertSerializableQueryKey,
+  coerceProjectIdKeyPart,
+  isLikelyAgentStackBillingModule,
+  isLikelyAgentStackSdk,
+  safeQueryKeyHashFn,
+  stableKeyPart,
+} from './lib/queryKeyUtils';
 export { useCart } from './hooks/useCart';
 export type {
   AddCartLineVariables,
@@ -146,6 +167,14 @@ export type {
   ProductGridEmbedProps,
   ProductQuickViewProps,
 } from './commerce/embeds';
+export {
+  SupportLauncherButton,
+  SupportLauncherFrame,
+} from './support';
+export type {
+  SupportLauncherButtonProps,
+  SupportLauncherFrameProps,
+} from './support';
 export { formatMoney } from '@agentstack/sdk/commerce/money';
 export type { Money } from '@agentstack/sdk/commerce/money';
 export { createFeatureModule, type FeatureModuleConfig, type FeatureModule } from './createFeatureModule';

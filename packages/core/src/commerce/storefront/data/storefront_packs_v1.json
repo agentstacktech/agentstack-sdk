@@ -1,0 +1,240 @@
+{
+  "version": "1",
+  "genetic_tag": "core.commerce.storefront_seed.gen1",
+  "description": "Bundled storefront seed packs — ProductSpec[] applied via StorefrontSeedService",
+  "packs": [
+    {
+      "id": "starter_three",
+      "name": "Starter Three",
+      "description": "Welcome Bundle, Pro Pack, and Founder Badge — featured digital goods for a new shop.",
+      "seed_options": { "set_featured": true },
+      "items": [
+        {
+          "row_id": "starter-1",
+          "preset_id": "marketplace_product",
+          "name": "Welcome Bundle",
+          "price_usdt": "9.99",
+          "image_url": "/s/2/demo-store/demo/welcome-bundle.svg",
+          "featured": true,
+          "create_listing": true,
+          "fulfillment_mode": "catalog_definition",
+          "preset_inputs": { "category": "featured" }
+        },
+        {
+          "row_id": "starter-2",
+          "preset_id": "marketplace_product",
+          "name": "Pro Pack",
+          "price_usdt": "24.99",
+          "image_url": "/s/2/demo-store/demo/pro-pack.svg",
+          "featured": true,
+          "create_listing": true,
+          "fulfillment_mode": "catalog_definition",
+          "preset_inputs": { "category": "featured" }
+        },
+        {
+          "row_id": "starter-3",
+          "preset_id": "marketplace_product",
+          "name": "Founder Badge",
+          "price_usdt": "4.99",
+          "image_url": "/s/2/demo-store/demo/founder-badge.svg",
+          "featured": true,
+          "create_listing": true,
+          "fulfillment_mode": "catalog_definition",
+          "preset_inputs": { "category": "featured" }
+        }
+      ]
+    },
+    {
+      "id": "course_academy",
+      "name": "Course Academy",
+      "description": "Three course_digital listings for an online academy storefront.",
+      "items": [
+        {
+          "row_id": "course-web-fundamentals",
+          "preset_id": "course_digital",
+          "name": "Web Development Fundamentals",
+          "description": "Master HTML, CSS, and JavaScript to build modern responsive websites.",
+          "price_usdt": "99.00",
+          "sku": "pack-ca-web-fundamentals",
+          "create_listing": true,
+          "quantity": 10,
+          "preset_inputs": {
+            "delivery_url": "https://example.com/courses/web-fundamentals"
+          }
+        },
+        {
+          "row_id": "course-advanced-python",
+          "preset_id": "course_digital",
+          "name": "Advanced Python Programming",
+          "description": "Deep dive into Python with advanced patterns and real-world practices.",
+          "price_usdt": "129.00",
+          "sku": "pack-ca-advanced-python",
+          "create_listing": true,
+          "quantity": 10,
+          "preset_inputs": {
+            "delivery_url": "https://example.com/courses/advanced-python"
+          }
+        },
+        {
+          "row_id": "course-uiux-design",
+          "preset_id": "course_digital",
+          "name": "UI/UX Design Principles",
+          "description": "Learn design thinking, user research, and prototyping techniques.",
+          "price_usdt": "89.00",
+          "sku": "pack-ca-uiux-design",
+          "create_listing": true,
+          "quantity": 10,
+          "preset_inputs": {
+            "delivery_url": "https://example.com/courses/uiux-design"
+          }
+        }
+      ]
+    },
+    {
+      "id": "collectibles",
+      "name": "Collectibles Bazaar",
+      "description": "Six game_card collectibles with rarity stats for a trading-card shop.",
+      "items": [
+        {
+          "row_id": "collectible-dragon-ember",
+          "preset_id": "game_card",
+          "name": "Dragon Ember",
+          "description": "Showcase collectible — rare game card.",
+          "price_usdt": "8.00",
+          "sku": "pack-cb-dragon-ember",
+          "tags": ["collectibles", "rare"],
+          "create_listing": true,
+          "quantity": 10,
+          "preset_inputs": { "attack": 18, "hp": 40, "rarity": "rare" }
+        },
+        {
+          "row_id": "collectible-crystal-shard",
+          "preset_id": "game_card",
+          "name": "Crystal Shard",
+          "description": "Showcase collectible — common game card.",
+          "price_usdt": "3.00",
+          "sku": "pack-cb-crystal-shard",
+          "tags": ["collectibles", "common"],
+          "create_listing": true,
+          "quantity": 10,
+          "preset_inputs": { "attack": 8, "hp": 25, "rarity": "common" }
+        },
+        {
+          "row_id": "collectible-void-wisp",
+          "preset_id": "game_card",
+          "name": "Void Wisp",
+          "description": "Showcase collectible — uncommon game card.",
+          "price_usdt": "5.00",
+          "sku": "pack-cb-void-wisp",
+          "tags": ["collectibles", "uncommon"],
+          "create_listing": true,
+          "quantity": 10,
+          "preset_inputs": { "attack": 12, "hp": 20, "rarity": "uncommon" }
+        },
+        {
+          "row_id": "collectible-solar-blade",
+          "preset_id": "game_card",
+          "name": "Solar Blade",
+          "description": "Showcase collectible — rare game card.",
+          "price_usdt": "9.00",
+          "sku": "pack-cb-solar-blade",
+          "tags": ["collectibles", "rare"],
+          "create_listing": true,
+          "quantity": 10,
+          "preset_inputs": { "attack": 22, "hp": 15, "rarity": "rare" }
+        },
+        {
+          "row_id": "collectible-moss-guardian",
+          "preset_id": "game_card",
+          "name": "Moss Guardian",
+          "description": "Showcase collectible — common game card.",
+          "price_usdt": "4.00",
+          "sku": "pack-cb-moss-guardian",
+          "tags": ["collectibles", "common"],
+          "create_listing": true,
+          "quantity": 10,
+          "preset_inputs": { "attack": 6, "hp": 55, "rarity": "common" }
+        },
+        {
+          "row_id": "collectible-arcane-tome",
+          "preset_id": "game_card",
+          "name": "Arcane Tome",
+          "description": "Showcase collectible — epic game card.",
+          "price_usdt": "12.00",
+          "sku": "pack-cb-arcane-tome",
+          "tags": ["collectibles", "epic"],
+          "create_listing": true,
+          "quantity": 10,
+          "preset_inputs": { "attack": 10, "hp": 30, "rarity": "epic" }
+        }
+      ]
+    },
+    {
+      "id": "creator_digital",
+      "name": "Creator Digital",
+      "description": "Digital goods for a maker portfolio — templates, icons, and art packs.",
+      "items": [
+        {
+          "row_id": "creator-aurora-ui-kit",
+          "preset_id": "marketplace_product",
+          "name": "Aurora UI Kit",
+          "description": "120-component Figma UI kit with design tokens, dark and light themes.",
+          "price_usdt": "24.00",
+          "sku": "pack-cp-aurora-ui-kit",
+          "create_listing": true,
+          "preset_inputs": { "category": "design" }
+        },
+        {
+          "row_id": "creator-grid-icon-pack",
+          "preset_id": "marketplace_product",
+          "name": "Grid Icon Pack",
+          "description": "480 pixel-perfect line icons — SVG, PDF and a ready-to-use icon font.",
+          "price_usdt": "12.00",
+          "sku": "pack-cp-grid-icon-pack",
+          "create_listing": true,
+          "preset_inputs": { "category": "icons" }
+        },
+        {
+          "row_id": "creator-focus-planner",
+          "preset_id": "marketplace_product",
+          "name": "Focus Planner Template",
+          "description": "Minimalist Notion workspace for makers and solo founders.",
+          "price_usdt": "9.00",
+          "sku": "pack-cp-focus-planner",
+          "create_listing": true,
+          "preset_inputs": { "category": "template" }
+        },
+        {
+          "row_id": "creator-mono-print-pack",
+          "preset_id": "marketplace_product",
+          "name": "Mono Print Pack",
+          "description": "Eight high-resolution monochrome art prints, ready to frame.",
+          "price_usdt": "18.00",
+          "sku": "pack-cp-mono-print-pack",
+          "create_listing": true,
+          "preset_inputs": { "category": "prints" }
+        },
+        {
+          "row_id": "creator-signal-dashboard-kit",
+          "preset_id": "marketplace_product",
+          "name": "Signal Dashboard Kit",
+          "description": "Ops-console component library with theming, charts and empty states.",
+          "price_usdt": "29.00",
+          "sku": "pack-cp-signal-dashboard-kit",
+          "create_listing": true,
+          "preset_inputs": { "category": "components" }
+        },
+        {
+          "row_id": "creator-field-notes-zine",
+          "preset_id": "marketplace_product",
+          "name": "Field Notes Zine",
+          "description": "A 40-page research-capture guide for offline-first work (PDF).",
+          "price_usdt": "6.00",
+          "sku": "pack-cp-field-notes-zine",
+          "create_listing": true,
+          "preset_inputs": { "category": "guide" }
+        }
+      ]
+    }
+  ]
+}

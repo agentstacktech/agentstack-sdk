@@ -8,6 +8,7 @@ export type TransportKind =
   | 'timeout'
   | 'typed_503'
   | 'unauthorized'
+  | 'project_session_required'
   | 'unknown';
 
 /** Typed HTTP 503 codes from DNA admission / auth mint paths. */
@@ -133,6 +134,9 @@ export function isNonRetryableAuthOrShed(err: unknown): boolean {
   }
 
   if (status === 401) {
+    if (code === 'project_session_required') {
+      return false;
+    }
     return true;
   }
 
@@ -162,10 +166,17 @@ export function classifyAuthFailure(
   if (
     name === 'NetworkError' ||
     errCode === 'ERR_NETWORK' ||
-    msg.includes('network error') ||
     msg.includes('failed to fetch') ||
     msg.includes('fetch failed')
   ) {
+    return { kind: 'offline' };
+  }
+
+  if (msg.includes('circuit breaker')) {
+    return { kind: 'unknown', code: 'circuit_open' };
+  }
+
+  if (msg.includes('network error')) {
     return { kind: 'offline' };
   }
 
@@ -190,6 +201,9 @@ export function classifyAuthFailure(
     msg.includes('invalid credentials') ||
     msg.includes('неверн')
   ) {
+    if ((apiCode || '').toLowerCase() === 'project_session_required') {
+      return { kind: 'project_session_required', code: apiCode || 'project_session_required' };
+    }
     return { kind: 'unauthorized', code: apiCode };
   }
 

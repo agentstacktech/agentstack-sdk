@@ -6,6 +6,8 @@
 
 One-page map of **every supported way** to depend on the SDK, when to pick each, and what to run after install.
 
+> **Default today (pre-npm publish):** use **Flow B** — clone [agentstack-sdk](https://github.com/agentstacktech/agentstack-sdk) and `file:` deps. Flow A applies after `@agentstack/sdk` is on the public npm registry (see [SDK_MIRROR_PUBLISH_RUNBOOK.md](../../../docs/sdk/SDK_MIRROR_PUBLISH_RUNBOOK.md)).
+
 ---
 
 ## Decision tree
@@ -16,18 +18,16 @@ flowchart TD
   q1 -->|yes| mono[Flow D: file:../agentstack-unified-sdk]
   q1 -->|no| q2{Need pinned SDK commit in git?}
   q2 -->|yes| sub[Flow B: git submodule]
-  q2 -->|no| q3{Ship production app?}
+  q2 -->|no| q3{npm @agentstack/sdk published?}
   q3 -->|yes| npm[Flow A: npm @agentstack/sdk]
-  q3 -->|no| q4{Hack SDK locally?}
-  q4 -->|yes| link[Flow E: npm link / file:]
-  q4 -->|no| npm
+  q3 -->|no| sub
 ```
 
 ---
 
-## Flow A — npm (default for apps)
+## Flow A — npm (after registry publish)
 
-**When:** Production and most integrators. Released versions on [npm](https://www.npmjs.com/package/@agentstack/sdk).
+**When:** Production apps once `@agentstack/sdk` is on npm. Until then use **Flow B** (mirror clone).
 
 ```bash
 npm install @agentstack/sdk
@@ -71,9 +71,9 @@ sdk.updateProjectId(/* active project */);
 # From your app repo (git required):
 git submodule add https://github.com/agentstacktech/agentstack-sdk.git vendor/agentstack-sdk
 git submodule update --init
-cd vendor/agentstack-sdk && git checkout v0.4.13
+cd vendor/agentstack-sdk && git checkout v0.4.18
 
-node vendor/agentstack-sdk/scripts/submodule-add-sdk.mjs --target . --tag v0.4.13
+node vendor/agentstack-sdk/scripts/submodule-add-sdk.mjs --target . --tag v0.4.18
 node vendor/agentstack-sdk/scripts/link-sdk-deps.mjs --target .
 cd vendor/agentstack-sdk && npm install && npm run build
 npm install   # in app root

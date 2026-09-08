@@ -2,6 +2,12 @@
 
 **EN (полный):** [CHANGELOG.md](./CHANGELOG.md)
 
+## [0.4.18] — 2026-09-08
+
+### Changed
+
+- Выравнивание `@agentstack/sdk`, `@agentstack/react` и `@agentstack/hooks` с платформой **0.4.18** (`sync:agentstack-version`).
+
 ## [0.4.13] — 2026-05-28
 
 ### Добавлено

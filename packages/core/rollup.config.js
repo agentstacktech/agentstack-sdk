@@ -31,6 +31,7 @@ function commerceSubpackageRollup(name) {
   const input = `src/commerce/${name}/index.ts`;
   const plugins = [
     resolve({ browser: true, preferBuiltins: false }),
+    json(),
     commonjs(),
     typescript({ tsconfig: './tsconfig.json', declaration: false, declarationMap: false }),
     terser(),

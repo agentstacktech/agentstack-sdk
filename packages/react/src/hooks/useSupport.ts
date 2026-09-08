@@ -5,10 +5,13 @@
  */
 
 import { useMemo } from 'react';
-import type { AgentSupport } from '@agentstack/sdk';
-import type { SupportProjectSearchResult } from '@agentstack/sdk';
+import type { AgentSupport, SupportProjectSearchResult } from '@agentstack/sdk';
+import { supportEligibilityQueryKey, supportMyThreadQueryKey } from '@agentstack/sdk';
 import { useSDKInstance } from '../context/SDKContext';
 import { useSDKQuery, type SDKQueryOptions } from './useSDKQuery';
+import { useSDKMutationWithInvalidation } from './useSDKMutationWithInvalidation';
+
+export { useSupportLauncherState } from '../support/useSupportLauncherState';
 
 /** Returns the shared ``AgentSupport`` facade (same instance as ``sdk.support`` / ``sdk.platform.support``). */
 export function useSupport(): AgentSupport {
@@ -44,23 +47,20 @@ export function useSupportEligibility(
   options?: SDKQueryOptions<SupportEligibilityResponse>
 ) {
   const sdk = useSDKInstance();
-  const sortedKey =
-    projectIds?.length ?
-      [...new Set(projectIds.filter((n) => Number.isFinite(n) && n > 0))].sort((a, b) => a - b).join(',')
-    : '';
+  const key = supportEligibilityQueryKey(projectIds ?? []);
+  const idCsv = key[2];
   return useSDKQuery(
     sdk,
-    ['support', 'eligibility', sortedKey] as const,
+    key,
     async () => {
-      const ids =
-        projectIds?.filter((n) => Number.isFinite(n) && n > 0).map((n) => Number(n)) ?? [];
+      const ids = idCsv.split(',').map(Number).filter((n) => Number.isFinite(n) && n > 0);
       if (ids.length === 0) return { projects: [] };
       return sdk.support.getEligibility({ project_ids: ids }) as Promise<SupportEligibilityResponse>;
     },
     {
-      enabled: Boolean(sortedKey && sdk.support) && (options?.enabled !== false),
       staleTime: 15_000,
       ...options,
+      enabled: Boolean(idCsv && sdk.support) && options?.enabled !== false,
     }
   );
 }
@@ -101,3 +101,36 @@ export function useSupportInbox(
     }
   );
 }
+
+/** End-user thread — ``GET /api/support/my-thread``. Key: ``['support', 'my-thread', projectId]``. */
+export function useSupportMyThread(
+  projectId: number | undefined,
+  options?: SDKQueryOptions<Record<string, unknown>>
+) {
+  const sdk = useSDKInstance();
+  return useSDKQuery(
+    sdk,
+    supportMyThreadQueryKey(projectId ?? 0),
+    async () => {
+      if (!projectId || projectId <= 0) throw new Error('projectId required');
+      return sdk.support.getMyThread({ project_id: projectId, limit: 100 });
+    },
+    {
+      enabled: Boolean(projectId && projectId > 0 && sdk.support) && (options?.enabled !== false),
+      staleTime: 10_000,
+      ...options,
+    }
+  );
+}
+
+/** Send on own channel — ``POST /api/support/messages`` + invalidate ``['support']``. */
+export function useSupportSendMessage() {
+  const sdk = useSDKInstance();
+  return useSDKMutationWithInvalidation<
+    Record<string, unknown>,
+    { project_id: number; body: string; client_message_id?: string | null }
+  >('support_user_send', (vars) => sdk.support.postUserMessage(vars), {
+    extraPrefixes: [['support']],
+  });
+}
+

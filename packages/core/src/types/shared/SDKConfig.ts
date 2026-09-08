@@ -51,6 +51,9 @@ export interface SDKConfig {
    * `/auth/login` only — session `project_id` is applied after success.
    */
   projectId?: number | string;
+
+  /** Optional sandbox environment UUID or name → `X-AgentStack-Env` header */
+  sandboxEnv?: string;
   
   /** Request timeout in milliseconds */
   timeout?: number;
@@ -218,10 +221,25 @@ export interface RequestConfig {
   signal?: AbortSignal;
 
   /**
+   * Set by HTTPClient when Bearer was omitted due to JWT/header project mismatch.
+   * Guest-scope 401 must not purge the active session (G-A114).
+   */
+  omittedBearerForMismatch?: boolean;
+
+  /** Set by frontend session bridge after vault sync (skip duplicate interceptor pass). */
+  _sessionOsBridged?: boolean;
+
+  /** Token epoch captured by session bridge for stale-request guard. */
+  _tokenEpoch?: number;
+
+  /**
    * Browser fetch priority hint (Chromium). Forwarded to `globalThis.fetch` when set.
    * Use `high` for latency-sensitive UI reads (e.g. open chat history).
    */
   fetchPriority?: 'high' | 'low' | 'auto';
+
+  /** Response body parsing mode (blob downloads, etc.). */
+  responseType?: 'json' | 'blob' | 'text' | 'arraybuffer';
 }
 
 export interface RetryConfig {

@@ -2,6 +2,21 @@
  * Context & Capability Fabric — SDK surface (`sdk.fabric.gen1`).
  */
 export {
+  organKindSchema,
+  organTemplateSchema,
+  organDescriptorSchema,
+  organDescriptorFixtureSchema,
+  parseOrganDescriptor,
+  parseOrganDescriptorFixture,
+} from './organDescriptor';
+export type {
+  OrganKind,
+  OrganTemplate,
+  OrganDescriptor,
+  OrganDescriptorFixture,
+} from './organDescriptor';
+
+export {
   capabilitySurfaceSchema,
   mutationRiskSchema,
   riskTierSchema,
@@ -15,6 +30,11 @@ export {
   capabilityDescriptorFixtureSchema,
   parseCapabilityDescriptor,
   parseCapabilityDescriptorFixture,
+  mcpCapabilityDescriptorSourceSchema,
+  mcpCapabilityDescriptorSlimSchema,
+  parseMcpCapabilityDescriptorSlim,
+  mcpCatalogActionRowSchema,
+  parseMcpCatalogActionRow,
 } from './capabilityDescriptor';
 export type {
   CapabilitySurface,
@@ -22,6 +42,9 @@ export type {
   CapabilityContextSpec,
   CapabilityDescriptor,
   CapabilityDescriptorFixture,
+  McpCapabilityDescriptorSource,
+  McpCapabilityDescriptorSlim,
+  McpCatalogActionRow,
 } from './capabilityDescriptor';
 
 export {
@@ -147,7 +170,7 @@ export type {
   FabricNotificationSmokeRequest,
   FabricNotificationSmokeResult,
 } from './notificationOpsApi';
-export type { CapabilityListResponse } from './listCapabilities';
+export type { CapabilityListResponse, CapabilityRow } from './listCapabilities';
 export type {
   CapabilityRecipe,
   CapabilityRecipeStep,

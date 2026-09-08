@@ -7,6 +7,27 @@
 export { AgentStackSDK } from './sdk';
 
 export {
+  AgentMcp,
+  mcpExecute,
+  mcpDiscoverByIntent,
+  mcpGetDiscovery,
+  resolveMcpUrl,
+  resolveMcpAuthToken,
+  resolvePublicOrigin,
+  loginWithDeviceCodeForm,
+  deviceCodeActivateUrl,
+  DEFAULT_DEVICE_SCOPES,
+} from './mcp';
+export type {
+  McpStep,
+  McpExecuteOptions,
+  McpExecuteResult,
+  McpStepResult,
+  DeviceCodeLoginOptions,
+  McpDiscoverOptions,
+} from './mcp';
+
+export {
   AGENTSTACK_PRODUCTION_ORIGIN,
   AGENTSTACK_PRODUCTION_API_BASE,
   AGENTSTACK_DEV_API_BASE,
@@ -30,6 +51,26 @@ export {
   readProjectIdFromBrowserStorage,
   resolveEffectiveProjectId,
 } from './config/projectContext';
+
+export { ECOSYSTEM_PROJECT_ID } from './config/ecosystemProject';
+
+export {
+  resolveRequestProjectContext,
+  jwtProjectIdFromToken,
+  hostedRouteProjectIdFromPath,
+} from './client/resolveRequestProjectContext';
+export type {
+  ProjectBindingMode,
+  ResolveRequestProjectContextInput,
+  ResolveRequestProjectContextResult,
+} from './client/resolveRequestProjectContext';
+
+export {
+  isEcosystemScopedApiPath,
+  isIdentityScopedApiPath,
+  isUserScopedSessionPath,
+  classifyRouteScope,
+} from './client/routeScopeClassifier';
 
 export {
   validateAppManifest,
@@ -56,6 +97,7 @@ export {
 export type { ClientNotificationPayload } from './utils/clientNotification';
 export { getApiErrorMessage, httpErrorStatus } from './utils/apiErrorMessage';
 export { SDKNotImplementedError } from './errors/SDKNotImplementedError';
+export { ConflictError, ServerBusyError } from './types/shared/HTTPTypes';
 export {
   buildAccountKey,
   buildUserAgntKey,
@@ -73,7 +115,7 @@ export type {
 export { verifyAgentCoinMerkleProof } from './atoms/agentcoinProof';
 
 // Core modules
-export { AgentAuth } from './modules/AgentAuth';
+export { AgentAuth, MfaRequiredError } from './modules/AgentAuth';
 export type { LoginCredentials, AuthTokens, UserProfile, SessionBootstrapPayload, SessionBootstrapSettingsSummary } from './modules/AgentAuth';
 export { AgentAPI } from './modules/AgentAPI';
 export type { AddUserToProjectData } from './modules/AgentAPI';
@@ -94,6 +136,19 @@ export {
   ProjectFinanceClient,
   SwapSession,
 } from './finance';
+export { AgentBusinessFacade, BusinessCommandClient } from './business';
+export type {
+  AttachBusinessChildBody,
+  BusinessAdoptCandidate,
+  BusinessCommandSnapshot,
+  BusinessOrgSettingsPatch,
+  BusinessTariffTemplate,
+  BusinessTreasurySlice,
+  BusinessTransferPreflight,
+  CreateBusinessCompositeBody,
+  CreateBusinessCompositeResult,
+  LinkBusinessChildBody,
+} from './business';
 export type {
   FinancePortfolioSnapshot,
   FinanceDashboardBundle,
@@ -102,6 +157,8 @@ export type {
   FundProjectRequest,
   RailBalanceSlice,
 } from './finance';
+export { EnergyClient } from './energy';
+export type { EnergyBalance, EnergyPacksMap, EnergyPackTier, EnergyPackInfo } from './energy';
 export {
   AgentEconomyFacade,
   LedgerClient,
@@ -147,6 +204,26 @@ export type {
   TestnetThreeRailSmokeRecipeResult,
 } from './economy';
 export { PublicGrantsClient, AgentPublicSurface } from './public';
+export { AdminGrantsClient } from './admin/grants';
+export type {
+  GrantOsApplication,
+  GrantOsApplicationDetail,
+  GrantOsApplicationPatch,
+  GrantOsAnchorFields,
+  GrantOsAnchorResponse,
+  GrantOsCatalogPatch,
+  GrantOsComposeData,
+  GrantOsComposeItem,
+  GrantOsComposeLink,
+  GrantOsFormField,
+  GrantOsHubSnapshot,
+  GrantOsOperatorHint,
+  GrantOsOpportunityUpsert,
+  GrantOsPipelineData,
+  GrantOsScoreBreakdown,
+  GrantMilestone,
+  EarningPlaybook,
+} from './admin/grants';
 export type {
   PublicGrantsSnapshot,
   PublicGrantsGrsSlice,
@@ -227,10 +304,65 @@ export type {
   AgentTemplatePreviewBody,
 } from './modules/AgentsFleet';
 export { parseAgentRunSSE } from './modules/AgentsFleet';
+export {
+  TERMINAL_RUN_STATUSES,
+  approvalArtifactHashFromDetail,
+  approvalArtifactHashFromRunRow,
+  isTerminalRunStatus,
+  runStatusFromGetRunPayload,
+} from './modules/agentRunTypes';
+export type {
+  AgentGetRunPayloadLike,
+  AgentRunDetailLike,
+  AgentRunRowLike,
+  AgentRunSpecLike,
+} from './modules/agentRunTypes';
 export { AgentWebhooks } from './modules/AgentWebhooks';
 export { AgentIntegrations, buildIntegrationHookCurl } from './modules/AgentIntegrations';
 export { AgentBots } from './modules/AgentBots';
+export { AgentMentor } from './modules/AgentMentor';
+export type { MentorConfig } from './modules/AgentMentor';
+export { AgentKnowledge } from './modules/AgentKnowledge';
+export type {
+  KnowledgeConfig,
+  KnowledgeConfigPatch,
+  KnowledgePolicyTemplate,
+  KnowledgePolicyTemplateSlot,
+  KnowledgePolicyTemplateApplyBody,
+  KnowledgePolicyTemplateApplyResult,
+  KnowledgeGenePack,
+  KnowledgeFaqPhenotype,
+  KnowledgeGeneLexiconEntry,
+  KnowledgeContentItem,
+  KnowledgeChunkSpan,
+  KnowledgeKbChunk,
+  KnowledgeAccessGrantBody,
+  KnowledgeChannelLinkBody,
+  KnowledgePlaygroundBody,
+  KnowledgeAccessSimulateBody,
+  KnowledgePromptRecord,
+  KnowledgePromptEnvelope,
+  KnowledgeAccessGrant,
+  KnowledgeChannelLink,
+  KnowledgeGetCourseStatus,
+  KnowledgeEvalCase,
+  KnowledgeEvalSuite,
+  KnowledgeRetrievalEvalResult,
+  KnowledgeEvalReadback,
+  KnowledgeEvalBaselineReport,
+  KnowledgeFullEvalResult,
+  KnowledgeEvalBaselineStored,
+} from './modules/AgentKnowledge';
 export { AgentCrm } from './modules/AgentCrm';
+export { AgentRag } from './modules/AgentRag';
+export type {
+  RagCellManifest,
+  RagCollection,
+  RagCollectionManifest,
+  RagHealthSnapshot,
+  RagScope,
+  RagSearchHit,
+} from './rag/types';
 export {
   crmBoardResponseSchema,
   crmContact360ResponseSchema,
@@ -270,6 +402,13 @@ export {
   hostingQuickStartResponseSchema,
 } from './hosting';
 export type { HostingSiteBucketInput, HostingQuickStartResponse } from './hosting';
+export {
+  SandboxClient,
+  GenerationsClient,
+  createSandboxClient,
+  createGenerationsClient,
+} from './sandbox';
+export type { PromoteStrategy, GenerationSettingsPatch, PreviewEnvScope } from './sandbox';
 export {
   integrationQueries,
   integrationListRecipes,
@@ -503,6 +642,7 @@ export type {
   AdminDataDnaListParams,
   AdminDataDnaListResponse,
   AdminDataHealthResponse,
+  AdminDataSnapshotResponse,
 } from './modules/AgentAdminData';
 export { AgentLogic } from './modules/AgentLogic';
 export { AgentMarketplace } from './modules/AgentMarketplace';
@@ -514,6 +654,17 @@ export type {
   SecurityProbeMetricsPayload,
   AdminHubSnapshotSecurityProbes,
 } from './modules/AgentDiagnostics';
+export {
+  tagDomainPrefix,
+  geneAddressCanonicalKey,
+  geneAddressWithoutPii,
+  TokenKind,
+  tokenKey,
+  parseToken,
+  tokenizeQueryString,
+  tokenizeAddress,
+} from './diagnostics';
+export type { GeneAddress, GeneToken } from './diagnostics';
 export { AgentCommerceAdmin } from './modules/AgentCommerceAdmin';
 export type {
   SettlementFunnelPayload,
@@ -653,6 +804,13 @@ export {
   supportGetInbox,
   supportGetConfig,
   supportGetEligibility,
+  supportEligibilityQueryKey,
+  supportMyThreadQueryKey,
+  supportStaffThreadQueryKey,
+  supportInboxQueryKey,
+  SUPPORT_TICKET_STATUS_FILTER_OPTIONS,
+  eligibilityRowForProject,
+  eligibilityRowsByProjectId,
   supportPutConfig,
   supportGetStaffThread,
   supportPostStaffThreadMessage,
@@ -660,11 +818,14 @@ export {
   supportTransitionTicket,
   supportAssignTicket,
   supportRequestHuman,
+  supportSetMyThreadReaction,
 } from './supportRest';
 export type {
   SupportEligibilityRow,
+  SupportEligibilityPayload,
   SupportProjectRolesResponse,
   SupportProjectSearchResult,
+  SupportInboxFilters,
 } from './supportRest';
 
 // 🗂️ File Storage Integration
@@ -838,6 +999,11 @@ export type {
 
 // HTTP Client
 export { HTTPClient, normalizeGetQueryArg, REACT_QUERY_TRANSPORT_RETRY } from './client/http-client';
+export {
+  isSessionAuthEndpoint,
+  isSwitchProjectEndpoint,
+  isAuthMintCredentialPath,
+} from './client/authEndpointClassifier';
 export {
   API_WARMING_UP_CODE,
   AUTH_MINT_BUSY_CODES,

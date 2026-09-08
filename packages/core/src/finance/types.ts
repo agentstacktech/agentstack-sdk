@@ -39,6 +39,8 @@ export interface ProjectFinanceSnapshot {
     treasury_agnt_atomic?: number | null;
     builder_energy_current?: number | null;
     builder_energy_purchased?: number | null;
+    llm_payer?: string | null;
+    keys_status?: string | null;
   } | null;
   pending_invoices_count: number;
   pending_withdrawals_count: number;

@@ -48,8 +48,15 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Run tests (publish gate subset)
-        run: npm run test -w @agentstack/sdk -- --testPathPattern="(agentstackEndpoints|validateAppManifest|integratorScope\\.unit|projectContext\\.unit)"
+      - name: Run tests
+        run: npm run test -w @agentstack/sdk
+
+      - name: SDK parity gates
+        run: |
+          npm run check:agents-fleet-parity
+          npm run check:commerce-assets-parity
+          npm run check:commerce-shop-parity
+          npm run check:finance-parity
 
   lint:
     runs-on: ubuntu-latest

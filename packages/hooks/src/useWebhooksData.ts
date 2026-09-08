@@ -10,7 +10,7 @@
 
 import { UseQueryResult } from '@tanstack/react-query';
 import type { AgentStackSDK } from '@agentstack/sdk';
-import { useSDKQuery } from '@agentstack/react';
+import { useSDKQuery, stableKeyPart } from '@agentstack/react';
 
 /**
  * Webhook data structure
@@ -128,7 +128,7 @@ export function useWebhooksData(
 
   const queryResult = useSDKQuery<Webhook[]>(
     sdk,
-    ['webhooks', project_id, filters],
+    ['webhooks', project_id ?? '', stableKeyPart(filters)],
     async (signal) => {
       try {
         const params: Record<string, unknown> = Object.entries(filters)

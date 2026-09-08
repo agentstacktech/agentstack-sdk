@@ -10,7 +10,7 @@ Once `@agentstack/sdk` is published to npm:
 
 1. **agentstack-frontend**: Update `package.json`:
    ```json
-   "@agentstack/sdk": "^0.4.13"
+   "@agentstack/sdk": "^0.4.18"
    ```
    Replace the `file:../agentstack-unified-sdk/packages/core` reference.
 

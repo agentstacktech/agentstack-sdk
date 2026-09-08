@@ -38,11 +38,20 @@ import type {
 } from '../modules/AgentDNA';
 import { SerialMutationQueue } from './command-queue';
 import type { AgentFinanceFacade } from '../finance/AgentFinanceFacade';
+import type { AgentAPI } from '../modules/AgentAPI';
+import type {
+  PatchProjectDataBody,
+  ProjectDataPathValue,
+  ProjectDataSnapshot,
+  RequestConfig,
+} from '../types';
 
 export interface AgentProtocolDeps {
   http: HTTPClient;
   commands: ProteinCommandChannel;
   snapshots: EntitySnapshotRepository;
+  /** Project REST — `/projects/{id}/data` (same as `sdk.api`, exposed for one entry point). */
+  api?: AgentAPI;
   /** Rules Engine — POST `/command` */
   rulesCommand?: AgentCommand;
   /** High-level protein — POST `/protein/execute` */
@@ -932,7 +941,7 @@ export class AgentProtocol {
     uuid: string,
     patches: Partial<Pick<DNAEntity<T>, 'data' | 'config'>>
   ): Promise<DNAEntity<T>> {
-    return this.requireDna().patch<T>(table, uuid, patches);
+    return this.requireDna().update<T>(table, uuid, patches);
   }
 
   dnaDelete(
@@ -944,6 +953,44 @@ export class AgentProtocol {
 
   dnaQuery<T = unknown>(table: string, filter: DNAFilter): Promise<DNAListResponse<T>> {
     return this.requireDna().query<T>(table, filter);
+  }
+
+  /**
+   * Patch one path under project.data — delegates to {@link AgentAPI.patchProjectData}.
+   */
+  async patchProjectData(
+    projectId: number,
+    path: string,
+    value?: unknown,
+    writeMode?: 'replace' | 'merge' | 'delete' | 'set' | 'put' | 'patch'
+  ): Promise<{ success: boolean; project_id: number; path: string }> {
+    const body: PatchProjectDataBody & { write_mode?: string } = {
+      path,
+      value: writeMode === 'delete' ? null : value,
+      ...(writeMode ? { write_mode: writeMode } : {}),
+    };
+    return this.requireApi().patchProjectData(projectId, body);
+  }
+
+  /**
+   * Read project.data snapshot or a single dot path — delegates to {@link AgentAPI.getProjectData}.
+   */
+  getProjectData(
+    projectId: number,
+    path?: string,
+    options?: Partial<RequestConfig>
+  ): Promise<ProjectDataSnapshot | ProjectDataPathValue> {
+    if (path != null && String(path).length > 0) {
+      return this.requireApi().getProjectData(projectId, { path: String(path), ...options });
+    }
+    return this.requireApi().getProjectData(projectId, options);
+  }
+
+  private requireApi(): AgentAPI {
+    if (!this.deps.api) {
+      throw new Error('AgentProtocol: AgentAPI is not configured');
+    }
+    return this.deps.api;
   }
 
   // ---------------------------------------------------------------------------

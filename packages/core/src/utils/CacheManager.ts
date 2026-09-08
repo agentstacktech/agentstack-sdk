@@ -22,6 +22,8 @@
  * ```
  */
 
+import { FileStorage } from './FileStorage';
+
 export interface CacheEntry<T = any> {
   /** Ключ кеша */
   key: string;
@@ -439,9 +441,6 @@ export class FileCacheManager extends CacheManager {
     file: File,
     options: CacheOptions & { includeDataURL?: boolean } = {}
   ) {
-    const { FileStorage } = await import('./FileStorage');
-
-    // Конвертируем файл в base64
     const base64Data = await FileStorage.fileToJSON(file, FileStorage.getAvatarOptions());
 
     // Создаем data URL для быстрого отображения
@@ -484,7 +483,6 @@ export class FileCacheManager extends CacheManager {
 
     if (!cachedData) return null;
 
-    const { FileStorage } = await import('./FileStorage');
     return FileStorage.jsonToFile(
       cachedData.base64,
       cachedData.filename,

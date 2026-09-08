@@ -106,6 +106,12 @@ export {
 
 export { commerceTopUpRecipe } from './topup/commerceTopUpRecipe';
 
+export {
+  composeAgentPresetFromAsset,
+  importAgentPresetFromAsset,
+  type AgentPresetComposeAnswers,
+} from './agentPresetCompose';
+
 
 
 export { SellerActivationClient } from './sell/SellerActivationClient';

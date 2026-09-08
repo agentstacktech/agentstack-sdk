@@ -65,5 +65,71 @@ def test_agents_fleet_has_runtime_parity_helpers() -> None:
         "metrics",
         "gates",
         "stream_path",
+        "automation_map",
+        "compile_workflow",
+        "fleet_diagnostics",
+        "reconcile_run",
+        "sweep_stale_runs",
+        "workflow_run_command",
+        "update",
+        "stop_run",
+        "create",
+        "fork",
+        "promote",
+        "kill",
+        "update_spec_patch",
+        "list_mine",
+        "start_run_mine",
+        "update_spec_patch_mine",
+        "list_llm_providers",
+        "list_fap_templates",
+        "preview_policy",
+        "preview_policy_mine",
+        "preview_template_mine",
+        "_policy_preview_body",
+        "_template_preview_body",
+        "for_project",
+        "ProjectAgentsFleetScope",
+        "agent_agents_types",
+        "run_status_from_get_run_payload",
+        "is_terminal_run_status",
     ):
         assert fragment in text, fragment
+
+    types_text = (
+        Path(__file__).resolve().parents[1] / "src" / "modules" / "agent_agents_types.py"
+    ).read_text(encoding="utf-8")
+    for fragment in ("approval_artifact_hash_from_detail", "AgentRunDetailDTO", "TERMINAL_RUN_STATUSES"):
+        assert fragment in types_text, fragment
+
+
+def test_merge_agent_spec_deep_merges_nested_dicts() -> None:
+    import importlib.util
+    import sys
+    import types as pytypes
+    from pathlib import Path
+
+    base = Path(__file__).resolve().parents[1] / "src"
+    if "modules" not in sys.modules:
+        sys.modules["modules"] = pytypes.ModuleType("modules")
+
+    types_path = base / "modules" / "agent_agents_types.py"
+    types_spec = importlib.util.spec_from_file_location("modules.agent_agents_types", types_path)
+    assert types_spec and types_spec.loader
+    types_mod = importlib.util.module_from_spec(types_spec)
+    sys.modules["modules.agent_agents_types"] = types_mod
+    types_spec.loader.exec_module(types_mod)
+
+    mod_path = base / "modules" / "agent_agents_fleet.py"
+    spec = importlib.util.spec_from_file_location("modules.agent_agents_fleet", mod_path)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["modules.agent_agents_fleet"] = mod
+    spec.loader.exec_module(mod)
+    merge = mod._merge_agent_spec
+    base = {"workflow": {"mode": "draft_design", "nodes": []}, "name": "A"}
+    patch = {"workflow": {"compile_target": "logic"}}
+    out = merge(base, patch)
+    assert out["name"] == "A"
+    assert out["workflow"]["mode"] == "draft_design"
+    assert out["workflow"]["compile_target"] == "logic"

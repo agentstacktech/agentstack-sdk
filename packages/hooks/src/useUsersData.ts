@@ -11,7 +11,7 @@
 import { UseQueryResult } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import type { AgentStackSDK } from '@agentstack/sdk';
-import { useSDKQuery } from '@agentstack/react';
+import { useSDKQuery, stableKeyPart } from '@agentstack/react';
 
 /**
  * User data structure
@@ -126,7 +126,7 @@ export function useUsersData(
 
   const queryResult = useSDKQuery<User[]>(
     sdk,
-    ['users', project_id, filters],
+    ['users', project_id ?? '', stableKeyPart(filters)],
     async (signal) => {
       try {
         const params: Record<string, string | number> = {};

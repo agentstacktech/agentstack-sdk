@@ -440,6 +440,35 @@ export interface Listing {
    * Updated at
    */
   updated_at?: string;
+
+  /**
+   * Storefront index denormalized card (browse API).
+   */
+  asset_card?: {
+    id?: string;
+    name?: string;
+    description?: string;
+    thumbnail_url?: string;
+    image_url?: string;
+    rarity?: string;
+    type?: string;
+    [key: string]: unknown;
+  };
+
+  /**
+   * Top-level listing price from storefront browse (USDT string).
+   */
+  price_usdt?: string;
+
+  /**
+   * Storefront facet metadata from index.
+   */
+  facet?: Record<string, unknown>;
+
+  /**
+   * Fulfillment mode from storefront index.
+   */
+  fulfillment_mode?: string;
 }
 
 /**

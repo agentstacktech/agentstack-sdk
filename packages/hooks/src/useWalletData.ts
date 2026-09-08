@@ -10,7 +10,7 @@
 
 import { UseQueryResult } from '@tanstack/react-query';
 import type { AgentStackSDK } from '@agentstack/sdk';
-import { useSDKQuery } from '@agentstack/react';
+import { useSDKQuery, stableKeyPart } from '@agentstack/react';
 import type { Wallet, WalletFilters, BaseHookOptions } from './types';
 
 /**
@@ -82,7 +82,7 @@ export function useWalletData(
 
   const queryResult = useSDKQuery<Wallet[]>(
     sdk,
-    ['wallets', user_id, filters],
+    ['wallets', user_id ?? '', stableKeyPart(filters)],
     async (signal) => {
       try {
         const params: Record<string, string | number> = {};

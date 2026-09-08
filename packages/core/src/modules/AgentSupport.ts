@@ -20,6 +20,7 @@ import {
   supportPutConfig,
   supportRequestHuman,
   supportSearchProjects,
+  supportSetMyThreadReaction,
   supportTransitionTicket,
 } from '../supportRest';
 
@@ -97,5 +98,9 @@ export class AgentSupport {
 
   requestHuman(params: { project_id: number; ticket_id: string }) {
     return supportRequestHuman(this.http, params);
+  }
+
+  setMyThreadReaction(params: { project_id: number; message_id: string; helpful: boolean }) {
+    return supportSetMyThreadReaction(this.http, params);
   }
 }

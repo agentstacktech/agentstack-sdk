@@ -7,7 +7,7 @@
  * Prefer vault Bearer for route pid, else guest (omit Bearer).
  */
 
-import { isEcosystemScopedApiPath } from './routeScopeClassifier';
+import { isEcosystemScopedApiPath, isIdentityScopedApiPath, isUserScopedSessionPath } from './routeScopeClassifier';
 import { ECOSYSTEM_PROJECT_ID } from '../config/ecosystemProject';
 
 export type ProjectBindingMode = 'hosted' | 'shell' | 'guest';
@@ -87,6 +87,16 @@ export function resolveRequestProjectContext(
     const vaultPid = vault ? jwtProjectIdFromToken(vault) : null;
     if (vaultPid === headerPid) {
       return { mode: 'shell', projectId: headerPid, bearer: vault };
+    }
+    const identityRoute =
+      input.requestPath != null && isUserScopedSessionPath(input.requestPath);
+    if (identityRoute && vault) {
+      // User-scoped (PAT + GET /projects list) — keep live JWT on pid mismatch (G-A157).
+      return {
+        mode: 'shell',
+        projectId: vaultPid ?? jwtPid ?? headerPid,
+        bearer: vault,
+      };
     }
     const ecosystemRoute =
       input.requestPath != null && isEcosystemScopedApiPath(input.requestPath);

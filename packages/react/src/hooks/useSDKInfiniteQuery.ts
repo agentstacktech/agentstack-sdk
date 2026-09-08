@@ -1,10 +1,13 @@
 import {
   useInfiniteQuery,
   type InfiniteData,
+  type Query,
+  type UseInfiniteQueryOptions,
   type UseInfiniteQueryResult,
   type QueryFunctionContext,
 } from '@tanstack/react-query';
 import type { AgentStackSDK } from '@agentstack/sdk';
+import { assertSerializableQueryKey } from '../lib/queryKeyUtils';
 
 export interface SDKInfiniteQueryOptions<T> {
   getNextPageParam?: (lastPage: T, allPages: T[]) => unknown;
@@ -15,6 +18,13 @@ export interface SDKInfiniteQueryOptions<T> {
   enabled?: boolean;
   /** When set, overrides TanStack default retries (AgentCoin: use ``false`` to avoid 503 spam). */
   retry?: number | boolean | ((failureCount: number, error: Error) => boolean);
+  refetchInterval?:
+    | number
+    | false
+    | ((query: Query<T, Error, InfiniteData<T, unknown>>) => number | false | undefined);
+  refetchOnWindowFocus?: boolean | 'always';
+  refetchOnMount?: boolean | 'always';
+  placeholderData?: UseInfiniteQueryOptions<T, Error>['placeholderData'];
 }
 
 function keyStringFromKey(key: string | readonly unknown[]): string {
@@ -31,6 +41,7 @@ export function useSDKInfiniteQuery<T = unknown>(
   queryFn: (ctx: { pageParam: unknown; signal: AbortSignal }) => Promise<T>,
   options?: SDKInfiniteQueryOptions<T>
 ): UseInfiniteQueryResult<InfiniteData<T, unknown>, Error> {
+  assertSerializableQueryKey(key);
   const queryKey = Array.isArray(key) ? key : [key];
   const keyStr = keyStringFromKey(key);
   const initialPageParam = options?.initialPageParam ?? 0;
@@ -63,5 +74,13 @@ export function useSDKInfiniteQuery<T = unknown>(
           : 0,
     enabled: options?.enabled !== false,
     ...(options?.retry !== undefined ? { retry: options.retry } : {}),
+    ...(options?.refetchInterval !== undefined
+      ? { refetchInterval: options.refetchInterval }
+      : {}),
+    ...(options?.refetchOnWindowFocus !== undefined
+      ? { refetchOnWindowFocus: options.refetchOnWindowFocus }
+      : {}),
+    ...(options?.refetchOnMount !== undefined ? { refetchOnMount: options.refetchOnMount } : {}),
+    ...(options?.placeholderData !== undefined ? { placeholderData: options.placeholderData } : {}),
   });
 }

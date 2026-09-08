@@ -42,7 +42,7 @@ const BUILD_HASH: string =
     : typeof import.meta !== 'undefined' &&
         typeof (import.meta as { env?: { VITE_APP_BUILD_ID?: string } }).env?.VITE_APP_BUILD_ID ===
           'string'
-      ? (import.meta as { env: { VITE_APP_BUILD_ID: string } }).env.VITE_APP_BUILD_ID
+      ? (import.meta as unknown as { env: { VITE_APP_BUILD_ID: string } }).env.VITE_APP_BUILD_ID
       : 'dev-local';
 
 export const SDK_VERSION: SDKVersion = {

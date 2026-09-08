@@ -218,7 +218,7 @@ export class StorefrontSeedClient {
 
     projectId: number,
 
-    body?: { limit?: number; idempotency_key?: string },
+    body?: { limit?: number; idempotency_key?: string; preset_id?: string },
 
   ) {
 

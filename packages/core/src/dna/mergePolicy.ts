@@ -24,8 +24,7 @@ export class DnaMergePolicyClient {
       `/projects/${projectId}/settings/ecosystem-merge`,
     );
     return (
-      (response as { data?: EcosystemMergeSettingsResponse }).data ??
-      (response as EcosystemMergeSettingsResponse)
+      response.data ?? (response as unknown as EcosystemMergeSettingsResponse)
     );
   }
 
@@ -38,8 +37,7 @@ export class DnaMergePolicyClient {
       patch,
     );
     return (
-      (response as { data?: EcosystemMergeSettingsResponse }).data ??
-      (response as EcosystemMergeSettingsResponse)
+      response.data ?? (response as unknown as EcosystemMergeSettingsResponse)
     );
   }
 }

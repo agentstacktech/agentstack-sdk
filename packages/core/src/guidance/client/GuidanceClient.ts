@@ -3,6 +3,7 @@
  * Prefer this over raw fetch so hybrid session headers stay centralized.
  */
 import type { HTTPClient } from '../../client/http-client';
+import type { RequestConfig } from '../../types';
 import {
   rebuildPathStateFromEvents,
   type RebuiltPathState,
@@ -48,10 +49,36 @@ export class GuidanceClient {
   constructor(
     private readonly http: HTTPClient,
     private readonly projectId: number,
+    private readonly headers?: () => Record<string, string>,
   ) {}
 
+  private withHeaders(config?: Partial<RequestConfig>): Partial<RequestConfig> | undefined {
+    if (!this.headers) return config;
+    const extra = this.headers();
+    return {
+      ...config,
+      headers: { ...extra, ...(config?.headers ?? {}) },
+    };
+  }
+
+  private get<T>(url: string, config?: Partial<RequestConfig>) {
+    return this.http.get<T>(url, undefined, this.withHeaders(config));
+  }
+
+  private post<T>(url: string, body?: unknown, config?: Partial<RequestConfig>) {
+    return this.http.post<T>(url, body, this.withHeaders(config));
+  }
+
+  private put<T>(url: string, body?: unknown, config?: Partial<RequestConfig>) {
+    return this.http.put<T>(url, body, this.withHeaders(config));
+  }
+
+  private patch<T>(url: string, body?: unknown, config?: Partial<RequestConfig>) {
+    return this.http.patch<T>(url, body, this.withHeaders(config));
+  }
+
   async listActiveSessions(): Promise<GuidanceSessionDto[]> {
-    const res = await this.http.get<GuidanceSessionDto[]>(
+    const res = await this.get<GuidanceSessionDto[]>(
       `/api/projects/${this.projectId}/guidance/sessions/active`,
     );
     return Array.isArray(res.data) ? res.data : [];
@@ -69,7 +96,7 @@ export class GuidanceClient {
     playbookId: string,
     initialState?: Record<string, unknown>,
   ): Promise<GuidanceSessionDto> {
-    const res = await this.http.post<GuidanceSessionDto>(
+    const res = await this.post<GuidanceSessionDto>(
       `/api/projects/${this.projectId}/guidance/sessions`,
       { playbook_id: playbookId, initial_state: initialState },
     );
@@ -77,7 +104,7 @@ export class GuidanceClient {
   }
 
   async hydrate(sessionId: string): Promise<GuidanceHydrateDto | null> {
-    const res = await this.http.get<GuidanceHydrateDto>(
+    const res = await this.get<GuidanceHydrateDto>(
       `/api/projects/${this.projectId}/guidance/sessions/${encodeURIComponent(sessionId)}/hydrate`,
     );
     return res.data ?? null;
@@ -88,7 +115,7 @@ export class GuidanceClient {
     state: Record<string, unknown>,
     percent?: number,
   ): Promise<GuidanceSessionDto | null> {
-    const res = await this.http.patch<GuidanceSessionDto>(
+    const res = await this.patch<GuidanceSessionDto>(
       `/api/projects/${this.projectId}/guidance/sessions/${encodeURIComponent(sessionId)}`,
       { state, percent },
     );
@@ -96,12 +123,12 @@ export class GuidanceClient {
   }
 
   async postEvents(events: Array<Record<string, unknown>>): Promise<void> {
-    await this.http.post(`/api/projects/${this.projectId}/guidance/events`, { events });
+    await this.post(`/api/projects/${this.projectId}/guidance/events`, { events });
   }
 
   /** Platform stubs + tenant rows (`GET …/guidance/definitions`). */
   async listDefinitions(): Promise<GuidanceDefinitionDto[]> {
-    const res = await this.http.get<GuidanceDefinitionDto[]>(
+    const res = await this.get<GuidanceDefinitionDto[]>(
       `/api/projects/${this.projectId}/guidance/definitions`,
     );
     return Array.isArray(res.data) ? res.data : [];
@@ -115,7 +142,7 @@ export class GuidanceClient {
     definitionId: string,
     input: UpsertGuidanceDefinitionInput,
   ): Promise<GuidanceDefinitionDto> {
-    const res = await this.http.put<GuidanceDefinitionDto>(
+    const res = await this.put<GuidanceDefinitionDto>(
       `/api/projects/${this.projectId}/guidance/definitions/${encodeURIComponent(definitionId)}`,
       {
         definition_id: definitionId,
@@ -130,9 +157,18 @@ export class GuidanceClient {
   /** Server verify snapshot for SPA runGoalVerify fallback (`GET …/path-status`). */
   async getPathStatus(playbookId?: string): Promise<GuidancePathStatusDto> {
     const q = playbookId ? `?playbook_id=${encodeURIComponent(playbookId)}` : '';
-    const res = await this.http.get<GuidancePathStatusDto>(
+    const res = await this.get<GuidancePathStatusDto>(
       `/api/projects/${this.projectId}/guidance/path-status${q}`,
     );
     return res.data ?? {};
   }
+}
+
+/** Factory for project-scoped Guidance REST client. */
+export function createGuidanceClient(
+  http: HTTPClient,
+  projectId: number,
+  headers?: () => Record<string, string>,
+): GuidanceClient {
+  return new GuidanceClient(http, projectId, headers);
 }

@@ -7,8 +7,33 @@ import { HTTPClient } from '../client/http-client';
 export class AgentBots {
   constructor(private client: HTTPClient) {}
 
-  list(projectId: number) {
-    return this.client.get<{ bots: unknown[] }>(`/projects/${projectId}/bots`);
+  list(projectId: number, options?: { source?: 'ecs' | 'dna' }) {
+    const qs =
+      options?.source === 'dna' ? '?source=dna' : options?.source === 'ecs' ? '?source=ecs' : '';
+    return this.client.get<{ bots: unknown[] }>(`/projects/${projectId}/bots${qs}`);
+  }
+
+  /** Rebuild ECS bots fleet index (Studio empty-list recovery). */
+  rebuildFleetIndex(projectId: number) {
+    return this.client.post<Record<string, unknown>>(
+      `/projects/${projectId}/bots/fleet/rebuild`,
+      {},
+    );
+  }
+
+  /** Project bots fleet health — mirrors MCP ``bots.fleet_diagnostics``. */
+  fleetDiagnostics(projectId: number) {
+    return this.client.get<Record<string, unknown>>(
+      `/projects/${projectId}/bots/fleet/diagnostics`,
+    );
+  }
+
+  /** Idempotent mentor /menu+/operator heal — mirrors MCP ``bots.ensure_mentor_commands``. */
+  healMentorCommands(projectId: number, botId: string) {
+    return this.client.post<Record<string, unknown>>(
+      `/projects/${projectId}/bots/${botId}/heal-mentor-commands`,
+      {},
+    );
   }
 
   templates(projectId: number) {
@@ -31,46 +56,11 @@ export class AgentBots {
     return this.client.post<{ bot: unknown }>(`/projects/${projectId}/bots`, body);
   }
 
-  /** Quick-start helper — maps channel + use case to built-in template (`sdk.bots.gen1`). */
-  quickStartCreate(
-    projectId: number,
-    body: {
-      channel:
-        | 'telegram'
-        | 'whatsapp'
-        | 'web_widget'
-        | 'instagram'
-        | 'slack';
-      useCase: 'info' | 'store' | 'payments' | 'full';
-      name?: string;
-      variables?: Record<string, string>;
-    },
-  ) {
-    const templateByUseCase: Record<typeof body.useCase, string> = {
-      info: 'menu_info',
-      store: 'store_front',
-      payments: 'payments_desk',
-      full: 'commerce_full',
-    };
-    const labels: Record<typeof body.channel, string> = {
-      telegram: 'Telegram',
-      whatsapp: 'WhatsApp',
-      web_widget: 'Web widget',
-      instagram: 'Instagram',
-      slack: 'Slack',
-    };
-    const useCase = body.useCase;
-    const name = body.name?.trim() || `${labels[body.channel]} bot`;
-    return this.create(projectId, {
-      name,
-      brain_mode: 'echo',
-      template_id: templateByUseCase[useCase],
-      template_variables: body.variables,
-    });
-  }
-
   update(projectId: number, botId: string, spec: Record<string, unknown>) {
-    return this.client.put<{ bot: unknown }>(`/projects/${projectId}/bots/${botId}`, spec);
+    return this.client.put<{
+      bot: unknown;
+      telegram_menu?: { ok?: boolean; skipped?: string; error?: string; n?: number };
+    }>(`/projects/${projectId}/bots/${botId}`, spec);
   }
 
   attachChannel(
@@ -87,7 +77,18 @@ export class AgentBots {
   setBrain(
     projectId: number,
     botId: string,
-    body: { mode: string; agent_uuid?: string; logic_id?: string; fallback_text?: string },
+    body: {
+      mode: string;
+      /** Pass null to clear; omit to leave unchanged on the server. */
+      agent_uuid?: string | null;
+      logic_id?: string | null;
+      fallback_text?: string;
+      rag_collections?: string[];
+      rag_trigger_mode?: string;
+      rag_trigger_phrases?: string[];
+      /** Studio debug: append source doc + original extractive under AI answer. */
+      rag_debug?: boolean;
+    },
   ) {
     return this.client.post<{ bot: unknown }>(
       `/projects/${projectId}/bots/${botId}/set_brain`,
@@ -107,29 +108,115 @@ export class AgentBots {
   }
 
   activate(projectId: number, botId: string, hookBase?: string) {
+    const trimmed = hookBase?.trim();
+    // Empty body → Core uses AGENTSTACK_PUBLIC_URL / default_hook_base (never localhost).
     return this.client.post<{ hook_url: string; activation: unknown }>(
       `/projects/${projectId}/bots/${botId}/activate`,
-      { hook_base: hookBase ?? 'http://localhost:8000' },
+      trimmed ? { hook_base: trimmed } : {},
     );
   }
 
-  conversations(projectId: number, botId: string, filter?: string) {
-    const qs = filter ? `?filter=${encodeURIComponent(filter)}` : '';
-    return this.client.get<{ conversations: unknown[] }>(
+  /**
+   * List conversations. `filter` / `includeMessages` / `limit` / `cursor` mirror REST + MCP
+   * `bots.conversations` (inbox defaults `include_messages=false`).
+   */
+  conversations(
+    projectId: number,
+    botId: string,
+    opts?: {
+      filter?: string;
+      includeMessages?: boolean;
+      limit?: number;
+      cursor?: string;
+    },
+  ) {
+    const params = new URLSearchParams();
+    if (opts?.filter) params.set('filter', opts.filter);
+    if (opts?.includeMessages) params.set('include_messages', 'true');
+    if (opts?.limit != null) params.set('limit', String(opts.limit));
+    if (opts?.cursor) params.set('cursor', opts.cursor);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    return this.client.get<{ conversations: unknown[]; next_cursor?: string }>(
       `/projects/${projectId}/bots/${botId}/conversations${qs}`,
     );
   }
 
-  health(projectId: number, botId: string) {
+  /**
+   * One conversation thread page (newest-at-end). ``before`` is hlc/at of the oldest shown turn.
+   */
+  conversation(
+    projectId: number,
+    botId: string,
+    conversationId: string,
+    opts?: { limit?: number; before?: string },
+  ) {
+    const params = new URLSearchParams();
+    if (opts?.limit != null) params.set('limit', String(opts.limit));
+    if (opts?.before) params.set('before', opts.before);
+    const qs = params.toString() ? `?${params.toString()}` : '';
     return this.client.get<Record<string, unknown>>(
-      `/projects/${projectId}/bots/${botId}/health`,
+      `/projects/${projectId}/bots/${botId}/conversations/${encodeURIComponent(conversationId)}${qs}`,
     );
   }
 
-  simulate(projectId: number, botId: string, text: string, externalUserId = 'sim-user') {
+  /**
+   * Health snapshot. Optional `include` mirrors REST/MCP (`queues`, `telegram`, `max`, …).
+   * OpenAPI regen optional — signature asserted in frontend `agentBotsSdkSignatures.test.ts`.
+   */
+  health(projectId: number, botId: string, opts?: { include?: string[] }) {
+    const params = new URLSearchParams();
+    if (opts?.include?.length) {
+      params.set('include', opts.include.join(','));
+    }
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    return this.client.get<Record<string, unknown>>(
+      `/projects/${projectId}/bots/${botId}/health${qs}`,
+    );
+  }
+
+  dlqReplay(projectId: number, botId: string, itemId: string) {
+    return this.client.post<Record<string, unknown>>(
+      `/projects/${projectId}/bots/${botId}/dlq/${encodeURIComponent(itemId)}/replay`,
+      {},
+    );
+  }
+
+  /** Project-scoped bots DLQ list (ANR-05). */
+  fleetDlqList(projectId: number, limit = 50) {
+    return this.client.get<{ success: boolean; dlq: unknown[]; count: number }>(
+      `/projects/${projectId}/bots/fleet/dlq`,
+      { limit },
+    );
+  }
+
+  /** Replay DLQ item scoped to project (preferred over bot-scoped alias). */
+  fleetDlqReplay(projectId: number, itemId: string) {
+    return this.client.post<Record<string, unknown>>(
+      `/projects/${projectId}/bots/fleet/dlq/${encodeURIComponent(itemId)}/replay`,
+      {},
+    );
+  }
+
+  simulate(
+    projectId: number,
+    botId: string,
+    text: string,
+    externalUserId = 'sim-user',
+    options?: { chat_type?: string; external_chat_id?: string; channel_kind?: string },
+  ) {
     return this.client.post<Record<string, unknown>>(
       `/projects/${projectId}/bots/${botId}/simulate`,
-      { text, external_user_id: externalUserId },
+      {
+        text,
+        external_user_id: externalUserId,
+        ...(options?.chat_type ? { chat_type: options.chat_type } : {}),
+        ...(options?.external_chat_id ? { external_chat_id: options.external_chat_id } : {}),
+        ...(options?.channel_kind ? { channel_kind: options.channel_kind } : {}),
+      },
+      {
+        useAiTimeout: true,
+        headers: { 'X-Request-Lane': 'ai_stream' },
+      },
     );
   }
 
@@ -153,10 +240,15 @@ export class AgentBots {
     conversationId: string,
     active: boolean,
     notifyUser = false,
+    opts?: { claim?: boolean },
   ) {
     return this.client.post<Record<string, unknown>>(
       `/projects/${projectId}/bots/${botId}/conversations/${encodeURIComponent(conversationId)}/handoff`,
-      { active, notify_user: notifyUser },
+      {
+        active,
+        notify_user: notifyUser,
+        ...(opts?.claim !== undefined ? { claim: opts.claim } : {}),
+      },
     );
   }
 
@@ -198,5 +290,50 @@ export class AgentBots {
       default_broadcast_template?: string;
       source?: string;
     }>(`/projects/${projectId}/bots/waba/templates${qs}`);
+  }
+
+  sendCommerceOffer(
+    projectId: number,
+    botId: string,
+    conversationId: string,
+    body: {
+      listing_uuid: string;
+      cta_label?: string;
+      intro_text?: string;
+      mirror_to_chat?: boolean;
+    },
+  ) {
+    return this.client.post<Record<string, unknown>>(
+      `/projects/${projectId}/bots/${botId}/conversations/${encodeURIComponent(conversationId)}/commerce_offer`,
+      body,
+    );
+  }
+
+  simulateCommerceOffer(
+    projectId: number,
+    botId: string,
+    body: {
+      listing_uuid: string;
+      external_user_id?: string;
+      /** Preferred — aligns with `/simulate` `channel_kind`. */
+      channel_kind?: string;
+      /** @deprecated Prefer `channel_kind`. */
+      channel?: string;
+      cta_label?: string;
+      intro_text?: string;
+    },
+  ) {
+    const { channel, channel_kind, ...rest } = body;
+    return this.client.post<Record<string, unknown>>(
+      `/projects/${projectId}/bots/${botId}/simulate/commerce_offer`,
+      {
+        ...rest,
+        channel_kind: channel_kind || channel,
+      },
+      {
+        useAiTimeout: true,
+        headers: { 'X-Request-Lane': 'ai_stream' },
+      },
+    );
   }
 }

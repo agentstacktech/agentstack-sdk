@@ -503,7 +503,10 @@ export class AgentHosting {
     const apiOrigin = (cfg.apiBase || cfg.baseUrl || '')
       .replace(/\/+$/, '')
       .replace(/\/api\/?$/, '');
-    const headers = this.client.buildFetchHeaders({}, `/hosting/buckets/${bucketId}/import-zip`);
+    const headers = await this.client.alignSessionThenBuildHeaders(
+      {},
+      `/hosting/buckets/${bucketId}/import-zip`,
+    );
     const opId = buildHostingZipOpId(projectId, bucketId, file);
     const result = await runResumableUpload(
       {

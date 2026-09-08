@@ -3,6 +3,8 @@ import { describe, expect, it } from '@jest/globals';
 import {
   classifyRouteScope,
   isEcosystemScopedApiPath,
+  isIdentityScopedApiPath,
+  isUserScopedSessionPath,
 } from '../../src/client/routeScopeClassifier';
 import { resolveRequestProjectContext } from '../../src/client/resolveRequestProjectContext';
 
@@ -10,6 +12,22 @@ describe('routeScopeClassifier', () => {
   it('marks profile wallets as ecosystem', () => {
     expect(isEcosystemScopedApiPath('/api/profile/wallets')).toBe(true);
     expect(classifyRouteScope('/api/profile/wallets', '/user/finance')).toBe('ecosystem');
+  });
+
+  it('marks user API keys as identity-scoped (not vault[1] treasury)', () => {
+    expect(isIdentityScopedApiPath('/api/user/api-keys')).toBe(true);
+    expect(isIdentityScopedApiPath('/api/user/api-keys/abc/rotate')).toBe(true);
+    expect(isIdentityScopedApiPath('/user/api-keys')).toBe(true);
+    expect(isIdentityScopedApiPath('https://agentstack.tech/api/user/api-keys')).toBe(true);
+    expect(isEcosystemScopedApiPath('/api/user/api-keys')).toBe(false);
+    expect(classifyRouteScope('/api/user/api-keys', '/user/profile')).toBe('workspace');
+  });
+
+  it('marks GET /projects list as user-scoped session (not /projects/:id)', () => {
+    expect(isUserScopedSessionPath('/api/projects')).toBe(true);
+    expect(isUserScopedSessionPath('/projects')).toBe(true);
+    expect(isUserScopedSessionPath('/api/projects/1444/bots')).toBe(false);
+    expect(isUserScopedSessionPath('/user/api-keys')).toBe(true);
   });
 
   it('marks storage APIs as ecosystem (dashboard vault[1] contour)', () => {
@@ -54,6 +72,43 @@ describe('resolveRequestProjectContext ecosystem cases', () => {
     });
     expect(r.mode).toBe('shell');
     expect(r.projectId).toBe(1);
+    expect(r.bearer).toBeUndefined();
+  });
+
+  it('PAT path keeps workspace vault bearer when header is eco', () => {
+    const payload = Buffer.from(JSON.stringify({ project_id: 1444 })).toString('base64');
+    const token = `h.${payload}.s`;
+    const r = resolveRequestProjectContext({
+      headerProjectId: 1,
+      jwtProjectId: 1444,
+      vaultToken: token,
+      requestPath: '/api/user/api-keys',
+    });
+    expect(r.mode).toBe('shell');
+    expect(r.bearer).toBe(token);
+    expect(r.projectId).toBe(1444);
+  });
+
+  it('GET /projects list keeps vault bearer on header/jwt mismatch', () => {
+    const payload = Buffer.from(JSON.stringify({ project_id: 1444 })).toString('base64');
+    const token = `h.${payload}.s`;
+    const r = resolveRequestProjectContext({
+      headerProjectId: 1,
+      jwtProjectId: 1444,
+      vaultToken: token,
+      requestPath: '/api/projects',
+    });
+    expect(r.mode).toBe('shell');
+    expect(r.bearer).toBe(token);
+  });
+
+  it('PAT path stays guest without vault token', () => {
+    const r = resolveRequestProjectContext({
+      headerProjectId: 1,
+      jwtProjectId: 1444,
+      requestPath: '/api/user/api-keys',
+    });
+    expect(r.mode).toBe('guest');
     expect(r.bearer).toBeUndefined();
   });
 

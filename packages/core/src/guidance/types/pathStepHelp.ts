@@ -32,6 +32,7 @@ export type PathStepHelpBlock = z.infer<typeof PathStepHelpBlockSchema>;
 export const GoalVerifySpecSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('hostingSitePublished'), minSites: z.number().optional() }),
   z.object({ kind: z.literal('hostedVitrinePublished') }),
+  z.object({ kind: z.literal('storefrontSeedApplied') }),
   z.object({ kind: z.literal('commerceSellerActivated') }),
   z.object({ kind: z.literal('integrationConnectionActive'), minCount: z.number().optional() }),
   z.object({ kind: z.literal('paymentWebhookOk') }),
@@ -41,11 +42,17 @@ export const GoalVerifySpecSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('agentExists'), minCount: z.number().optional() }),
   z.object({ kind: z.literal('agentRunSucceeded'), agentIdKey: z.string().optional() }),
   z.object({ kind: z.literal('logicRuleInstalled'), minCount: z.number().optional() }),
+  z.object({ kind: z.literal('logicRulePublished'), minCount: z.number().optional() }),
   z.object({ kind: z.literal('storageFileExists'), minCount: z.number().optional() }),
   z.object({ kind: z.literal('crmContactExists'), minCount: z.number().optional() }),
+  z.object({ kind: z.literal('crmContactCreated'), minCount: z.number().optional() }),
   z.object({ kind: z.literal('supportThreadExists') }),
   z.object({ kind: z.literal('apiKeyExists'), minCount: z.number().optional() }),
   z.object({ kind: z.literal('schedulerTaskActive') }),
+  z.object({ kind: z.literal('ragCollectionExists'), minCount: z.number().optional() }),
+  z.object({ kind: z.literal('ragChunkIngested'), minCount: z.number().optional() }),
+  z.object({ kind: z.literal('ragSearchReturned') }),
+  z.object({ kind: z.literal('businessHeadExists'), minOrgans: z.number().optional() }),
   z.object({ kind: z.literal('manualConfirm'), checklistKeys: z.array(z.string()) }),
 ]);
 

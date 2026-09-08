@@ -1,0 +1,41 @@
+{
+  "name": "@agentstack/cli",
+  "version": "0.1.0",
+  "description": "AgentStack product CLI — SDK REST + MCP escape hatch",
+  "type": "module",
+  "bin": {
+    "agentstack": "./dist/bin.js"
+  },
+  "main": "./dist/bin.js",
+  "types": "./dist/bin.d.ts",
+  "files": [
+    "dist",
+    "AI_INDEX.md",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "test": "vitest run",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "dependencies": {
+    "@agentstack/sdk": "file:../core"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agentstacktech/agentstack-sdk.git",
+    "directory": "packages/cli"
+  },
+  "license": "MIT",
+  "homepage": "https://agentstack.tech",
+  "geneticTag": "repo.tooling.user_cli.gen1"
+}

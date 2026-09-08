@@ -6,6 +6,28 @@ export {
 } from './HostedStorefrontClient';
 
 export { StorefrontSeedClient } from './StorefrontSeedClient';
+export type {
+  StorefrontSeedPlanBody,
+  StorefrontSeedProductSpec,
+} from './StorefrontSeedClient';
+
+export {
+  listBundledPacks,
+  packToSpecs,
+  packSeedOptions,
+  storefrontPackItemSchema,
+  storefrontPackSchema,
+  storefrontPacksFixtureSchema,
+  STOREFRONT_PACKS_VERSION,
+} from './packs';
+
+export type {
+  StorefrontPack,
+  StorefrontPackItem,
+  StorefrontPackMeta,
+  StorefrontPackSeedOptions,
+  StorefrontPacksFixture,
+} from './packs';
 
 export {
   getProductSource,

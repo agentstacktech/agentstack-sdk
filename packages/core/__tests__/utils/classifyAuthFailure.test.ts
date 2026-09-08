@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from '@jest/globals';
 import {
   classifyAuthFailure,
   isNonRetryableAuthOrShed,
@@ -36,6 +36,15 @@ describe('classifyAuthFailure', () => {
       kind: 'offline',
     });
     expect(classifyAuthFailure({ code: 'ERR_NETWORK' })).toEqual({ kind: 'offline' });
+    expect(classifyAuthFailure({ message: 'Network error' })).toEqual({ kind: 'offline' });
+  });
+
+  it('does not treat circuit-open as offline (G-A159)', () => {
+    expect(
+      classifyAuthFailure({
+        message: 'Circuit breaker open! Retry in 5s. (5 consecutive failures)',
+      }),
+    ).toEqual({ kind: 'unknown', code: 'circuit_open' });
   });
 
   it('classifies unauthorized', () => {

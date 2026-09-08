@@ -7,7 +7,9 @@ const DEPRECATED_MSG =
 
 /**
  * Server-backed path store (`sdk.guidance.gen1` P2).
+ *
  * @deprecated Prefer `GuidanceClient` + `pathServerSync` in the SPA shell.
+ * SPA SoT is `pathServerSync.ts` / `hybridGuidanceTransport.ts` — do not add new callers.
  */
 export class RemotePathStore implements IPathStore {
   constructor(

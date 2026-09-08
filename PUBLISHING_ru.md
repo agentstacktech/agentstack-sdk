@@ -4,7 +4,7 @@
 
 ## После первого npm publish
 
-1. **agentstack-frontend:** `"@agentstack/sdk": "^0.4.13"` вместо `file:../agentstack-unified-sdk/...`
+1. **agentstack-frontend:** `"@agentstack/sdk": "^0.4.18"` вместо `file:../agentstack-unified-sdk/...`
 2. **Локальная разработка:** `npm link` в `packages/core`
 
 ## Шаги npm

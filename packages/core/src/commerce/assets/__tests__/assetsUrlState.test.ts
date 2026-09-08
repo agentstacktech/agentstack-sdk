@@ -2,6 +2,7 @@ import {
   buildAssetsWizardHref,
   buildProjectAssetsWizardHref,
   parseAssetsSearchParams,
+  writeAssetsSearchParams,
 } from '../index';
 
 describe('commerce/assets url state', () => {
@@ -29,5 +30,14 @@ describe('commerce/assets url state', () => {
     expect(parsed.presetId).toBe('game_card');
     expect(parsed.step).toBe('media');
     expect(parsed.assetId).toBe('a1');
+  });
+
+  it('parses and writes pack param', () => {
+    const parsed = parseAssetsSearchParams(new URLSearchParams('mode=studio&pack=starter_three'));
+    expect(parsed.pack).toBe('starter_three');
+    const next = writeAssetsSearchParams(new URLSearchParams('mode=studio'), { pack: 'course_academy' });
+    expect(next.get('pack')).toBe('course_academy');
+    const cleared = writeAssetsSearchParams(next, { pack: null });
+    expect(cleared.get('pack')).toBeNull();
   });
 });

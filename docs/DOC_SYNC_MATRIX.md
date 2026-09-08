@@ -3,21 +3,21 @@
 **Genetic tag:** `repo.platform.sdk.docs_i18n.gen1`
 **RU:** [DOC_SYNC_MATRIX_ru.md](./DOC_SYNC_MATRIX_ru.md) (summary)
 
-Generated: 2026-07-12T03:01:22.850Z · Do not edit by hand — run `npm run generate:docs-i18n`
+Generated: 2026-09-08T20:42:18.776Z · Do not edit by hand — run `npm run generate:docs-i18n`
 
 | EN | RU | Diátaxis | Lines EN | Lines RU | Fences EN/RU | H2 EN/RU | Ratio | Status |
 |----|-----|----------|----------|----------|--------------|----------|-------|--------|
-| [README.en.md](README.en.md) | [README.md](README.md) | — | 670 | 677 | 52/54 | 23/16 | 0.99 | **legacy-ru-path** |
+| [README.en.md](README.en.md) | [README.md](README.md) | — | 674 | 684 | 52/56 | 23/16 | 0.99 | **legacy-ru-path** |
 | [docs/DOCS_I18N.md](docs/DOCS_I18N.md) | [docs/DOCS_I18N_ru.md](docs/DOCS_I18N_ru.md) | — | 101 | 93 | 0/0 | 10/10 | 1.09 | **balanced** |
 | [docs/DOC_HUB.md](docs/DOC_HUB.md) | [docs/DOC_HUB_ru.md](docs/DOC_HUB_ru.md) | — | 70 | 69 | 0/0 | 8/8 | 1.01 | **balanced** |
 | [docs/GLOSSARY.md](docs/GLOSSARY.md) | [docs/GLOSSARY_ru.md](docs/GLOSSARY_ru.md) | reference | 44 | 44 | 0/0 | 0/0 | 1 | **balanced** |
 | [docs/README.md](docs/README.md) | [docs/README_ru.md](docs/README_ru.md) | — | 54 | 51 | 0/0 | 5/5 | 1.06 | **balanced** |
-| [docs/SDK_INTEGRATION_FLOWS.md](docs/SDK_INTEGRATION_FLOWS.md) | [docs/SDK_INTEGRATION_FLOWS_ru.md](docs/SDK_INTEGRATION_FLOWS_ru.md) | how-to | 234 | 184 | 22/16 | 11/11 | 1.27 | **balanced** |
+| [docs/SDK_INTEGRATION_FLOWS.md](docs/SDK_INTEGRATION_FLOWS.md) | [docs/SDK_INTEGRATION_FLOWS_ru.md](docs/SDK_INTEGRATION_FLOWS_ru.md) | how-to | 234 | 186 | 22/16 | 11/11 | 1.26 | **balanced** |
 | [docs/quick-start.md](docs/quick-start.md) | [docs/quick-start_ru.md](docs/quick-start_ru.md) | tutorial | 40 | 42 | 4/4 | 2/2 | 0.95 | **balanced** |
-| [docs/INTEGRATOR_SCOPE.md](docs/INTEGRATOR_SCOPE.md) | [docs/INTEGRATOR_SCOPE_ru.md](docs/INTEGRATOR_SCOPE_ru.md) | reference | 82 | 81 | 2/2 | 5/5 | 1.01 | **balanced** |
+| [docs/INTEGRATOR_SCOPE.md](docs/INTEGRATOR_SCOPE.md) | [docs/INTEGRATOR_SCOPE_ru.md](docs/INTEGRATOR_SCOPE_ru.md) | reference | 95 | 94 | 2/2 | 6/6 | 1.01 | **balanced** |
 | [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md) | [docs/PROJECT_CONTEXT_ru.md](docs/PROJECT_CONTEXT_ru.md) | how-to | 93 | 84 | 4/4 | 6/6 | 1.11 | **balanced** |
 | [docs/SUBMODULE_CONSUMER.md](docs/SUBMODULE_CONSUMER.md) | [docs/SUBMODULE_CONSUMER_ru.md](docs/SUBMODULE_CONSUMER_ru.md) | how-to | 34 | 34 | 2/2 | 3/3 | 1 | **balanced** |
-| [AGENTS.md](AGENTS.md) | [AGENTS_ru.md](AGENTS_ru.md) | — | 102 | 85 | 2/2 | 6/6 | 1.2 | **balanced** |
+| [AGENTS.md](AGENTS.md) | [AGENTS_ru.md](AGENTS_ru.md) | — | 138 | 85 | 6/2 | 6/6 | 1.62 | **ru-thin** |
 | [docs/AI_INTEGRATOR_GUIDE.md](docs/AI_INTEGRATOR_GUIDE.md) | [docs/AI_INTEGRATOR_GUIDE_ru.md](docs/AI_INTEGRATOR_GUIDE_ru.md) | — | 104 | 105 | 8/8 | 10/10 | 0.99 | **balanced** |
 | [docs/AI_APPLICATION_FACTORY.md](docs/AI_APPLICATION_FACTORY.md) | [docs/AI_APPLICATION_FACTORY_ru.md](docs/AI_APPLICATION_FACTORY_ru.md) | how-to | 105 | 103 | 12/12 | 6/6 | 1.02 | **balanced** |
 | [docs/AI_ERROR_ACTION_MATRIX.md](docs/AI_ERROR_ACTION_MATRIX.md) | [docs/AI_ERROR_ACTION_MATRIX_ru.md](docs/AI_ERROR_ACTION_MATRIX_ru.md) | reference | 17 | 17 | 0/0 | 0/0 | 1 | **balanced** |

@@ -12,5 +12,5 @@
 
 - `AgentsFleet.ts` — REST facade for `/api/projects/{id}/agents/*` and `/api/users/me/agents/*`
 - **UI V2 helpers:** `listLlmProviders()`, `listFapTemplates()`, `previewPolicy` / `previewPolicyMine`, `previewTemplate` / `previewTemplateMine`, `updateSpecPatch` / `updateSpecPatchMine` (client `mergeAgentSpec` + GET + PUT)
-- **Parity backlog:** typed run DTOs, run detail, list filters (`status`, `since`, `with_agc_purchase`), timeline, and stream helpers must stay aligned with REST/MCP/Python.
+- **Parity:** Python `AgentAgentsFleet` + `agent_agents_types.py` (SDK-PY-03 run helpers). Full Pydantic models remain optional.
 - `forProject(id)` — chained helpers including `previewPolicy`, `previewTemplate`, `updateSpecPatch`

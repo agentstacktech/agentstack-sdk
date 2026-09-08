@@ -2,7 +2,7 @@
 
 > **Informal / may lag code.** Shipped truth: `sdk.getModuleCatalog()` · releases: [CHANGELOG.md](CHANGELOG.md). Archived meta: [docs/archive/README.md](docs/archive/README.md).
 
-**Status:** Platform line **0.4.13** (aligned with `AGENTSTACK_CORE_VERSION`)
+**Status:** Platform line **0.4.18** (aligned with `AGENTSTACK_CORE_VERSION`)
 
 ## Shipped (use `getModuleCatalog()` for truth)
 

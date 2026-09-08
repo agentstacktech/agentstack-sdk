@@ -88,4 +88,55 @@ export class AgentDiagnostics {
     );
     return res.data;
   }
+
+  /** GET /api/diagnostics/neural-graph — Visualizer Gen2 BFF. */
+  async getNeuralGraph(params: {
+    include: string;
+    project_id?: number;
+    gene_heat_top_k?: number;
+    signal?: AbortSignal;
+  }): Promise<import('../diagnostics/neuralGraph').NeuralGraphData> {
+    const q: Record<string, string | number> = { include: params.include };
+    if (params.project_id != null) q.project_id = params.project_id;
+    if (params.gene_heat_top_k != null) q.gene_heat_top_k = params.gene_heat_top_k;
+    const res = await this.client.get<import('../diagnostics/neuralGraph').NeuralGraphData>(
+      '/diagnostics/neural-graph',
+      q,
+      { signal: params.signal, skipCache: true } as { signal?: AbortSignal; skipCache?: boolean },
+    );
+    return res.data;
+  }
+
+  /** POST /api/diagnostics/promote-hot-gene */
+  async promoteHotGene(
+    body: Record<string, unknown>,
+    options?: { signal?: AbortSignal },
+  ): Promise<Record<string, unknown>> {
+    const res = await this.client.post<Record<string, unknown>>(
+      '/diagnostics/promote-hot-gene',
+      body,
+      { signal: options?.signal },
+    );
+    return res.data;
+  }
+
+  /** GET /api/diagnostics/gene-token-query */
+  async geneTokenQuery(params: {
+    tokens: string;
+    project_id?: number;
+    source?: string;
+    limit?: number;
+    signal?: AbortSignal;
+  }): Promise<Record<string, unknown>> {
+    const q: Record<string, string | number> = { tokens: params.tokens };
+    if (params.project_id != null) q.project_id = params.project_id;
+    if (params.source) q.source = params.source;
+    if (params.limit != null) q.limit = params.limit;
+    const res = await this.client.get<Record<string, unknown>>(
+      '/diagnostics/gene-token-query',
+      q,
+      { signal: params.signal },
+    );
+    return res.data;
+  }
 }

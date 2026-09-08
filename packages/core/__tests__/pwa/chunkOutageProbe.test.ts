@@ -15,6 +15,10 @@ describe('isTransientBrowserNetworkError', () => {
     ).toBe(true);
   });
 
+  it('detects Firefox brotli/gzip decode TypeError', () => {
+    expect(isTransientBrowserNetworkError(new TypeError('Decoding failed.'))).toBe(true);
+  });
+
   it('ignores AbortError', () => {
     expect(isTransientBrowserNetworkError(new DOMException('aborted', 'AbortError'))).toBe(false);
   });

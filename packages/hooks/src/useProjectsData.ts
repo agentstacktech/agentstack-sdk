@@ -10,7 +10,7 @@
 
 import { UseQueryResult } from '@tanstack/react-query';
 import type { AgentStackSDK } from '@agentstack/sdk';
-import { useSDKQuery } from '@agentstack/react';
+import { useSDKQuery, stableKeyPart } from '@agentstack/react';
 
 /**
  * Project data structure
@@ -115,7 +115,7 @@ export function useProjectsData(
 
   const queryResult = useSDKQuery<Project[]>(
     sdk,
-    ['projects', filters],
+    ['projects', stableKeyPart(filters)],
     async (signal) => {
       try {
         const res = await sdk.api.getProjects(

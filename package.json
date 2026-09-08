@@ -4,11 +4,12 @@
   "workspaces": [
     "packages/core",
     "packages/react",
-    "packages/hooks"
+    "packages/hooks",
+    "packages/cli"
   ],
   "scripts": {
-    "build": "npm run build -w @agentstack/sdk && npm run build -w @agentstack/react && npm run build -w @agentstack/hooks",
-    "test": "npm run test -w @agentstack/sdk",
+    "build": "npm run build -w @agentstack/sdk && npm run build -w @agentstack/react && npm run build -w @agentstack/hooks && npm run build -w @agentstack/cli",
+    "test": "npm run test -w @agentstack/sdk && npm run test -w @agentstack/cli",
     "check:economy-parity": "npm run check:economy-parity -w @agentstack/sdk",
     "check:finance-parity": "npm run check:finance-parity -w @agentstack/sdk",
     "check:commerce-marketplace-parity": "npm run check:commerce-marketplace-parity -w @agentstack/sdk",

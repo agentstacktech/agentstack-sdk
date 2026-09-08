@@ -1,6 +1,5 @@
 # AgentStack SDK
 
-[![npm version](https://img.shields.io/npm/v/@agentstack/sdk.svg)](https://www.npmjs.com/package/@agentstack/sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **Languages:** [English (canonical)](README.en.md) · **Русский** (this file)
@@ -13,7 +12,15 @@
 
 Универсальный TypeScript/JavaScript SDK для экосистемы AgentStack. Модульный API: auth, projects, payments, DNA, protocol, Neural Architecture.
 
-**Quick Start (TypeScript/JavaScript):**
+**Quick Start (TypeScript/JavaScript) — today:**
+
+```bash
+git clone https://github.com/agentstacktech/agentstack-sdk.git vendor/agentstack-sdk
+cd vendor/agentstack-sdk && npm ci && npm run build
+# package.json: "@agentstack/sdk": "file:vendor/agentstack-sdk/packages/core"
+```
+
+**After npm publish:**
 
 ```bash
 npm install @agentstack/sdk
@@ -55,7 +62,7 @@ Full decision tree, CI, and env checklist: **[docs/SDK_INTEGRATION_FLOWS.md](doc
 
 ```bash
 git submodule add https://github.com/agentstacktech/agentstack-sdk.git vendor/agentstack-sdk
-node vendor/agentstack-sdk/scripts/bootstrap-submodule-consumer.mjs --target . --tag v0.4.13
+node vendor/agentstack-sdk/scripts/bootstrap-submodule-consumer.mjs --target . --tag v0.4.18
 ```
 
 Then `npm install` in your app and set `projectId` — see [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md).

@@ -35,6 +35,7 @@ export function normalizeBatchSubUrl(url: string): string {
     '/logic',
     '/diagnostics',
     '/profile',
+    '/user',
     '/sessions',
     '/neural',
     '/dna',
@@ -162,11 +163,11 @@ export class RequestBatcher {
   /** Absolute deadline (epoch ms) for the current burst; set when queue goes 0 → 1. */
   private burstDeadline: number | null = null;
   private baseUrl: string;
-  private getAuthHeaders: () => Record<string, string>;
+  private getAuthHeaders: () => Record<string, string> | Promise<Record<string, string>>;
 
   constructor(
     baseUrl: string,
-    getAuthHeaders: () => Record<string, string>,
+    getAuthHeaders: () => Record<string, string> | Promise<Record<string, string>>,
     options?: {
       batchTimeout?: number;
       maxBatchSize?: number;
@@ -351,7 +352,7 @@ export class RequestBatcher {
 
     try {
       // Отправить batch запрос
-      const authHeaders = this.getAuthHeaders();
+      const authHeaders = await Promise.resolve(this.getAuthHeaders());
       // Remove trailing slash and ensure /api/batch path (avoid /api/api/batch)
       const baseUrl = this.baseUrl.replace(/\/$/, '');
       const batchUrl = baseUrl.endsWith('/api') ? `${baseUrl}/batch` : `${baseUrl}/api/batch`;
@@ -442,7 +443,7 @@ export class RequestBatcher {
    * Выполнить запрос немедленно (без батчинга)
    */
   private async executeImmediate<T = any>(config: RequestConfig): Promise<T> {
-    const authHeaders = this.getAuthHeaders();
+    const authHeaders = await Promise.resolve(this.getAuthHeaders());
     const url = new URL(config.url, this.baseUrl);
     
     // Добавить query параметры

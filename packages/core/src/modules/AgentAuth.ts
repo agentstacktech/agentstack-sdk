@@ -21,6 +21,9 @@ import {
 } from '../config/agentstackEndpoints';
 import { normalizeProjectId } from '../config/projectContext';
 import { isTypedDna503Code } from '../utils/classifyAuthFailure';
+import { jwtProjectIdFromToken } from '../client/resolveRequestProjectContext';
+import { isTransientBrowserNetworkError } from '../client/networkErrors';
+import { loginWithDeviceCodeForm } from '../mcp/deviceCode';
 import type {
   UserSettings,
   NotificationSettings,
@@ -37,6 +40,24 @@ export interface LoginCredentials {
   mint_id?: string;
   /** Optional device binding hint (Session OS V3.1). */
   device_fingerprint?: string;
+  mfa_ticket?: string;
+  mfa_method?: string;
+  mfa_code?: string;
+}
+
+export class MfaRequiredError extends Error {
+  readonly mfa_required = true;
+  mfa_ticket: string;
+  methods: string[];
+  expires_in?: number;
+
+  constructor(data: { mfa_ticket: string; methods?: string[]; expires_in?: number }) {
+    super('MFA required');
+    this.name = 'MfaRequiredError';
+    this.mfa_ticket = data.mfa_ticket;
+    this.methods = Array.isArray(data.methods) ? data.methods : [];
+    this.expires_in = data.expires_in;
+  }
 }
 
 export interface AuthTokens {
@@ -166,6 +187,9 @@ export class AgentAuth extends SimpleEventEmitter {
   private lastSessionBootstrap: SessionBootstrapPayload | null = null;
   /** Abort in-flight bootstrap when force-login discards a stale flight (AUTH-RACE-02). */
   private sessionBootstrapAbort: AbortController | null = null;
+  /** Coalesce rapid force:true bootstrap calls (BC epoch storm). */
+  private lastForceBootstrapInvalidateAt = 0;
+  private static readonly FORCE_BOOTSTRAP_COALESCE_MS = 500;
 
   constructor(client: HTTPClient, authStateStore?: AuthStateStore) {
     super();
@@ -428,6 +452,19 @@ export class AgentAuth extends SimpleEventEmitter {
           throw new Error('Login mint in progress — please retry');
         }
 
+        // Handle 8DNA response format
+        const data = response.data;
+        if (!data) {
+          throw new UnauthorizedError('Invalid credentials');
+        }
+        if (data.mfa_required && data.mfa_ticket) {
+          throw new MfaRequiredError({
+            mfa_ticket: String(data.mfa_ticket),
+            methods: Array.isArray(data.methods) ? data.methods : [],
+            expires_in: typeof data.expires_in === 'number' ? data.expires_in : undefined,
+          });
+        }
+
         try {
           if (typeof localStorage !== 'undefined') {
             localStorage.removeItem(mintStorageKey);
@@ -439,11 +476,6 @@ export class AgentAuth extends SimpleEventEmitter {
           /* ignore */
         }
 
-        // Handle 8DNA response format
-        const data = response.data;
-        if (!data) {
-          throw new UnauthorizedError('Invalid credentials');
-        }
         if (data.success && data.session) {
           // Convert AgentStack session response to AuthTokens format
           const session = data.session;
@@ -780,6 +812,174 @@ export class AgentAuth extends SimpleEventEmitter {
   }
 
   /**
+   * Mint a session for an accessible target project without password (Session OS switch contour).
+   */
+  async switchProject(
+    targetProjectId: number,
+    options?: { mintId?: string },
+  ): Promise<{
+    access_token: string;
+    project_id?: number;
+    jti?: string;
+    api_key?: string;
+  }> {
+    const pid = Number(targetProjectId);
+    if (!Number.isFinite(pid) || pid <= 0) {
+      throw new ValidationError('target_project_id must be a positive number');
+    }
+    // Already on target — return live Bearer (no remint / lease race after login).
+    try {
+      const live = String(this.client.getAuthToken?.() || '').trim();
+      if (live && jwtProjectIdFromToken(live) === pid) {
+        let jti: string | undefined;
+        try {
+          const payload = JSON.parse(
+            atob(live.split('.')[1]?.replace(/-/g, '+').replace(/_/g, '/') || ''),
+          ) as { jti?: string };
+          jti = typeof payload.jti === 'string' ? payload.jti : undefined;
+        } catch {
+          /* ignore */
+        }
+        return { access_token: live, project_id: pid, jti };
+      }
+    } catch {
+      /* fall through to network switch */
+    }
+    const mintStorageKey = `agentstack_switch_mint:${pid}`;
+    let mintId = (options?.mintId || '').trim();
+    if (!mintId && typeof sessionStorage !== 'undefined') {
+      try {
+        mintId = (sessionStorage.getItem(mintStorageKey) || '').trim();
+      } catch {
+        /* ignore */
+      }
+    }
+    if (!mintId) {
+      mintId =
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `switch-${Date.now()}-${pid}`;
+    }
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem(mintStorageKey, mintId);
+      }
+    } catch {
+      /* ignore */
+    }
+
+    const body = { target_project_id: pid, mint_id: mintId };
+    const switchTimeoutMs = 60_000;
+    const maxPolls = 20;
+    const deadline = Date.now() + switchTimeoutMs;
+    let lastErr: unknown = null;
+    let mintPollBeaconEmitted = false;
+    this.client.beginAuthCriticalSection?.(switchTimeoutMs);
+    try {
+    const noteMintPoll = (code: string | undefined): void => {
+      if (mintPollBeaconEmitted || !code) return;
+      mintPollBeaconEmitted = true;
+      if (typeof window === 'undefined') return;
+      try {
+        window.dispatchEvent(
+          new CustomEvent('agentstack.auth.beacon', {
+            detail: {
+              name: 'auth.sdk.switch_mint_poll',
+              project_id: pid,
+              code,
+            },
+          }),
+        );
+      } catch {
+        /* ignore */
+      }
+    };
+
+    for (let attempt = 0; attempt < maxPolls; attempt++) {
+      if (Date.now() >= deadline) break;
+      try {
+        const response = await this.client.post('/auth/switch-project', body, {
+          timeout: Math.max(5_000, deadline - Date.now()),
+          headers: {
+            'X-Project-ID': '1',
+            'Idempotency-Key': mintId,
+            'X-Mint-Id': mintId,
+          },
+        });
+        const data = response.data as Record<string, unknown>;
+        const code =
+          (data?.code as string) ||
+          ((data?.detail as Record<string, unknown>)?.code as string);
+        if (
+          code === 'auth_mint_in_progress' ||
+          code === 'switch_in_progress' ||
+          code === 'login_capacity' ||
+          code === 'project_key_unavailable' ||
+          code === 'auth_mint_timeout' ||
+          (response as { status?: number })?.status === 503
+        ) {
+          noteMintPoll(code);
+          const retryAfterSec = 2;
+          const sleepMs = Math.min(
+            retryAfterSec * 1000,
+            Math.max(0, deadline - Date.now()),
+          );
+          if (sleepMs <= 0) break;
+          await new Promise((r) => setTimeout(r, sleepMs));
+          continue;
+        }
+        if (data?.success) {
+          await this.persistSessionFromLoginResponse(data);
+          this.client.markRecentLoginSuccess?.();
+          const session = (data.session || {}) as Record<string, unknown>;
+          return {
+            access_token: String(data.access_token || session.user_token || ''),
+            project_id: Number(data.project_id ?? session.project_id ?? pid),
+            jti: typeof data.jti === 'string' ? data.jti : (session.jti as string | undefined),
+            api_key:
+              typeof session.api_key === 'string' ? session.api_key : undefined,
+          };
+        }
+        throw new Error('Switch project failed: unexpected response');
+      } catch (err: unknown) {
+        lastErr = err;
+        const detailCode =
+          (err as { response?: { data?: { code?: string; detail?: { code?: string } } } })
+            ?.response?.data?.code ||
+          (err as { response?: { data?: { detail?: { code?: string } } } })?.response?.data
+            ?.detail?.code;
+        const status = (err as { response?: { status?: number }; status?: number })?.response
+          ?.status ?? (err as { status?: number })?.status;
+        if (
+          detailCode === 'auth_mint_in_progress' ||
+          detailCode === 'switch_in_progress' ||
+          detailCode === 'project_key_unavailable' ||
+          detailCode === 'auth_mint_timeout' ||
+          status === 503 ||
+          status === 409
+        ) {
+          noteMintPoll(detailCode);
+          const sleepMs = Math.min(2000, Math.max(0, deadline - Date.now()));
+          if (sleepMs <= 0) break;
+          await new Promise((r) => setTimeout(r, sleepMs));
+          continue;
+        }
+        if (isTransientBrowserNetworkError(err)) {
+          const sleepMs = Math.min(1500, Math.max(0, deadline - Date.now()));
+          if (sleepMs <= 0) break;
+          await new Promise((r) => setTimeout(r, sleepMs));
+          continue;
+        }
+        throw this.transformError(err);
+      }
+    }
+    throw this.transformError(lastErr);
+    } finally {
+      this.client.endAuthCriticalSection?.();
+    }
+  }
+
+  /**
    * Attach mint/login JSON to SDK client + auth state (password login + login-by-key).
    */
   async persistSessionFromLoginResponse(data: Record<string, unknown>): Promise<AuthTokens> {
@@ -859,46 +1059,27 @@ export class AgentAuth extends SimpleEventEmitter {
   }
 
   /**
-   * Device Code grant wrapper — POST /oauth2/device/authorize then poll token endpoint.
+   * Device Code grant — urlencoded form posts (Core OAuth rejects JSON bodies).
    * Returns issued tokens / key metadata from the token response.
    */
   async loginWithDeviceCode(body: {
     client_id: string;
     scope?: string;
+    onUserCode?: (info: {
+      userCode: string;
+      verificationUri: string;
+      verificationUriComplete: string;
+    }) => void;
   }): Promise<Record<string, unknown>> {
     return this.errorHandler.executeWithErrorHandling(async () => {
-      const authRes = await this.client.post(
-        '/oauth2/device/authorize',
-        { client_id: body.client_id, scope: body.scope || 'mcp:execute agents:run' },
-        { skipAuthStateCheck: true },
-      );
-      const device = authRes.data as Record<string, unknown>;
-      const deviceCode = String(device.device_code || '');
-      const interval = Math.max(2, Number(device.interval) || 5);
-      const expiresIn = Math.max(30, Number(device.expires_in) || 600);
-      const deadline = Date.now() + expiresIn * 1000;
-      while (Date.now() < deadline) {
-        await new Promise((r) => setTimeout(r, interval * 1000));
-        try {
-          const tokenRes = await this.client.post(
-            '/oauth2/token',
-            {
-              grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-              device_code: deviceCode,
-              client_id: body.client_id,
-            },
-            { skipAuthStateCheck: true },
-          );
-          return tokenRes.data as Record<string, unknown>;
-        } catch (pollErr: any) {
-          const errCode = pollErr?.response?.data?.error;
-          if (errCode === 'authorization_pending' || errCode === 'slow_down') {
-            continue;
-          }
-          throw pollErr;
-        }
-      }
-      throw new Error('Device Code authorization timed out');
+      const cfg = this.client.getConfig() as { apiBase?: string; baseUrl?: string };
+      const apiBase = String(cfg.apiBase || cfg.baseUrl || 'https://agentstack.tech/api');
+      return loginWithDeviceCodeForm({
+        apiBase,
+        clientId: body.client_id,
+        scope: body.scope,
+        onUserCode: body.onUserCode,
+      });
     }, { operation: 'login_with_device_code' }) as Promise<Record<string, unknown>>;
   }
 
@@ -1128,6 +1309,14 @@ export class AgentAuth extends SimpleEventEmitter {
       return this.lastSessionBootstrap;
     }
     if (options?.force) {
+      const now = Date.now();
+      if (
+        now - this.lastForceBootstrapInvalidateAt < AgentAuth.FORCE_BOOTSTRAP_COALESCE_MS &&
+        this.sessionBootstrapInFlight
+      ) {
+        return this.sessionBootstrapInFlight;
+      }
+      this.lastForceBootstrapInvalidateAt = now;
       // Never await stale in-flight — mint terminates other JTIs; awaiting old bootstrap = 401.
       this.invalidateSessionBootstrap('force_login');
     }
@@ -1344,6 +1533,47 @@ export class AgentAuth extends SimpleEventEmitter {
     }, { operation: 'changePassword' }) as Promise<{ success: boolean; message: string }>;
   }
 
+  async getPasswordSetupStatus(token: string): Promise<{
+    valid: boolean;
+    email: string;
+    email_masked: string;
+    display_name: string;
+    expires_at: number;
+  }> {
+    return this.errorHandler.executeWithErrorHandling(async () => {
+      const response = await this.client.get(
+        '/auth/password-setup/status',
+        { token },
+        { skipAuthStateCheck: true },
+      );
+      return response.data;
+    }, { operation: 'getPasswordSetupStatus' }) as Promise<{
+      valid: boolean;
+      email: string;
+      email_masked: string;
+      display_name: string;
+      expires_at: number;
+    }>;
+  }
+
+  async completePasswordSetup(
+    token: string,
+    password: string,
+  ): Promise<{ success: boolean; email: string; user_id: number }> {
+    return this.errorHandler.executeWithErrorHandling(async () => {
+      const response = await this.client.post(
+        '/auth/password-setup/complete',
+        { token, password },
+        { skipAuthStateCheck: true },
+      );
+      return response.data;
+    }, { operation: 'completePasswordSetup' }) as Promise<{
+      success: boolean;
+      email: string;
+      user_id: number;
+    }>;
+  }
+
 
   /**
    * Получение статуса 2FA
@@ -1494,6 +1724,92 @@ export class AgentAuth extends SimpleEventEmitter {
     );
     this.evictProfileRelatedCaches();
     return data;
+  }
+
+  /**
+   * MFA status (enrolled methods, backup remaining).
+   */
+  async getMfaStatus(): Promise<{
+    enrolled: boolean;
+    methods: Array<{ id?: string; kind?: string }>;
+    backup_codes_remaining?: number;
+  }> {
+    const response = await this.client.get('/auth/mfa/status');
+    return response.data;
+  }
+
+  async beginTotpEnroll(): Promise<{ secret: string; otpauth_url: string }> {
+    const response = await this.client.post('/auth/mfa/totp/begin', {});
+    return response.data;
+  }
+
+  async confirmTotpEnroll(code: string): Promise<{ enrolled: boolean; backup_codes?: string[] }> {
+    const response = await this.client.post('/auth/mfa/totp/confirm', { code });
+    this.evictProfileRelatedCaches();
+    return response.data;
+  }
+
+  async beginChannelMfa(
+    channel = 'telegram',
+    sourceId?: string,
+  ): Promise<{ sent?: boolean; channel?: string }> {
+    const response = await this.client.post('/auth/mfa/channel/begin', {
+      channel,
+      source_id: sourceId || undefined,
+    });
+    return response.data;
+  }
+
+  async confirmChannelMfa(
+    channel: string,
+    code: string,
+    sourceId?: string,
+  ): Promise<{ enrolled: boolean }> {
+    const response = await this.client.post('/auth/mfa/channel/confirm', {
+      channel,
+      code,
+      source_id: sourceId || undefined,
+    });
+    this.evictProfileRelatedCaches();
+    return response.data;
+  }
+
+  async beginTelegramMfa(): Promise<{ sent?: boolean }> {
+    return this.beginChannelMfa('telegram');
+  }
+
+  async confirmTelegramMfa(code: string): Promise<{ enrolled: boolean }> {
+    return this.confirmChannelMfa('telegram', code);
+  }
+
+  async disableMfa(password: string): Promise<{ enrolled: boolean }> {
+    const response = await this.client.post('/auth/mfa/disable', { password });
+    this.evictProfileRelatedCaches();
+    return response.data;
+  }
+
+  async sendMfaOtp(mfaTicket: string, method: string): Promise<{ sent: boolean }> {
+    const response = await this.client.post(
+      '/auth/mfa/otp/send',
+      { mfa_ticket: mfaTicket, method },
+      { skipAuthStateCheck: true },
+    );
+    return response.data;
+  }
+
+  async getNotificationPrefs(): Promise<{ prefs: unknown; sources: unknown[] }> {
+    const response = await this.client.get('/users/me/notification-prefs');
+    return response.data;
+  }
+
+  async putNotificationPrefs(prefs: Record<string, unknown>): Promise<{ prefs: unknown }> {
+    const response = await this.client.put('/users/me/notification-prefs', prefs);
+    return response.data;
+  }
+
+  async putNotificationSource(source: Record<string, unknown>): Promise<{ sources: unknown[] }> {
+    const response = await this.client.put('/users/me/notification-sources', { source });
+    return response.data;
   }
 
   /**
@@ -1652,6 +1968,33 @@ export class AgentAuth extends SimpleEventEmitter {
 
   async getActiveSessions(): Promise<Awaited<ReturnType<AgentAuth['getSessions']>>> {
     return this.getSessions();
+  }
+
+  /** Bot channel identities linked to this profile (Security tab). */
+  async listChannelIdentities(): Promise<{
+    identities: Array<{
+      id: string;
+      channel: string;
+      external_user_id: string;
+      external_user_id_masked?: string;
+      proof?: string;
+      linked_at?: string;
+      last_seen_at?: string;
+    }>;
+    total: number;
+  }> {
+    const response = await this.client.get('/auth/me/channel-identities');
+    return response.data || response;
+  }
+
+  async revokeChannelIdentity(
+    identityId: string,
+    options?: { currentPassword?: string },
+  ): Promise<{ success: boolean }> {
+    const response = await this.client.delete(`/auth/me/channel-identities/${identityId}`, {
+      body: options?.currentPassword ? { current_password: options.currentPassword } : undefined,
+    });
+    return response.data || response;
   }
 
   // ===== JSON Profile Data Methods =====

@@ -26,7 +26,10 @@ export type AuthErrorCode =
   | 'session_not_found'
   | 'auth_mint_timeout'
   | 'backend_unavailable'
-  | 'unauthorized';
+  | 'unauthorized'
+  | 'cache_epoch_stale'
+  | 'stale_jti_discarded'
+  | 'project_session_required';
 
 export class UnauthorizedError extends Error {
   public readonly status: number;
@@ -78,9 +81,20 @@ export class ConflictError extends Error {
 }
 
 export class RateLimitError extends Error {
-  constructor(message: string) {
+  public readonly status = 429;
+  public readonly apiCode?: string;
+  public readonly requestId?: string;
+  public readonly retryAfterSec?: number;
+
+  constructor(
+    message: string,
+    options?: { apiCode?: string; requestId?: string; retryAfterSec?: number },
+  ) {
     super(message);
     this.name = 'RateLimitError';
+    this.apiCode = options?.apiCode;
+    this.requestId = options?.requestId;
+    this.retryAfterSec = options?.retryAfterSec;
   }
 }
 
@@ -112,6 +126,28 @@ export class ServerError extends Error {
     this.apiCode = options?.apiCode;
     this.requestId = options?.requestId;
     this.retryAfterSec = options?.retryAfterSec;
+  }
+}
+
+/** Load-shed 503 with structured ``server_busy`` code — honor Retry-After. */
+export class ServerBusyError extends ServerError {
+  public readonly retryAfterMs?: number;
+
+  constructor(
+    message: string,
+    status?: number,
+    options?: {
+      apiCode?: string;
+      requestId?: string;
+      retryAfterSec?: number;
+      retryAfterMs?: number;
+    }
+  ) {
+    super(message, status, options);
+    this.name = 'ServerBusyError';
+    this.retryAfterMs =
+      options?.retryAfterMs ??
+      (options?.retryAfterSec != null ? options.retryAfterSec * 1000 : undefined);
   }
 }
 

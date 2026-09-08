@@ -179,8 +179,17 @@ export class CircuitBreaker {
    */
   private isExpectedError(error: Error): boolean {
     if (this.isAbortLikeError(error)) return true;
+    if (error.name === 'RateLimitError') return true;
     if (isAuthTransientRetryError(error)) return true;
     const apiCode = (error as { apiCode?: string }).apiCode;
+    if (apiCode === 'probe_rate_limited' || apiCode === 'rate_limit_exceeded') return true;
+    if (
+      apiCode === 'economy_crypto_disabled' ||
+      apiCode === 'ECONOMY_CRYPTO_DISABLED' ||
+      apiCode === 'server_busy'
+    ) {
+      return true;
+    }
     if (apiCode && isTypedDna503Code(apiCode)) return true;
     const message = (error.message || '').toLowerCase();
     const expectedPatterns = [
@@ -200,6 +209,13 @@ export class CircuitBreaker {
       'timeout',
       'entity not found',
       'dna_router_unavailable',
+      'crypto and agnt',
+      'economy_crypto',
+      'server_busy',
+      'server error',
+      'ecosystem admin access required',
+      'only ecosystem admin',
+      'admin or owner role required',
     ];
 
     return expectedPatterns.some((pattern) => message.includes(pattern));

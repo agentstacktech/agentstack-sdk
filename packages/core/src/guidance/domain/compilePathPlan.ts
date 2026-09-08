@@ -8,22 +8,16 @@ import type {
 } from '../types/playbookTypes';
 import { deriveStepStatuses } from './deriveStepStatuses';
 import { applyAggregateToPlan } from './pathProgressAggregate';
+import {
+  isPostExecuteQuestion,
+  postExecuteQuestionsAfter,
+  resolveNextFromQuestion,
+} from './postExecuteQuestions';
 import { resolveExecutionStepsLegacy } from './resolveExecutionSteps';
 
 export type CompassCompileContext = {
   hideOptionIds?: Set<string>;
 };
-
-function resolveNextFromQuestion(
-  node: Extract<PlaybookNode, { kind: 'question' }>,
-  answers: Record<string, unknown>,
-): string | null {
-  for (const opt of node.options) {
-    if (!opt.set) continue;
-    if (Object.entries(opt.set).every(([k, v]) => answers[k] === v)) return opt.next;
-  }
-  return null;
-}
 
 function walkAnsweredQuestions(playbook: Playbook, state: PlaybookStateV2): string[] {
   const ids: string[] = [];
@@ -33,6 +27,7 @@ function walkAnsweredQuestions(playbook: Playbook, state: PlaybookStateV2): stri
   for (let i = 0; i < guard && nodeId; i += 1) {
     const node = playbook.nodes[nodeId];
     if (!node || node.kind !== 'question') break;
+    if (isPostExecuteQuestion(node)) break;
     ids.push(nodeId);
     if (!state.completedNodeIds.includes(nodeId)) break;
     const next = resolveNextFromQuestion(node, state.answers);
@@ -104,7 +99,11 @@ export function compilePathPlan(
 ): PathPlanResult {
   const questionIds = walkAnsweredQuestions(playbook, state);
   const currentQ = playbook.nodes[state.currentNodeId];
-  if (currentQ?.kind === 'question' && !questionIds.includes(state.currentNodeId)) {
+  if (
+    currentQ?.kind === 'question' &&
+    !isPostExecuteQuestion(currentQ) &&
+    !questionIds.includes(state.currentNodeId)
+  ) {
     questionIds.push(state.currentNodeId);
   }
 
@@ -115,14 +114,25 @@ export function compilePathPlan(
 
   const execIds = resolveExecutionStepsLegacy(playbook, state);
   const execSteps: Omit<PathStepPlan, 'status'>[] = [];
+  const plannedIds = new Set<string>();
+
+  const appendExec = (node: PlaybookNode, phase: PathStepPlan['phase']) => {
+    if (plannedIds.has(node.id)) return;
+    plannedIds.add(node.id);
+    execSteps.push(nodeToPlan(node, phase));
+  };
+
   for (const id of execIds) {
     const node = playbook.nodes[id];
     if (!node) continue;
     if (node.kind === 'task' || node.kind === 'capability' || node.kind === 'verify') {
-      execSteps.push(nodeToPlan(node, node.kind === 'verify' ? 'verify' : 'execute'));
+      appendExec(node, node.kind === 'verify' ? 'verify' : 'execute');
+    } else if (node.kind === 'recipe') {
+      appendExec(node, 'execute');
     }
-    if (node.kind === 'recipe') {
-      execSteps.push(nodeToPlan(node, 'execute'));
+
+    for (const q of postExecuteQuestionsAfter(playbook, id)) {
+      appendExec(q, 'discover');
     }
   }
 

@@ -1,5 +1,5 @@
 /**
- * Economy-related capability hints (RBAC `/rbac/check`).
+ * Economy-related capability hints (RBAC `/rbac/check` + platform crypto policy).
  * Genetic tag: sdk.economy.gen1
  */
 

@@ -1,6 +1,7 @@
 import type { PathSessionIndex, Playbook, PlaybookId, PlaybookStateV2 } from '../types/playbookTypes';
 import type { IPathStore } from './IPathStore';
 import { isPlaybookStateV2, migrateV1ToV2, normalizePathState } from './migrateV1ToV2';
+import { normalizePathSessionIndex } from './normalizePathSessionIndex';
 
 const KEY_PREFIX = 'agentstack.compass.path.v2';
 const INDEX_SUFFIX = 'index';
@@ -50,7 +51,7 @@ export class LocalPathStore implements IPathStore {
     try {
       const raw = this.storage.getItem(this.indexKey(userId));
       if (!raw) return { activePlaybookId: null, sessions: [] };
-      return JSON.parse(raw) as PathSessionIndex;
+      return normalizePathSessionIndex(JSON.parse(raw) as unknown);
     } catch {
       return { activePlaybookId: null, sessions: [] };
     }

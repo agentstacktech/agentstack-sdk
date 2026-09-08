@@ -223,15 +223,14 @@ export class AgentDNA {
   }
 
   /**
-   * Update entity (add missing fields)
-   * 
-   * ✅ Philosophy: Use uuid instead of database ID!
-   * Philosophy v0.1.40: Circuit Breaker protection automatic!
-   * Philosophy v0.1.9: PUT = add missing fields (SAFE!)
-   * 
+   * Update entity — PUT replaces the entire `data` blob.
+   *
+   * This is not a merge. For one nested project.data leaf use
+   * {@link AgentDNA.patch} → `PATCH /projects/{id}/data`.
+   *
    * @example
-   * const updated = await sdk.dna.update('data_projects_user', 'uuid-here', {
-   *   data: { bio: 'Developer' }
+   * const updated = await sdk.dna.update('data_projects_8dna', 'uuid-here', {
+   *   data: { bio: 'Developer' }  // entire data document
    * });
    */
   async update<T = any>(
@@ -244,31 +243,45 @@ export class AgentDNA {
   }
 
   /**
-   * Patch entity (update/remove fields)
-   * 
-   * ✅ Philosophy: Use uuid instead of database ID!
-   * Philosophy v0.1.40: Circuit Breaker protection automatic!
-   * Philosophy v0.1.9: PATCH = surgical update/delete!
-   * 
+   * Patch one path under project.data (REST PATCH /projects/{id}/data).
+   *
+   * There is no `PATCH /dna/{table}/{uuid}` route. Do not pass a table name.
+   *
    * @example
-   * const patched = await sdk.dna.patch('data_projects_user', 'uuid-here', {
-   *   data: { bio: null }  // Remove bio field
-   * });
+   * await sdk.dna.patch(123, 'config.theme', 'dark');
+   * await sdk.dna.patch(123, 'config.theme', undefined, { writeMode: 'delete' });
    */
-  async patch<T = any>(
-    table: string,
-    uuid: string,
-    patches: Partial<Pick<DNAEntity<T>, 'data' | 'config'>>
-  ): Promise<DNAEntity<T>> {
-    const response = await this.client.patch(`/dna/${table}/${uuid}`, patches);
-    
-    // Philosophy v0.1.9: Handle 204 No Content
-    if (response.status === 204) {
-      // Refetch to get updated entity
-      return this.get(table, uuid);
+  async patch(
+    projectId: number,
+    path: string,
+    value?: unknown,
+    options?: { writeMode?: 'replace' | 'merge' | 'delete' | 'set' | 'put' | 'patch' }
+  ): Promise<{
+    success: boolean;
+    project_id: number;
+    path: string;
+    write?: { mode: string };
+  }> {
+    if (typeof projectId === 'string') {
+      throw new Error(
+        'AgentDNA.patch no longer calls PATCH /dna/{table}/{uuid} (that route does not exist). ' +
+          'Use sdk.dna.patch(projectId, path, value) → PATCH /projects/{id}/data, ' +
+          'or sdk.dna.update(table, uuid, { data }) for a full data replace (PUT).'
+      );
     }
-    
-    return response.data?.entity || response.data;
+    const writeMode =
+      options?.writeMode || (value === undefined ? 'delete' : 'replace');
+    const response = await this.client.patch(`/projects/${projectId}/data`, {
+      path,
+      value: writeMode === 'delete' ? null : value,
+      write_mode: writeMode,
+    });
+    return response.data as {
+      success: boolean;
+      project_id: number;
+      path: string;
+      write?: { mode: string };
+    };
   }
 
   /**

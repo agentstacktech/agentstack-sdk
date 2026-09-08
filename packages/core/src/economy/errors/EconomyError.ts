@@ -10,6 +10,7 @@ export type EconomyErrorCode =
   | 'SCHEMA_MISSING'
   | 'CAP_DENIED'
   | 'FUNDING_NOT_OFFERED'
+  | 'ECONOMY_CRYPTO_DISABLED'
   | 'UNKNOWN';
 
 export class EconomyError extends AgentStackError {
@@ -66,8 +67,16 @@ export function mapEconomyErrorFromHttp(status: number, body: unknown): EconomyE
   if (status === 403) {
     return new EconomyError('CAP_DENIED', detail || 'Forbidden', { status });
   }
-  if (status === 503 && /schema|unavailable/i.test(detail)) {
-    return new EconomyError('SCHEMA_MISSING', detail, { status });
+  if (status === 503) {
+    if (codeToken === 'economy_crypto_disabled') {
+      return new EconomyError('ECONOMY_CRYPTO_DISABLED', detail || codeToken, {
+        status,
+        body,
+      });
+    }
+    if (/schema|unavailable/i.test(detail)) {
+      return new EconomyError('SCHEMA_MISSING', detail, { status });
+    }
   }
   if (status === 400 || status === 422) {
     if (codeToken === 'quote_expired' || codeToken === 'quote_consumed') {

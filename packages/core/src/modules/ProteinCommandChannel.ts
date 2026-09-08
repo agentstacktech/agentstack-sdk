@@ -99,6 +99,33 @@ export class ProteinCommandChannel {
     return this.executeCommand<T>(body as ProteinCommandExecuteRequest);
   }
 
+  /**
+   * DNA GET with optional ``If-Epoch-Match`` (N8-04 RYW after DELTA flush).
+   * ``entityKey`` should be ``uuid:<uuid>`` when fencing dual protein entries.
+   */
+  async getEntity<T = unknown>(args: {
+    entityType?: string;
+    entityUuid: string;
+    projectId?: number;
+    ifEpochMatch?: number;
+  }): Promise<T> {
+    const headers = this.supplementalHeaders();
+    const epoch = args.ifEpochMatch;
+    if (epoch != null && Number.isFinite(epoch) && epoch > 0) {
+      headers['If-Epoch-Match'] = String(Math.floor(epoch));
+    }
+    const et = encodeURIComponent(args.entityType || 'entity');
+    const id = encodeURIComponent(args.entityUuid);
+    const qs =
+      args.projectId != null && Number(args.projectId) > 0
+        ? `?project_id=${encodeURIComponent(String(args.projectId))}`
+        : '';
+    const res = await this.http.get<T>(`/commands/dna/${et}/get/${id}${qs}`, {
+      headers,
+    });
+    return res.data;
+  }
+
   async executeDNAOperation<T = unknown>(
     entityType: string,
     operation: string,
