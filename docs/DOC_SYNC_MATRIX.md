@@ -3,7 +3,7 @@
 **Genetic tag:** `repo.platform.sdk.docs_i18n.gen1`
 **RU:** [DOC_SYNC_MATRIX_ru.md](./DOC_SYNC_MATRIX_ru.md) (summary)
 
-Generated: 2026-09-08T20:42:18.776Z · Do not edit by hand — run `npm run generate:docs-i18n`
+Generated: 2026-09-08T20:52:57.028Z · Do not edit by hand — run `npm run generate:docs-i18n`
 
 | EN | RU | Diátaxis | Lines EN | Lines RU | Fences EN/RU | H2 EN/RU | Ratio | Status |
 |----|-----|----------|----------|----------|--------------|----------|-------|--------|
@@ -17,7 +17,7 @@ Generated: 2026-09-08T20:42:18.776Z · Do not edit by hand — run `npm run gene
 | [docs/INTEGRATOR_SCOPE.md](docs/INTEGRATOR_SCOPE.md) | [docs/INTEGRATOR_SCOPE_ru.md](docs/INTEGRATOR_SCOPE_ru.md) | reference | 95 | 94 | 2/2 | 6/6 | 1.01 | **balanced** |
 | [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md) | [docs/PROJECT_CONTEXT_ru.md](docs/PROJECT_CONTEXT_ru.md) | how-to | 93 | 84 | 4/4 | 6/6 | 1.11 | **balanced** |
 | [docs/SUBMODULE_CONSUMER.md](docs/SUBMODULE_CONSUMER.md) | [docs/SUBMODULE_CONSUMER_ru.md](docs/SUBMODULE_CONSUMER_ru.md) | how-to | 34 | 34 | 2/2 | 3/3 | 1 | **balanced** |
-| [AGENTS.md](AGENTS.md) | [AGENTS_ru.md](AGENTS_ru.md) | — | 138 | 85 | 6/2 | 6/6 | 1.62 | **ru-thin** |
+| [AGENTS.md](AGENTS.md) | [AGENTS_ru.md](AGENTS_ru.md) | — | 138 | 110 | 6/4 | 6/6 | 1.25 | **balanced** |
 | [docs/AI_INTEGRATOR_GUIDE.md](docs/AI_INTEGRATOR_GUIDE.md) | [docs/AI_INTEGRATOR_GUIDE_ru.md](docs/AI_INTEGRATOR_GUIDE_ru.md) | — | 104 | 105 | 8/8 | 10/10 | 0.99 | **balanced** |
 | [docs/AI_APPLICATION_FACTORY.md](docs/AI_APPLICATION_FACTORY.md) | [docs/AI_APPLICATION_FACTORY_ru.md](docs/AI_APPLICATION_FACTORY_ru.md) | how-to | 105 | 103 | 12/12 | 6/6 | 1.02 | **balanced** |
 | [docs/AI_ERROR_ACTION_MATRIX.md](docs/AI_ERROR_ACTION_MATRIX.md) | [docs/AI_ERROR_ACTION_MATRIX_ru.md](docs/AI_ERROR_ACTION_MATRIX_ru.md) | reference | 17 | 17 | 0/0 | 0/0 | 1 | **balanced** |

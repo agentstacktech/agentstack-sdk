@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-08T20:42:18.776Z",
+  "generatedAt": "2026-09-08T20:52:57.028Z",
   "entries": [
     {
       "path": "README.en.md",
@@ -416,7 +416,7 @@
         "links"
       ],
       "codeFences": 6,
-      "syncStatus": "ru-thin",
+      "syncStatus": "balanced",
       "diataxis": null
     },
     {
@@ -424,18 +424,18 @@
       "lang": "ru",
       "mirror": "AGENTS.md",
       "pairRole": "paired",
-      "lineCount": 85,
+      "lineCount": 110,
       "h2Count": 6,
       "h2Slugs": [
         "bootstrap-за-60-секунд",
         "discover-validate-execute",
         "дерево-решений",
-        "анти-паттерны",
         "genetic-routing",
+        "анти-паттерны",
         "ссылки"
       ],
-      "codeFences": 2,
-      "syncStatus": "ru-thin",
+      "codeFences": 4,
+      "syncStatus": "balanced",
       "diataxis": null
     },
     {

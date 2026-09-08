@@ -1,6 +1,6 @@
 # SDK i18n doc registry (auto-generated)
 
-Generated: 2026-09-08T20:42:18.776Z · `npm run generate:docs-i18n`
+Generated: 2026-09-08T20:52:57.028Z · `npm run generate:docs-i18n`
 
 | EN | RU | Role | Lines EN/RU | Ratio | Status |
 |----|-----|------|-------------|-------|--------|
@@ -14,7 +14,7 @@ Generated: 2026-09-08T20:42:18.776Z · `npm run generate:docs-i18n`
 | `docs/INTEGRATOR_SCOPE.md` | `docs/INTEGRATOR_SCOPE_ru.md` | paired | 95/94 | 1.01 | balanced |
 | `docs/PROJECT_CONTEXT.md` | `docs/PROJECT_CONTEXT_ru.md` | paired | 93/84 | 1.11 | balanced |
 | `docs/SUBMODULE_CONSUMER.md` | `docs/SUBMODULE_CONSUMER_ru.md` | paired | 34/34 | 1 | balanced |
-| `AGENTS.md` | `AGENTS_ru.md` | paired | 138/85 | 1.62 | ru-thin |
+| `AGENTS.md` | `AGENTS_ru.md` | paired | 138/110 | 1.25 | balanced |
 | `docs/AI_INTEGRATOR_GUIDE.md` | `docs/AI_INTEGRATOR_GUIDE_ru.md` | paired | 104/105 | 0.99 | balanced |
 | `docs/AI_APPLICATION_FACTORY.md` | `docs/AI_APPLICATION_FACTORY_ru.md` | paired | 105/103 | 1.02 | balanced |
 | `docs/AI_ERROR_ACTION_MATRIX.md` | `docs/AI_ERROR_ACTION_MATRIX_ru.md` | paired | 17/17 | 1 | balanced |
