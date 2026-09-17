@@ -66,8 +66,11 @@ export type {
 } from './client/resolveRequestProjectContext';
 
 export {
+  isAdminScopedApiPath,
   isEcosystemScopedApiPath,
   isIdentityScopedApiPath,
+  isIdentityBearerSessionPath,
+  isMcpOAuthAuthorizePath,
   isUserScopedSessionPath,
   classifyRouteScope,
 } from './client/routeScopeClassifier';
@@ -77,7 +80,9 @@ export {
   assertModuleEnabled,
   assertIntegratorModule,
   assertProjectIdConfigured,
+  createAgentSession,
 } from './ai-preflight';
+export type { AgentSession } from './ai-preflight';
 
 // Unified Application Manifest (UAM v1) — parity with Python `ai_builder.manifest.schema`
 export {
@@ -136,6 +141,12 @@ export {
   ProjectFinanceClient,
   SwapSession,
 } from './finance';
+export {
+  AgentChecklist,
+  AgentTime,
+  AgentGoals,
+  AgentCalendar,
+} from './workspace';
 export { AgentBusinessFacade, BusinessCommandClient } from './business';
 export type {
   AttachBusinessChildBody,
@@ -211,6 +222,7 @@ export type {
   GrantOsApplicationPatch,
   GrantOsAnchorFields,
   GrantOsAnchorResponse,
+  GrantOsBlockerHint,
   GrantOsCatalogPatch,
   GrantOsComposeData,
   GrantOsComposeItem,
@@ -223,6 +235,8 @@ export type {
   GrantOsScoreBreakdown,
   GrantMilestone,
   EarningPlaybook,
+  GrantOsEarningPlaybookPatch,
+  GrantOsEarningSnapshot,
 } from './admin/grants';
 export type {
   PublicGrantsSnapshot,
@@ -407,8 +421,16 @@ export {
   GenerationsClient,
   createSandboxClient,
   createGenerationsClient,
+  applyPromoteGatesPolicy,
+  resolveRequireGatesPassed,
 } from './sandbox';
-export type { PromoteStrategy, GenerationSettingsPatch, PreviewEnvScope } from './sandbox';
+export type {
+  PromoteStrategy,
+  GenerationSettingsPatch,
+  PreviewEnvScope,
+  GenerationSettingsLike,
+  PromoteBodyLike,
+} from './sandbox';
 export {
   integrationQueries,
   integrationListRecipes,
@@ -819,6 +841,7 @@ export {
   supportAssignTicket,
   supportRequestHuman,
   supportSetMyThreadReaction,
+  supportGetAiBindingHealth,
 } from './supportRest';
 export type {
   SupportEligibilityRow,
@@ -1009,6 +1032,8 @@ export {
   AUTH_MINT_BUSY_CODES,
   isApiWarmingUpError,
   isAuthTransientRetryError,
+  isBackendReconnectingError,
+  dispatchBackendReconnectingEvent,
   parseApiWarmingFromBody,
   warmingRetryDelayMs,
 } from './client/apiWarming';
