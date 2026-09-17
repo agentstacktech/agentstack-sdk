@@ -253,3 +253,14 @@ export async function supportPutConfig(
   );
   return r.data;
 }
+
+/** ``GET /api/support/ai-binding/health`` — staff AI binding diagnostics. */
+export async function supportGetAiBindingHealth(
+  client: HttpLike,
+  params: { project_id: number }
+) {
+  const r = await client.get<Record<string, unknown>>(`${BASE}/ai-binding/health`, {
+    params: { project_id: params.project_id },
+  });
+  return r.data;
+}

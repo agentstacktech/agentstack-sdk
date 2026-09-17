@@ -14,6 +14,7 @@
     "check:finance-parity": "npm run check:finance-parity -w @agentstack/sdk",
     "check:commerce-marketplace-parity": "npm run check:commerce-marketplace-parity -w @agentstack/sdk",
     "check:commerce-shop-parity": "npm run check:commerce-shop-parity -w @agentstack/sdk",
+    "check:sdk-parity": "npm run build -w @agentstack/sdk && npm run check:economy-parity && npm run check:finance-parity && npm run check:commerce-marketplace-parity && npm run check:commerce-shop-parity && npm run check:commerce-topup-parity -w @agentstack/sdk && npm run check:agents-fleet-parity -w @agentstack/sdk && npm run check:commerce-assets-parity -w @agentstack/sdk",
     "lint": "npm run lint -w @agentstack/sdk",
     "clean": "npm run clean -w @agentstack/sdk",
     "check:docs-urls": "npm run check:docs-urls -w @agentstack/sdk",

@@ -2,7 +2,7 @@ import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
 import typescript from '@rollup/plugin-typescript';
-import { terser } from 'rollup-plugin-terser';
+import terser from '@rollup/plugin-terser';
 import dts from 'rollup-plugin-dts';
 import { readFileSync } from 'fs';
 
@@ -26,6 +26,33 @@ const commerceSubpackages = [
   'guidance',
   'surfaces',
 ];
+
+function simpleSubpackageRollup(input, distDir, externals = ['eventemitter3', 'zod']) {
+  const plugins = [
+    resolve({ browser: true, preferBuiltins: false }),
+    json(),
+    commonjs(),
+    typescript({ tsconfig: './tsconfig.json', declaration: false, declarationMap: false }),
+    terser(),
+  ];
+  return [
+    {
+      input,
+      output: [
+        { file: `${distDir}/index.js`, format: 'cjs', sourcemap: true, inlineDynamicImports: true },
+        { file: `${distDir}/index.esm.js`, format: 'esm', sourcemap: true, inlineDynamicImports: true },
+      ],
+      plugins,
+      external: externals,
+    },
+    {
+      input,
+      output: [{ file: `${distDir}/index.d.ts`, format: 'esm' }],
+      plugins: [dts()],
+      external: [/\.css$/],
+    },
+  ];
+}
 
 function commerceSubpackageRollup(name) {
   const input = `src/commerce/${name}/index.ts`;
@@ -348,6 +375,26 @@ export default [
     ],
     external: ['zod'],
   },
+  {
+    input: 'src/messaging/index.ts',
+    output: [
+      { file: 'dist/messaging/index.js', format: 'cjs', sourcemap: true, inlineDynamicImports: true },
+      { file: 'dist/messaging/index.esm.js', format: 'esm', sourcemap: true, inlineDynamicImports: true },
+    ],
+    plugins: [
+      resolve({ browser: true, preferBuiltins: false }),
+      commonjs(),
+      typescript({ tsconfig: './tsconfig.json', declaration: false, declarationMap: false }),
+      terser(),
+    ],
+    external: [],
+  },
+  ...simpleSubpackageRollup('src/mcp/index.ts', 'dist/mcp', ['eventemitter3', 'zod']),
+  ...simpleSubpackageRollup('src/workspace/index.ts', 'dist/workspace', ['eventemitter3', 'zod']),
+  ...simpleSubpackageRollup('src/diagnostics/index.ts', 'dist/diagnostics', ['eventemitter3', 'zod']),
+  ...simpleSubpackageRollup('src/public/services/index.ts', 'dist/services', ['eventemitter3', 'zod']),
+  ...simpleSubpackageRollup('src/admin/hubCommerce.ts', 'dist/admin/hubCommerce', ['eventemitter3', 'zod']),
+  ...simpleSubpackageRollup('src/admin/hubNeurocache.ts', 'dist/admin/hubNeurocache', ['eventemitter3', 'zod']),
   // Type definitions
   {
     input: 'src/index.ts',
@@ -364,6 +411,12 @@ export default [
   {
     input: 'src/manifest/index.ts',
     output: [{ file: 'dist/manifest/index.d.ts', format: 'esm' }],
+    plugins: [dts()],
+    external: [/\.css$/],
+  },
+  {
+    input: 'src/messaging/index.ts',
+    output: [{ file: 'dist/messaging/index.d.ts', format: 'esm' }],
     plugins: [dts()],
     external: [/\.css$/],
   },

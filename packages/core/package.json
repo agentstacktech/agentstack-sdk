@@ -14,16 +14,22 @@
       "require": "./dist/index.js"
     },
     "./diagnostics": {
-      "types": "./src/diagnostics/index.ts",
-      "import": "./src/diagnostics/index.ts",
-      "require": "./src/diagnostics/index.ts",
-      "default": "./src/diagnostics/index.ts"
+      "types": "./dist/diagnostics/index.d.ts",
+      "import": "./dist/diagnostics/index.esm.js",
+      "require": "./dist/diagnostics/index.js",
+      "default": "./dist/diagnostics/index.esm.js"
     },
     "./mcp": {
-      "types": "./src/mcp/index.ts",
-      "import": "./src/mcp/index.ts",
-      "require": "./src/mcp/index.ts",
-      "default": "./src/mcp/index.ts"
+      "types": "./dist/mcp/index.d.ts",
+      "import": "./dist/mcp/index.esm.js",
+      "require": "./dist/mcp/index.js",
+      "default": "./dist/mcp/index.esm.js"
+    },
+    "./messaging": {
+      "types": "./dist/messaging/index.d.ts",
+      "import": "./dist/messaging/index.esm.js",
+      "require": "./dist/messaging/index.js",
+      "default": "./dist/messaging/index.esm.js"
     },
     "./i18n": {
       "types": "./dist/i18n/index.d.ts",
@@ -46,15 +52,21 @@
       "require": "./dist/public/grants/index.js"
     },
     "./services": {
-      "types": "./src/public/services/index.ts",
-      "import": "./src/public/services/index.ts",
-      "require": "./src/public/services/index.ts",
-      "default": "./src/public/services/index.ts"
+      "types": "./dist/services/index.d.ts",
+      "import": "./dist/services/index.esm.js",
+      "require": "./dist/services/index.js",
+      "default": "./dist/services/index.esm.js"
     },
     "./finance": {
       "types": "./dist/finance/index.d.ts",
       "import": "./dist/finance/index.js",
       "require": "./dist/finance/index.js"
+    },
+    "./workspace": {
+      "types": "./dist/workspace/index.d.ts",
+      "import": "./dist/workspace/index.esm.js",
+      "require": "./dist/workspace/index.js",
+      "default": "./dist/workspace/index.esm.js"
     },
     "./fabric": {
       "types": "./dist/fabric/index.d.ts",
@@ -235,6 +247,18 @@
       "import": "./dist/manifest/index.esm.js",
       "require": "./dist/manifest/index.js",
       "default": "./dist/manifest/index.esm.js"
+    },
+    "./admin/hubCommerce": {
+      "types": "./dist/admin/hubCommerce/index.d.ts",
+      "import": "./dist/admin/hubCommerce/index.esm.js",
+      "require": "./dist/admin/hubCommerce/index.js",
+      "default": "./dist/admin/hubCommerce/index.esm.js"
+    },
+    "./admin/hubNeurocache": {
+      "types": "./dist/admin/hubNeurocache/index.d.ts",
+      "import": "./dist/admin/hubNeurocache/index.esm.js",
+      "require": "./dist/admin/hubNeurocache/index.js",
+      "default": "./dist/admin/hubNeurocache/index.esm.js"
     }
   },
   "files": [
@@ -323,7 +347,7 @@
     "rollup": "^4.30.0",
     "rollup-plugin-copy": "^3.5.0",
     "rollup-plugin-dts": "^6.1.1",
-    "rollup-plugin-terser": "^7.0.2",
+    "@rollup/plugin-terser": "^0.4.4",
     "ts-jest": "^29.2.5",
     "typescript": "^5.7.3"
   },

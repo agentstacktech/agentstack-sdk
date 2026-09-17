@@ -17,7 +17,21 @@ const required = [
   './pwa',
   './mobile',
   './logic/blueprints',
+  './mcp',
+  './workspace',
+  './diagnostics',
+  './messaging',
+  './services',
 ];
+
+const srcExports = Object.entries(pkg.exports ?? {}).filter(([, v]) => {
+  const target = typeof v === 'string' ? v : v.import || v.require || v.default || '';
+  return String(target).includes('/src/');
+});
+if (srcExports.length) {
+  console.error('check-package-exports: exports must point at dist/, not src/:', srcExports.map(([k]) => k).join(', '));
+  process.exit(1);
+}
 
 const missing = required.filter((k) => !exportsKeys.has(k));
 if (missing.length) {

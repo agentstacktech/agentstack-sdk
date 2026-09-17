@@ -24,14 +24,17 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Type check
+        run: npm run type-check -w @agentstack/sdk
+
       - name: Docs and export guards
         run: |
           npm run check:docs-i18n:all
           npm run check:package-exports
           npm run test:sdk-submodule
 
-      - name: Economy + finance SDK parity
-        run: npm run check:economy-parity && npm run check:finance-parity
+      - name: SDK parity bundle
+        run: npm run check:sdk-parity
 
   test:
     runs-on: ubuntu-latest
