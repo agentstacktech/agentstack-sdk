@@ -15,6 +15,22 @@ export function applyPresetRules(presetId: string, draft: AssetDraft): AssetDraf
       },
     };
   }
+  if (presetId === 'project_orchestrator_pack_v2') {
+    const packName =
+      (draft.components.metadata?.custom_fields as Record<string, unknown>)?.pack_name;
+    return {
+      ...draft,
+      name: packName ? String(packName) : draft.name,
+      components: {
+        ...draft.components,
+        properties: {
+          ...draft.components.properties,
+          category: 'project_orchestrator',
+          tradeable: true,
+        },
+      },
+    };
+  }
   if (presetId === 'marketplace_product') {
     return {
       ...draft,

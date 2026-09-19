@@ -7,7 +7,12 @@
  * — same client policy (retry, do not trip CB).
  */
 
-import { isTypedDna503Code } from '../utils/classifyAuthFailure';
+import {
+  classifyAuthFailure,
+  extractAuthErrorFields,
+  isTransientSessionMissReason,
+  isTypedDna503Code,
+} from '../utils/classifyAuthFailure';
 
 export const API_WARMING_UP_CODE = 'api_warming_up' as const;
 /** Nginx 502/504 mapped body — distinct from API cold status=starting (F1b-06). */
@@ -105,6 +110,34 @@ export function isAuthTransientRetryError(error: unknown): boolean {
   if (e.apiCode && isTypedDna503Code(e.apiCode)) return true;
   if (e.status === 503) return true;
   return false;
+}
+
+/** Backend recycle / edge warm-up — keep session, show reconnect UX (G-A24). */
+export function isBackendReconnectingError(error: unknown): boolean {
+  if (isAuthTransientRetryError(error)) return true;
+  const { status, apiCode, sessionMissReason, name, message } =
+    extractAuthErrorFields(error);
+  if (status === 502 || status === 504) return true;
+  if (apiCode === 'session_resolve_busy') return true;
+  if (isTransientSessionMissReason(sessionMissReason) || isTransientSessionMissReason(apiCode)) {
+    return true;
+  }
+  if (name === 'TypeError' && /fetch/i.test(message)) return true;
+  const { kind } = classifyAuthFailure(error);
+  return kind === 'offline' || kind === 'timeout' || kind === 'typed_503';
+}
+
+export function dispatchBackendReconnectingEvent(code = UPSTREAM_UNAVAILABLE_CODE): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.dispatchEvent(
+      new CustomEvent('agentstack.api.warming', {
+        detail: { code, message: 'Server is reconnecting — retry in a moment…' },
+      }),
+    );
+  } catch {
+    /* ignore */
+  }
 }
 
 /** Delay before next attempt; prefer Retry-After / retry_after_seconds (+ jitter F3-06). */

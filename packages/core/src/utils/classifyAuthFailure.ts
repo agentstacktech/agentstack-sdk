@@ -29,12 +29,19 @@ const TYPED_503_SET = new Set<string>(TYPED_DNA_503_CODES);
 export const BATCH_TRANSPORT_SHED_CODES = new Set([
   'batch_sub_timeout',
   'dna_overloaded',
+  'server_busy',
+  'admission_shed',
 ]);
 
 export function isTypedDna503Code(
   code: string | undefined | null,
 ): code is TypedDna503Code {
   return !!code && TYPED_503_SET.has(code);
+}
+
+/** Load-shed / admission 503 codes — quiet console when client will retry. */
+export function isTransportShed503Code(code: string | undefined | null): boolean {
+  return !!code && (isTypedDna503Code(code) || BATCH_TRANSPORT_SHED_CODES.has(code));
 }
 
 type ErrorShape = {
@@ -53,14 +60,16 @@ type ErrorShape = {
   };
 };
 
-function readDetailCode(detail: unknown): string | undefined {
+function readDetailField(detail: unknown, key: string): string | undefined {
   if (detail == null || typeof detail !== 'object' || Array.isArray(detail)) {
     return undefined;
   }
-  const o = detail as Record<string, unknown>;
-  if (typeof o.code === 'string') return o.code;
-  if (typeof o.error === 'string') return o.error;
-  return undefined;
+  const raw = (detail as Record<string, unknown>)[key];
+  return typeof raw === 'string' ? raw : undefined;
+}
+
+function readDetailCode(detail: unknown): string | undefined {
+  return readDetailField(detail, 'code') ?? readDetailField(detail, 'error');
 }
 
 /** Pull api/status fields from SDK errors, fetch failures, or axios-like shapes. */
@@ -69,19 +78,26 @@ export function extractAuthErrorFields(err: unknown): {
   name?: string;
   message: string;
   apiCode?: string;
+  sessionMissReason?: string;
 } {
   if (err == null) return { message: '' };
   if (typeof err === 'string') return { message: err };
 
-  const e = err as ErrorShape;
+  const e = err as ErrorShape & { sessionMissReason?: string };
   const data = e.response?.data;
-  const detailCode = readDetailCode(data?.detail);
+  const detail = data?.detail;
+  const detailCode = readDetailCode(detail);
   const apiCode =
     (typeof e.apiCode === 'string' && e.apiCode) ||
     (typeof e.code === 'string' && e.code) ||
     (typeof data?.code === 'string' && data.code) ||
     (typeof data?.error === 'string' && data.error) ||
     detailCode ||
+    undefined;
+
+  const sessionMissReason =
+    (typeof e.sessionMissReason === 'string' && e.sessionMissReason) ||
+    readDetailField(detail, 'reason') ||
     undefined;
 
   const status =
@@ -97,7 +113,23 @@ export function extractAuthErrorFields(err: unknown): {
     (err instanceof Error ? err.message : '') ||
     '';
 
-  return { status, name, message, apiCode };
+  return { status, name, message, apiCode, sessionMissReason };
+}
+
+/** Backoff ladder for post-restart bootstrap / refreshUser (G-A24). */
+export function sessionBootstrapRetryDelayMs(round: number): number {
+  const ladder = [0, 400, 800, 1_500, 2_500];
+  return ladder[Math.min(Math.max(0, round), ladder.length - 1)] ?? 2_500;
+}
+
+/** True when bootstrap should retry without clearing local auth. */
+export function isTransientSessionBootstrapError(err: unknown): boolean {
+  const { status, apiCode, sessionMissReason } = extractAuthErrorFields(err);
+  if (status === 503 && apiCode === 'session_resolve_busy') return true;
+  if (apiCode === 'session_not_found' && isTransientSessionMissReason(sessionMissReason)) {
+    return true;
+  }
+  return isTransientSessionMissReason(apiCode);
 }
 
 const SESSION_DEATH_FRAGMENTS = [
@@ -105,6 +137,36 @@ const SESSION_DEATH_FRAGMENTS = [
   'terminated',
   'session_expired',
 ] as const;
+
+/** Post-restart / overload — retry before vault purge (G-A24, G-A96). */
+const TRANSIENT_SESSION_MISS_REASONS = new Set([
+  'absent',
+  'dna_timeout',
+  'hist_busy',
+  'server_busy',
+  'session_resolve_busy',
+  'cache_epoch_stale',
+]);
+
+/** True when a session miss is likely transient (deploy recycle, L1/DNA race). */
+export function isTransientSessionMissReason(reason?: string | null): boolean {
+  const r = String(reason || '').toLowerCase();
+  if (!r) return false;
+  if (TRANSIENT_SESSION_MISS_REASONS.has(r)) return true;
+  if (r.startsWith('absent')) return true;
+  if (r.includes('dna_timeout')) return true;
+  return false;
+}
+
+/** Client vault purge policy — shared by SDK HTTP client and Session OS bridge. */
+export function shouldPurgeClientSessionOnMiss(opts: {
+  reason?: string;
+  inPostLoginGrace?: boolean;
+}): boolean {
+  if (opts.inPostLoginGrace) return false;
+  if (isTransientSessionMissReason(opts.reason)) return false;
+  return true;
+}
 
 const MINT_BUSY_FRAGMENTS = [
   'auth_mint_in_progress',
@@ -125,6 +187,10 @@ export function isNonRetryableAuthOrShed(err: unknown): boolean {
   }
 
   if (SESSION_DEATH_FRAGMENTS.some((frag) => code.includes(frag))) {
+    const { sessionMissReason } = extractAuthErrorFields(err);
+    if (isTransientSessionMissReason(sessionMissReason)) {
+      return false;
+    }
     return true;
   }
 
@@ -140,7 +206,16 @@ export function isNonRetryableAuthOrShed(err: unknown): boolean {
     return true;
   }
 
+  // Permission denied — retrying cannot succeed without role change.
+  if (status === 403) {
+    return true;
+  }
+
   if (MINT_BUSY_FRAGMENTS.some((frag) => code.includes(frag))) {
+    return true;
+  }
+
+  if (status === 503 && isTransportShed503Code(apiCode)) {
     return true;
   }
 

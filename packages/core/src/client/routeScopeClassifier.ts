@@ -30,6 +30,12 @@ function normalizeApiPath(urlOrPath: string): string {
   return raw.split('?')[0] || '';
 }
 
+/** Platform-operator admin BFF (`/api/admin/*`) — may need vault[1] bearer on workspace routes. */
+export function isAdminScopedApiPath(urlOrPath: string): boolean {
+  const path = normalizeApiPath(urlOrPath);
+  return path.startsWith('/api/admin/');
+}
+
 /** True when the request targets personal/ecosystem treasury (not hosted storefront). */
 export function isEcosystemScopedApiPath(urlOrPath: string): boolean {
   const path = normalizeApiPath(urlOrPath);
@@ -50,6 +56,20 @@ export function isUserScopedSessionPath(urlOrPath: string): boolean {
   const path = normalizeApiPath(urlOrPath);
   const rest = path.startsWith('/api/') ? path.slice(4) : path;
   return rest === '/projects' || rest === '/projects/';
+}
+
+/** MCP OAuth authorize resume — binds code to user_id, not workspace project key (G-A174). */
+export function isMcpOAuthAuthorizePath(urlOrPath: string): boolean {
+  const path = normalizeApiPath(urlOrPath);
+  return (
+    path.endsWith('/mcp/.well-known/oauth-authorize') ||
+    path.endsWith('/api/oauth2/authorize')
+  );
+}
+
+/** Paths that must send the freshest identity JWT (PAT CRUD, project list, MCP Connect resume). */
+export function isIdentityBearerSessionPath(urlOrPath: string): boolean {
+  return isUserScopedSessionPath(urlOrPath) || isMcpOAuthAuthorizePath(urlOrPath);
 }
 
 export type RouteScopeKind = 'ecosystem' | 'hosted' | 'workspace';

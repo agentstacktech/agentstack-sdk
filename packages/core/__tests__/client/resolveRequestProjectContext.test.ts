@@ -2,6 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 
 import {
   classifyRouteScope,
+  isAdminScopedApiPath,
   isEcosystemScopedApiPath,
   isIdentityScopedApiPath,
   isUserScopedSessionPath,
@@ -9,6 +10,12 @@ import {
 import { resolveRequestProjectContext } from '../../src/client/resolveRequestProjectContext';
 
 describe('routeScopeClassifier', () => {
+  it('marks admin BFF paths as admin-scoped', () => {
+    expect(isAdminScopedApiPath('/api/admin/data/snapshot')).toBe(true);
+    expect(isAdminScopedApiPath('/api/admin/hub-snapshot')).toBe(true);
+    expect(isEcosystemScopedApiPath('/api/admin/data/snapshot')).toBe(false);
+  });
+
   it('marks profile wallets as ecosystem', () => {
     expect(isEcosystemScopedApiPath('/api/profile/wallets')).toBe(true);
     expect(classifyRouteScope('/api/profile/wallets', '/user/finance')).toBe('ecosystem');

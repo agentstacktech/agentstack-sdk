@@ -575,7 +575,7 @@ await sdk.notifications.markAsRead(notification.id);
 // Создание кошелька
 const wallet = await sdk.wallets.createWallet({
   project_id: 1,
-  name: 'Основной кошелек',
+  name: 'Main Wallet',
   type: 'main',
   currency: 'USD',
   initial_balance: 10000,

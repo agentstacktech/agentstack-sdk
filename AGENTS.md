@@ -72,6 +72,14 @@ sdk.updateProjectId(42);
 **Local Core:** `AGENTSTACK_API_BASE=http://localhost:8000/api`  
 **Vite apps:** `VITE_API_BASE_URL=https://agentstack.tech/api`
 
+### Hosted workspace SaaS (`/s/{pid}/{bucket}/`)
+
+Hosted buckets use **workspace PID** in session + **`POST /mcp`** (not `/api/mcp/execute`). Read integrator **before** editing `hosted-vertical/` or `hosted-sdk-cdn/`:
+
+- [docs/sdk/HOSTED_WORKSPACE_INTEGRATOR.md](../docs/sdk/HOSTED_WORKSPACE_INTEGRATOR.md)
+- `resolveMcpUrl(apiBase)` → MCP origin; REST needs **`X-Project-ID`**
+- CI: `npm run audit:hosted-workspace-wire`
+
 ---
 
 ## Discover → validate → execute
@@ -90,6 +98,7 @@ Full recipes: [docs/AI_APPLICATION_FACTORY.md](docs/AI_APPLICATION_FACTORY.md)
 
 ## Decision tree
 
+- **Agent script bootstrap** → `createAgentSession(config)` → `{ sdk, catalog, matrix }` then auth + first call
 - **CRUD / projects / users** → `sdk.platform.api` or `sdk.platform.dna`
 - **DNA command bus** → `sdk.platform.protocol.executeCommand` (not raw `/commands` fetch; prefer protocol over legacy `sdk.protein.*` for new code — [docs/PROTEIN_SYSTEM_GUIDE.md](docs/PROTEIN_SYSTEM_GUIDE.md))
 - **Rules engine** → `sdk.platform.command` or `protocol.executeRulesCommand`

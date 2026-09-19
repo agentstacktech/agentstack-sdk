@@ -4,6 +4,13 @@
  */
 
 import type { HTTPClient } from '../client/http-client';
+import { applyPromoteGatesPolicy, type GenerationSettingsLike } from './promotePolicy';
+
+export {
+  applyPromoteGatesPolicy,
+  resolveRequireGatesPassed,
+} from './promotePolicy';
+export type { GenerationSettingsLike, PromoteBodyLike } from './promotePolicy';
 
 export type PromoteStrategy = 'immediate' | 'canary' | 'blue_green';
 
@@ -89,6 +96,8 @@ export function toSandboxLimitError(error: unknown): SandboxLimitError | null {
 
 export type GenerationSettingsPatch = {
   auto_generation_mode?: boolean;
+  auto_checkpoint_before_promote?: boolean;
+  require_gates_passed_on_promote?: boolean;
   auto_generation_categories?: string[];
   auto_generation_soak_minutes?: number;
   auto_generation_require_approval?: boolean;
@@ -186,11 +195,26 @@ export class GenerationsClient {
       rollout_steps?: Array<{ weight: number; pause_minutes: number; auto_advance: boolean }>;
       require_gates_passed?: boolean;
     },
+    options?: {
+      applyGatesPolicy?: boolean;
+      settings?: GenerationSettingsLike;
+    },
   ) {
+    let params: Record<string, unknown> = { project_id: projectId, ...body };
+    if (options?.applyGatesPolicy !== false) {
+      const settings =
+        options?.settings ??
+        ((await this.getSettings(projectId)) as { settings?: GenerationSettingsLike })?.settings;
+      params = applyPromoteGatesPolicy(
+        params as { require_gates_passed?: boolean },
+        settings ?? null,
+      ) as Record<string, unknown>;
+      params.project_id = projectId;
+    }
     const result = await mcp.execute([
       {
         action: 'generation.promote',
-        params: { project_id: projectId, ...body },
+        params,
       },
     ]);
     return result;
@@ -321,9 +345,22 @@ export class SandboxClient {
       rollout_steps?: Array<{ weight: number; pause_minutes: number; auto_advance: boolean }>;
       require_gates_passed?: boolean;
     },
+    options?: {
+      /** When true (default), merge require_gates_passed from project settings if omitted. */
+      applyGatesPolicy?: boolean;
+      settings?: GenerationSettingsLike;
+    },
   ) {
+    let payload = body;
+    if (options?.applyGatesPolicy !== false) {
+      const settings =
+        options?.settings ??
+        ((await this.generations.getSettings(projectId)) as { settings?: GenerationSettingsLike })
+          ?.settings;
+      payload = applyPromoteGatesPolicy(body, settings ?? null);
+    }
     try {
-      const res = await this.http.post(`/sandbox/promote?project_id=${projectId}`, body);
+      const res = await this.http.post(`/sandbox/promote?project_id=${projectId}`, payload);
       return res.data;
     } catch (err) {
       const mapped = toSandboxLimitError(err);

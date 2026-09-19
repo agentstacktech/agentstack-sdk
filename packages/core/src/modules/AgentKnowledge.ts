@@ -68,12 +68,20 @@ export type KnowledgeFaqPhenotype = {
   retrieve_expand?: string;
 };
 
+export type KnowledgePinnedShapeBinding = {
+  phenotype: string;
+  glossary_stem: string;
+  extract_mode?: 'section' | 'quote' | 'full';
+  section_heading?: string;
+};
+
 export type KnowledgeGenePack = {
   version?: number;
   program_stems?: string[];
   aliases?: Record<string, string>;
   lexicon?: Record<string, KnowledgeGeneLexiconEntry>;
   phenotypes?: KnowledgeFaqPhenotype[];
+  pinned_shapes?: KnowledgePinnedShapeBinding[];
   sanitize_drop?: string[];
   skip_asked_stems?: string[];
   situational_needles?: string[];
@@ -668,6 +676,135 @@ export class AgentKnowledge {
         headers: { 'X-Request-Lane': 'ai_stream' },
       },
     );
+  }
+
+  /** Rule-based acceptance suite (MCP parity). Prefer eval_mode=retrieval to avoid LLM cost. */
+  runAcceptanceSuite(
+    projectId: number,
+    body?: {
+      suite_id?: string;
+      group?: string;
+      case_id?: string;
+      eval_mode?: string;
+      bot_uuid?: string;
+      principal_user_id?: number;
+    },
+  ) {
+    return this.client.post<{
+      ok: boolean;
+      pass_rate?: number;
+      passed?: number;
+      total?: number;
+      verdicts?: unknown[];
+    }>(`/projects/${projectId}/knowledge/acceptance/run`, body ?? {}, {
+      useAiTimeout: true,
+      headers: { 'X-Request-Lane': 'ai_stream' },
+    });
+  }
+
+  /** Hybrid retrieval probe (no LLM) — top doc_ids for a query. */
+  probeRetrieval(
+    projectId: number,
+    body: { query: string; top_k?: number; principal_user_id?: number },
+  ) {
+    return this.client.post<{
+      ok: boolean;
+      query: string;
+      top_k: number;
+      doc_ids?: string[];
+      hits?: Array<Record<string, unknown>>;
+    }>(`/projects/${projectId}/knowledge/retrieve/probe`, body, {
+      useAiTimeout: true,
+      headers: { 'X-Request-Lane': 'ai_stream' },
+    });
+  }
+
+  /** Single journal turn (MCP/REST parity). */
+  journalTurn(
+    projectId: number,
+    params?: { correlation_id?: string; turn_id?: string; include_restricted?: boolean },
+  ) {
+    const qs = new URLSearchParams();
+    if (params?.correlation_id) qs.set('correlation_id', params.correlation_id);
+    if (params?.turn_id) qs.set('turn_id', params.turn_id);
+    if (params?.include_restricted) qs.set('include_restricted', 'true');
+    const q = qs.toString();
+    return this.client.get<{
+      ok: boolean;
+      turn?: Record<string, unknown>;
+      synthesis_path?: string;
+      phenotype?: string;
+      snippet_ids?: string[];
+    }>(`/projects/${projectId}/knowledge/journal/turn${q ? `?${q}` : ''}`);
+  }
+
+  /** Acceptance suite catalog. */
+  listAcceptanceSuites(projectId: number) {
+    return this.client.get<{
+      ok: boolean;
+      suites?: Array<Record<string, unknown>>;
+    }>(`/projects/${projectId}/knowledge/acceptance/list`);
+  }
+
+  /** Partial gene_pack phenotype merge (ergonomic alias for config.patch). */
+  upsertPhenotype(
+    projectId: number,
+    body: { phenotype: Record<string, unknown> },
+  ) {
+    return this.client.post<{
+      ok: boolean;
+      config?: Record<string, unknown>;
+      safety_playbooks?: Record<string, unknown>;
+      compile_warnings?: string[];
+    }>(`/projects/${projectId}/knowledge/phenotype/upsert`, body);
+  }
+
+  /** Merge one pinned_shapes binding (phenotype → glossary_stem). */
+  upsertPinnedShape(
+    projectId: number,
+    body: { binding: Record<string, unknown> },
+  ) {
+    return this.client.post<{
+      ok: boolean;
+      config?: Record<string, unknown>;
+      safety_playbooks?: Record<string, unknown>;
+      compile_warnings?: string[];
+    }>(`/projects/${projectId}/knowledge/gene-pack/pinned-shape/upsert`, body);
+  }
+
+  /** Read-only mentor doctor (gene pack + retrieval probe). */
+  runDoctor(
+    projectId: number,
+    body?: {
+      skip_gene_pack?: boolean;
+      skip_retrieval?: boolean;
+      fadeev?: boolean;
+      canonical?: boolean;
+      min_map_keys?: number;
+    },
+  ) {
+    return this.client.post<{
+      ok: boolean;
+      checks?: Record<string, unknown>;
+    }>(`/projects/${projectId}/knowledge/doctor/run`, body ?? {}, {
+      useAiTimeout: true,
+      headers: { 'X-Request-Lane': 'ai_stream' },
+    });
+  }
+
+  /** Draft correction steps from a journal turn — no auto-write. */
+  proposeCorrection(
+    projectId: number,
+    body: { correlation_id?: string; turn_id?: string },
+  ) {
+    return this.client.post<{
+      ok: boolean;
+      proposed_steps?: Array<Record<string, unknown>>;
+      synthesis_path?: string;
+      turn_id?: string;
+      correlation_id?: string;
+      note?: string;
+    }>(`/projects/${projectId}/knowledge/correction/propose`, body);
   }
 
   exportJson(projectId: number) {

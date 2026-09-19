@@ -276,6 +276,33 @@ describe('AgentAuth', () => {
       );
     });
 
+    it('retries bootstrap on transient session_not_found (G-A24)', async () => {
+      jest.useFakeTimers();
+      const { UnauthorizedError } = require('../../src/types/shared/HTTPTypes');
+      mockHttpClient.get
+        .mockRejectedValueOnce(
+          new UnauthorizedError('Session miss', {
+            status: 401,
+            code: 'session_not_found',
+            sessionMissReason: 'absent',
+          }),
+        )
+        .mockResolvedValueOnce({
+          data: {
+            success: true,
+            data: testUser,
+            settings_summary: { theme: 'dark', language: 'ru', timezone: 'UTC' },
+          },
+        });
+
+      const promise = auth.getSessionBootstrapPayload({ force: true });
+      await jest.runAllTimersAsync();
+      const result = await promise;
+      expect(mockHttpClient.get).toHaveBeenCalledTimes(2);
+      expect(result.user.user_id).toBe(1);
+      jest.useRealTimers();
+    });
+
     it('should refresh token', async () => {
       const refreshData = { refresh_token: 'refresh_token_123' };
       const expectedResponse = {

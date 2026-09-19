@@ -258,6 +258,20 @@ describe('createAppUpdateCoordinator', () => {
     await applyPromise;
   });
 
+  it('does not schedule navigation fallback for user apply (strategy owns reload)', async () => {
+    const fallback = jest.fn();
+    const { coordinator } = makeCoordinator({
+      onNavigationFallback: fallback,
+      scheduleTimeout: (fn) => {
+        fn();
+        return 1;
+      },
+    });
+    coordinator.ingestSignal({ reason: 'sw_waiting' });
+    await coordinator.apply({ reason: 'sw_waiting', mode: 'user' });
+    expect(fallback).not.toHaveBeenCalled();
+  });
+
   it('navigation fallback uses onNavigationFallback for deep recovery', async () => {
     const fallback = jest.fn();
     const { coordinator } = makeCoordinator({

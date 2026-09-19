@@ -153,6 +153,26 @@ export interface BatchResponse {
   failed: number;
 }
 
+function parseRetryAfterMs(header: string | null): number | null {
+  if (!header) return null;
+  const sec = Number.parseInt(header, 10);
+  if (Number.isFinite(sec) && sec > 0) return sec * 1000;
+  const when = Date.parse(header);
+  if (Number.isFinite(when)) return Math.max(0, when - Date.now());
+  return null;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+/** True when gateway batch POST should be retried (warm-up / admission shed). */
+function isBatchTransportRetryStatus(status: number): boolean {
+  return status === 503 || status === 429;
+}
+
 export class RequestBatcher {
   private queue: Map<string, QueuedRequest> = new Map();
   private batchTimeout: number = 50; // ms
@@ -164,6 +184,7 @@ export class RequestBatcher {
   private burstDeadline: number | null = null;
   private baseUrl: string;
   private getAuthHeaders: () => Record<string, string> | Promise<Record<string, string>>;
+  private shouldDeferFlush?: () => boolean;
 
   constructor(
     baseUrl: string,
@@ -173,10 +194,13 @@ export class RequestBatcher {
       maxBatchSize?: number;
       /** Max time from first queued GET until a flush is forced (debounce-with-maxWait). */
       maxBatchWaitMs?: number;
+      /** When true, re-queue and reschedule flush (login / post-mint grace). */
+      shouldDeferFlush?: () => boolean;
     }
   ) {
     this.baseUrl = baseUrl;
     this.getAuthHeaders = getAuthHeaders;
+    this.shouldDeferFlush = options?.shouldDeferFlush;
     if (options?.batchTimeout) {
       this.batchTimeout = options.batchTimeout;
     }
@@ -265,7 +289,7 @@ export class RequestBatcher {
     const now = Date.now();
     const maxWaitRemaining =
       this.burstDeadline != null ? this.burstDeadline - now : Infinity;
-    if (maxWaitRemaining <= 0) {
+    if (maxWaitRemaining <= 0 && !this.shouldDeferFlush?.()) {
       void this.flush();
       return;
     }
@@ -287,6 +311,21 @@ export class RequestBatcher {
     }
     if (this.queue.size === 0) {
       this.burstDeadline = null;
+      return;
+    }
+
+    if (this.shouldDeferFlush?.()) {
+      if (this.burstDeadline == null || this.burstDeadline <= Date.now()) {
+        this.burstDeadline = Date.now() + this.maxBatchWaitMs;
+      }
+      const delay = Math.max(
+        this.batchTimeout,
+        Math.min(this.maxBatchWaitMs, this.burstDeadline - Date.now()),
+      );
+      this.timeoutId = setTimeout(() => {
+        this.timeoutId = null;
+        void this.flush();
+      }, delay);
       return;
     }
 
@@ -351,9 +390,18 @@ export class RequestBatcher {
     };
 
     try {
-      // Отправить batch запрос
       const authHeaders = await Promise.resolve(this.getAuthHeaders());
-      // Remove trailing slash and ensure /api/batch path (avoid /api/api/batch)
+      const bearer =
+        authHeaders.Authorization ||
+        authHeaders.authorization ||
+        '';
+      if (!String(bearer).trim()) {
+        for (const queuedRequest of requests) {
+          queuedRequest.reject(new Error('Batch deferred: missing bearer'));
+        }
+        return;
+      }
+
       const baseUrl = this.baseUrl.replace(/\/$/, '');
       const batchUrl = baseUrl.endsWith('/api') ? `${baseUrl}/batch` : `${baseUrl}/api/batch`;
       const timeoutHeader = batchPayload[0]?.headers?.['X-Request-Timeout-Ms'];
@@ -362,15 +410,12 @@ export class RequestBatcher {
         timeoutMs && Number.isFinite(timeoutMs) && timeoutMs > 0
           ? AbortSignal.timeout(timeoutMs)
           : undefined;
-      const response = await fetch(batchUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeaders
-        },
-        body: JSON.stringify(batchRequest),
-        signal: batchSignal,
-      });
+      const response = await this.postBatchWithRetry(
+        batchUrl,
+        batchRequest,
+        authHeaders,
+        batchSignal,
+      );
 
       if (!response.ok) {
         throw new Error(`Batch request failed: ${response.status} ${response.statusText}`);
@@ -437,6 +482,43 @@ export class RequestBatcher {
         queuedRequest.reject(error);
       }
     }
+  }
+
+  /** POST /api/batch with warm-up / admission-shed retries (cold deploy + event_loop_lag). */
+  private async postBatchWithRetry(
+    batchUrl: string,
+    batchRequest: BatchRequest,
+    authHeaders: Record<string, string>,
+    signal?: AbortSignal,
+  ): Promise<Response> {
+    const maxAttempts = 3;
+    let last: Response | null = null;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      last = await fetch(batchUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
+        body: JSON.stringify(batchRequest),
+        signal,
+      });
+      if (last.ok || !isBatchTransportRetryStatus(last.status)) {
+        return last;
+      }
+      if (attempt >= maxAttempts - 1) {
+        return last;
+      }
+      const retryMs =
+        parseRetryAfterMs(last.headers.get('Retry-After')) ?? (attempt + 1) * 750;
+      logger.debug('[Batch] transport retry', {
+        status: last.status,
+        attempt: attempt + 1,
+        retry_ms: retryMs,
+      });
+      await sleep(retryMs);
+    }
+    return last!;
   }
 
   /**

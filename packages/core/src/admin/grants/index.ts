@@ -5,6 +5,7 @@ export type {
   GrantOsApplicationPatch,
   GrantOsAnchorFields,
   GrantOsAnchorResponse,
+  GrantOsBlockerHint,
   GrantOsCatalogPatch,
   GrantOsComposeData,
   GrantOsComposeItem,
@@ -17,4 +18,6 @@ export type {
   GrantOsScoreBreakdown,
   GrantMilestone,
   EarningPlaybook,
+  GrantOsEarningPlaybookPatch,
+  GrantOsEarningSnapshot,
 } from './adminGrantsTypes';

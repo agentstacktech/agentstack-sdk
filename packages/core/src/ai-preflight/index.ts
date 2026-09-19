@@ -37,4 +37,6 @@ export function assertProjectIdConfigured(sdk: AgentStackSDK): number {
   return sdk.requireProjectId();
 }
 
+export { createAgentSession, type AgentSession } from './createAgentSession';
+
 export { appManifestSchema };

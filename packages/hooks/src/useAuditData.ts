@@ -14,18 +14,31 @@ import type { AgentStackSDK } from '@agentstack/sdk';
 import { useSDKQuery, stableKeyPart } from '@agentstack/react';
 import type { AuditLog, AuditFilters, BaseHookOptions } from './types';
 
+function isAbortError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const name = (err as { name?: string }).name;
+  return name === 'AbortError' || (err as { code?: string }).code === 'ABORT_ERR';
+}
+
 /**
  * Hook options for audit data
  */
 export interface UseAuditDataOptions extends BaseHookOptions {
   filters?: AuditFilters;
+  page?: number;
+  limit?: number;
 }
 
-/**
- * Hook result
- */
-export interface UseAuditDataResult extends Omit<UseQueryResult<AuditLog[], Error>, 'data'> {
-  data: AuditLog[];
+export interface AuditLogsPage {
+  entries: AuditLog[];
+  total: number;
+  totalPages: number;
+  currentPage: number;
+  limit: number;
+}
+
+export interface UseAuditDataResult extends Omit<UseQueryResult<AuditLogsPage, Error>, 'data'> {
+  data: AuditLogsPage;
   filters: AuditFilters;
   setFilters: (filters: AuditFilters) => void;
 }
@@ -85,32 +98,57 @@ export function useAuditData(
   const {
     refreshInterval = 60000,
     enabled = true,
-    staleTime = 5 * 60 * 1000
+    staleTime = 5 * 60 * 1000,
+    page = 1,
+    limit = 50,
   } = options;
 
   const [filters, setFiltersState] = useState<AuditFilters>(() => ({
     ...(options.filters ?? {}),
   }));
 
-  const queryResult = useSDKQuery<AuditLog[]>(
+  const emptyPage: AuditLogsPage = {
+    entries: [],
+    total: 0,
+    totalPages: 0,
+    currentPage: page,
+    limit,
+  };
+
+  const queryResult = useSDKQuery<AuditLogsPage>(
     sdk,
-    ['audit-logs', stableKeyPart(filters)],
+    ['audit-logs', stableKeyPart(filters), page, limit],
     async (signal) => {
       try {
-        const params = Object.entries(filters)
-          .filter(([_, value]) => value !== undefined && value !== '')
-          .reduce<Record<string, unknown>>(
-            (acc, [key, value]) => ({ ...acc, [key]: value }),
-            {}
-          );
+        const params: Record<string, unknown> = {
+          page,
+          limit,
+          ...Object.entries(filters)
+            .filter(([_, value]) => value !== undefined && value !== '')
+            .reduce<Record<string, unknown>>(
+              (acc, [key, value]) => ({ ...acc, [key]: value }),
+              {},
+            ),
+        };
 
-        const response = await sdk.httpClient.get('/audit/logs', params, { signal });
-        return response.data?.logs || response.data || [];
+        const response = await sdk.httpClient.get('/audit/logs', params, {
+          signal,
+          skipBatching: true,
+        });
+        const body = response.data ?? {};
+        const entries = (body.entries ?? body.logs ?? []) as AuditLog[];
+        return {
+          entries,
+          total: Number(body.total ?? entries.length),
+          totalPages: Number(body.totalPages ?? 1),
+          currentPage: Number(body.currentPage ?? page),
+          limit: Number(body.limit ?? limit),
+        };
       } catch (error: unknown) {
+        if (isAbortError(error)) throw error;
         const err = error as { status?: number };
         if (err.status === 404) {
-          console.warn('📋 Audit service not available - graceful empty response');
-          return [];
+          return emptyPage;
         }
         throw error;
       }
@@ -119,12 +157,13 @@ export function useAuditData(
       refetchInterval: refreshInterval,
       enabled,
       staleTime,
+      retry: (failureCount, error) => !isAbortError(error) && failureCount < 1,
     }
   );
   
   return {
     ...queryResult,
-    data: queryResult.data || [],
+    data: queryResult.data ?? emptyPage,
     filters,
     setFilters: useCallback((next: AuditFilters) => {
       setFiltersState(next);

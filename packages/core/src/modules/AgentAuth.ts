@@ -10,7 +10,7 @@ import { logger } from '../utils/logger';
 import { maskSecretForLog } from '../utils/maskSecretForLog';
 import { SDKErrorHandler, NetworkError, ValidationError, NotFoundError, PermissionError, ServerError } from '../errors/ErrorHandler';
 import { executeOrNotFoundFallback } from '../utils/httpDeleteIdempotent';
-import { ConflictError, UnauthorizedError } from '../types/shared/HTTPTypes';
+import { ConflictError, RateLimitError, UnauthorizedError } from '../types/shared/HTTPTypes';
 import { retryManager } from '../errors/RetryManager';
 import { offlineManager } from '../errors/OfflineManager';
 import { getStorageItem, setStorageItem, removeStorageItem } from '../utils/storage-utils';
@@ -20,7 +20,11 @@ import {
   AGENTSTACK_PRODUCTION_ORIGIN,
 } from '../config/agentstackEndpoints';
 import { normalizeProjectId } from '../config/projectContext';
-import { isTypedDna503Code } from '../utils/classifyAuthFailure';
+import {
+  isTransientSessionBootstrapError,
+  isTypedDna503Code,
+  sessionBootstrapRetryDelayMs,
+} from '../utils/classifyAuthFailure';
 import { jwtProjectIdFromToken } from '../client/resolveRequestProjectContext';
 import { isTransientBrowserNetworkError } from '../client/networkErrors';
 import { loginWithDeviceCodeForm } from '../mcp/deviceCode';
@@ -211,7 +215,11 @@ export class AgentAuth extends SimpleEventEmitter {
     }
     this.sessionBootstrapAbort = null;
     this.sessionBootstrapInFlight = null;
-    this.lastSessionBootstrap = null;
+    // Keep last successful payload on force_login — stale-while-revalidate during
+    // mint/retry storms; fresh success overwrites. Clear only on identity change.
+    if (reason !== 'force_login') {
+      this.lastSessionBootstrap = null;
+    }
     if (reason === 'force_login' || reason === 'login_start') {
       try {
         if (typeof window !== 'undefined') {
@@ -1332,6 +1340,33 @@ export class AgentAuth extends SimpleEventEmitter {
   }
 
   private async fetchSessionBootstrapPayloadOnce(): Promise<SessionBootstrapPayload> {
+    const maxRounds = 4;
+    let lastErr: unknown;
+    for (let round = 0; round < maxRounds; round++) {
+      try {
+        return await this.fetchSessionBootstrapPayloadAttempt();
+      } catch (err) {
+        lastErr = err;
+        if (!isTransientSessionBootstrapError(err) || round >= maxRounds - 1) {
+          throw err;
+        }
+        const delayMs = sessionBootstrapRetryDelayMs(round);
+        logger.info('Session bootstrap transient miss — retrying', {
+          round: round + 1,
+          delayMs,
+        });
+        if (delayMs > 0) {
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+        if (round > 0 && typeof this.client.clearCacheEpoch === 'function') {
+          this.client.clearCacheEpoch();
+        }
+      }
+    }
+    throw lastErr;
+  }
+
+  private async fetchSessionBootstrapPayloadAttempt(): Promise<SessionBootstrapPayload> {
     const ac = new AbortController();
     this.sessionBootstrapAbort = ac;
     let response;
@@ -1355,18 +1390,39 @@ export class AgentAuth extends SimpleEventEmitter {
         throw new Error('Session bootstrap aborted (stale jti discarded)');
       }
       if (err instanceof UnauthorizedError) {
-        this.lastSessionBootstrap = null;
+        if (!isTransientSessionBootstrapError(err)) {
+          this.lastSessionBootstrap = null;
+        }
         throw err;
+      }
+      if (err instanceof RateLimitError && this.lastSessionBootstrap) {
+        logger.warn('Session bootstrap rate limited — returning last successful payload');
+        return this.lastSessionBootstrap;
       }
       throw err;
     }
     if (response.status === 401) {
-      this.lastSessionBootstrap = null;
-      throw new UnauthorizedError('Session bootstrap failed', {
+      const rawDetail = (response.data as { detail?: unknown } | undefined)?.detail;
+      const detail =
+        rawDetail && typeof rawDetail === 'object' && !Array.isArray(rawDetail)
+          ? (rawDetail as Record<string, unknown>)
+          : null;
+      const missReason =
+        typeof detail?.reason === 'string' ? String(detail.reason) : undefined;
+      const detailCode =
+        typeof detail?.code === 'string' ? String(detail.code) : undefined;
+      const authCode =
+        detailCode === 'session_not_found' ? 'session_not_found' : 'session_expired';
+      const bootstrapErr = new UnauthorizedError('Session bootstrap failed', {
         status: 401,
-        code: 'session_expired',
+        code: authCode,
         traceId: response.traceId,
+        sessionMissReason: missReason,
       });
+      if (!isTransientSessionBootstrapError(bootstrapErr)) {
+        this.lastSessionBootstrap = null;
+      }
+      throw bootstrapErr;
     }
     const body = response.data as {
       success?: boolean;
@@ -1568,6 +1624,58 @@ export class AgentAuth extends SimpleEventEmitter {
       );
       return response.data;
     }, { operation: 'completePasswordSetup' }) as Promise<{
+      success: boolean;
+      email: string;
+      user_id: number;
+    }>;
+  }
+
+  async requestPasswordReset(email: string): Promise<{ success: boolean; message: string }> {
+    return this.errorHandler.executeWithErrorHandling(async () => {
+      const response = await this.client.post(
+        '/auth/password-reset/request',
+        { email },
+        { skipAuthStateCheck: true },
+      );
+      return response.data;
+    }, { operation: 'requestPasswordReset' }) as Promise<{ success: boolean; message: string }>;
+  }
+
+  async getPasswordResetStatus(token: string): Promise<{
+    valid: boolean;
+    email: string;
+    email_masked: string;
+    display_name: string;
+    expires_at: number;
+  }> {
+    return this.errorHandler.executeWithErrorHandling(async () => {
+      const response = await this.client.get(
+        '/auth/password-reset/status',
+        { token },
+        { skipAuthStateCheck: true },
+      );
+      return response.data;
+    }, { operation: 'getPasswordResetStatus' }) as Promise<{
+      valid: boolean;
+      email: string;
+      email_masked: string;
+      display_name: string;
+      expires_at: number;
+    }>;
+  }
+
+  async completePasswordReset(
+    token: string,
+    password: string,
+  ): Promise<{ success: boolean; email: string; user_id: number }> {
+    return this.errorHandler.executeWithErrorHandling(async () => {
+      const response = await this.client.post(
+        '/auth/password-reset/reset',
+        { token, password },
+        { skipAuthStateCheck: true },
+      );
+      return response.data;
+    }, { operation: 'completePasswordReset' }) as Promise<{
       success: boolean;
       email: string;
       user_id: number;
@@ -1795,6 +1903,46 @@ export class AgentAuth extends SimpleEventEmitter {
       { skipAuthStateCheck: true },
     );
     return response.data;
+  }
+
+  /** Passwordless sign-in: request email OTP (Mail Hub template ``email_otp``). */
+  async sendEmailOtpLogin(email: string): Promise<{
+    challenge_id: string;
+    masked_email: string;
+    expires_in: number;
+    sent: boolean;
+  }> {
+    const response = await this.client.post(
+      '/auth/email-otp/send',
+      { email },
+      { skipAuthStateCheck: true },
+    );
+    return response.data;
+  }
+
+  /** Verify email OTP and mint session (MFA second step via mfa_ticket + mfa_code). */
+  async loginWithEmailOtp(body: {
+    challenge_id: string;
+    otp_code: string;
+    device_fingerprint?: string;
+    project_id?: number;
+    mfa_ticket?: string;
+    mfa_method?: string;
+    mfa_code?: string;
+  }): Promise<Record<string, unknown>> {
+    const response = await this.client.post('/auth/email-otp/login', body, {
+      skipAuthStateCheck: true,
+      timeout: 60_000,
+    });
+    const data = response.data;
+    if (data?.mfa_required && data?.mfa_ticket) {
+      throw new MfaRequiredError({
+        mfa_ticket: String(data.mfa_ticket),
+        methods: Array.isArray(data.methods) ? data.methods : [],
+        expires_in: typeof data.expires_in === 'number' ? data.expires_in : undefined,
+      });
+    }
+    return data;
   }
 
   async getNotificationPrefs(): Promise<{ prefs: unknown; sources: unknown[] }> {

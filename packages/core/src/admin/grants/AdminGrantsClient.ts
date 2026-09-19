@@ -12,6 +12,9 @@ import type {
   GrantOsApplicationPatch,
   GrantOsCatalogPatch,
   GrantOsComposeData,
+  GrantOsEarningPlaybookPatch,
+  GrantOsEarningSnapshot,
+  EarningPlaybook,
   GrantOsHubSnapshot,
   GrantOsOpportunityUpsert,
   GrantOsPipelineData,
@@ -26,6 +29,59 @@ export class AdminGrantsClient {
 
   async getHubSnapshot(opts?: ReqOpts): Promise<GrantOsHubSnapshot> {
     const res = await this.http.get<GrantOsHubSnapshot>(`${PREFIX}/hub-snapshot`, {
+      skipBatching: true,
+      signal: opts?.signal,
+    });
+    return res.data;
+  }
+
+  async listEarningPlaybooks(
+    opts?: ReqOpts & { programId?: string },
+  ): Promise<GrantOsEarningSnapshot> {
+    const qs = opts?.programId
+      ? `?program_id=${encodeURIComponent(opts.programId)}`
+      : '';
+    const res = await this.http.get<GrantOsEarningSnapshot>(
+      `${PREFIX}/earning-playbooks${qs}`,
+      { skipBatching: true, signal: opts?.signal },
+    );
+    return res.data;
+  }
+
+  async getEarningPlaybook(
+    playbookId: string,
+    opts?: ReqOpts,
+  ): Promise<{ playbook: EarningPlaybook }> {
+    const res = await this.http.get<{ playbook: EarningPlaybook }>(
+      `${PREFIX}/earning-playbooks/${encodeURIComponent(playbookId)}`,
+      { skipBatching: true, signal: opts?.signal },
+    );
+    return res.data;
+  }
+
+  async upsertEarningPlaybook(
+    playbookId: string,
+    patch: GrantOsEarningPlaybookPatch,
+    opts?: ReqOpts,
+  ): Promise<{ playbook: EarningPlaybook; earning: GrantOsEarningSnapshot }> {
+    const res = await this.http.put<{
+      playbook: EarningPlaybook;
+      earning: GrantOsEarningSnapshot;
+    }>(`${PREFIX}/earning-playbooks/${encodeURIComponent(playbookId)}`, patch, {
+      skipBatching: true,
+      signal: opts?.signal,
+    });
+    return res.data;
+  }
+
+  async deleteEarningPlaybook(
+    playbookId: string,
+    opts?: ReqOpts,
+  ): Promise<{ deleted: string; earning: GrantOsEarningSnapshot }> {
+    const res = await this.http.delete<{
+      deleted: string;
+      earning: GrantOsEarningSnapshot;
+    }>(`${PREFIX}/earning-playbooks/${encodeURIComponent(playbookId)}`, {
       skipBatching: true,
       signal: opts?.signal,
     });
@@ -164,17 +220,53 @@ export class AdminGrantsClient {
     return res.data;
   }
 
-  /** Returns raw blob for bundle download. */
-  async downloadBundleBlob(programId: string): Promise<Blob> {
-    const res = await this.http.post<Blob>(
-      `${PREFIX}/bundle/${encodeURIComponent(programId)}`,
-      {},
-      {
-        skipBatching: true,
-        responseType: 'blob',
-      },
+  /** Returns raw blob for bundle download (streams when Content-Length + onProgress set). */
+  async downloadBundleBlob(
+    programId: string,
+    opts?: ReqOpts & { onProgress?: (loaded: number, total: number) => void },
+  ): Promise<Blob> {
+    const path = `${PREFIX}/bundle/${encodeURIComponent(programId)}`;
+    const url = this.http.resolveApiUrl(path);
+    const headers = await this.http.alignSessionThenBuildHeaders(
+      { 'Content-Type': 'application/json', Accept: 'application/zip' },
+      path,
     );
-    return res.data;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: '{}',
+      credentials: 'include',
+      signal: opts?.signal,
+    });
+    if (!response.ok) {
+      let detail = '';
+      try {
+        detail = await response.text();
+      } catch {
+        detail = response.statusText;
+      }
+      throw new Error(detail || `Bundle download failed (${response.status})`);
+    }
+    const total = Number(response.headers.get('content-length') || 0);
+    const body = response.body;
+    const onProgress = opts?.onProgress;
+    if (!body || !onProgress || !total) {
+      return await response.blob();
+    }
+    const reader = body.getReader();
+    const chunks: BlobPart[] = [];
+    let loaded = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        chunks.push(value);
+        loaded += value.byteLength;
+        onProgress(loaded, total);
+      }
+    }
+    const type = response.headers.get('content-type') || 'application/zip';
+    return new Blob(chunks, { type });
   }
 
   async listCatalog(opts?: ReqOpts): Promise<{ programs: Record<string, unknown>[]; count: number }> {

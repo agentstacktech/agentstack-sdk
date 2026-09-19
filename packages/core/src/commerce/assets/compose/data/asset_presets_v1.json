@@ -1,346 +1,394 @@
-{
-  "version": 1,
-  "branchingQuestions": [
-    {
-      "id": "primary_goal",
-      "title": "What are you building?",
-      "options": [
-        { "id": "game", "label": "Game economy", "categories": ["game"] },
-        { "id": "sell", "label": "Sell or monetize", "categories": ["sell"] },
-        { "id": "education", "label": "Courses & content", "categories": ["education"] }
-      ]
-    }
-  ],
-  "presets": [
-    {
-      "id": "game_currency",
-      "name": "In-game currency",
-      "description": "Gold, gems, credits — stackable tradeable currency",
-      "category": "game",
-      "assetType": "currency",
-      "defaultPriceUsdt": "1.00",
-      "steps": ["intent", "basics", "publish", "review"],
-      "seedComponents": {
-        "properties": { "stackable": true, "tradeable": true, "category": "currency" },
-        "game": { "game_metadata": {} },
-        "metadata": { "schema_version": "1", "custom_fields": {} }
-      },
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "display_unit": {
-            "type": "string",
-            "title": "Display unit",
-            "default": "coins",
-            "enum": ["coins", "gems", "credits", "gold", "tokens"]
-          }
-        }
-      },
-      "postCreateActions": [{ "action": "logic.openTemplate", "templateId": "commerce.asset.currency_created", "optional": true }]
-    },
-    {
-      "id": "game_resource",
-      "name": "Game resource",
-      "description": "Wood, ore, food — harvestable resources",
-      "category": "game",
-      "assetType": "digital_item",
-      "defaultPriceUsdt": "0.10",
-      "steps": ["intent", "basics", "media", "publish", "review"],
-      "seedComponents": {
-        "properties": { "category": "resource", "stackable": true, "tradeable": true, "rarity": "common" },
-        "game": { "stats": {} },
-        "metadata": { "schema_version": "1", "custom_fields": {} }
-      },
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "max_stack": { "type": "number", "title": "Max stack", "default": 999 }
-        }
-      },
-      "postCreateActions": []
-    },
-    {
-      "id": "game_card",
-      "name": "Game item / card",
-      "description": "RPG or TCG item with stats",
-      "category": "game",
-      "assetType": "digital_item",
-      "defaultPriceUsdt": "5.00",
-      "steps": ["intent", "basics", "media", "publish", "review"],
-      "seedComponents": {
-        "properties": { "rarity": "common", "tradeable": true, "transferable": true },
-        "game": { "stats": { "attack": 0, "hp": 0 }, "level_requirement": 0 },
-        "visual": {},
-        "metadata": { "schema_version": "1", "custom_fields": {} }
-      },
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "attack": { "type": "number", "title": "Attack", "default": 10 },
-          "hp": { "type": "number", "title": "HP", "default": 50 }
-        }
-      },
-      "postCreateActions": []
-    },
-    {
-      "id": "marketplace_product",
-      "name": "Marketplace product",
-      "description": "Sell on the project marketplace",
-      "category": "sell",
-      "assetType": "digital_item",
-      "defaultPriceUsdt": "9.99",
-      "steps": ["intent", "basics", "media", "publish", "review"],
-      "seedComponents": {
-        "properties": { "tradeable": true, "transferable": true, "description": "" },
-        "visual": {},
-        "metadata": { "schema_version": "1", "lifecycle": "published", "custom_fields": {} }
-      },
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "listing_price": {
-            "type": "string",
-            "title": "Listing price (USDT)",
-            "enum": ["4.99", "9.99", "19.99", "49.00"]
-          }
-        }
-      },
-      "postCreateActions": [
-        { "action": "marketplace.createListing", "optional": false },
-        { "action": "logic.openTemplate", "templateId": "commerce.marketplace.product", "optional": true }
-      ]
-    },
-    {
-      "id": "course_digital",
-      "name": "Digital course",
-      "description": "Course, guide, or downloadable content",
-      "category": "education",
-      "assetType": "service",
-      "defaultPriceUsdt": "49.00",
-      "steps": ["intent", "basics", "media", "publish", "review"],
-      "seedComponents": {
-        "properties": { "category": "education", "description": "" },
-        "visual": {},
-        "metadata": {
-          "schema_version": "1",
-          "custom_fields": { "delivery_url": "" }
-        }
-      },
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "delivery_url": { "type": "string", "title": "Delivery URL", "format": "uri" }
-        },
-        "required": ["delivery_url"]
-      },
-      "postCreateActions": [
-        { "action": "integrate.openSection", "section": "gallery", "optional": true }
-      ]
-    },
-    {
-      "id": "consumable",
-      "name": "Consumable",
-      "description": "Potions, boosts, one-time use items",
-      "category": "game",
-      "assetType": "digital_item",
-      "defaultPriceUsdt": "2.00",
-      "steps": ["intent", "basics", "media", "review"],
-      "seedComponents": {
-        "properties": { "stackable": true, "rarity": "common" },
-        "game": { "effects": [{ "type": "buff", "value": 10 }] },
-        "metadata": { "schema_version": "1", "custom_fields": {} }
-      },
-      "inputSchema": { "type": "object", "properties": {} },
-      "postCreateActions": []
-    },
-    {
-      "id": "subscription_entitlement",
-      "name": "Subscription access",
-      "description": "Entitlement linked to buffs",
-      "category": "sell",
-      "assetType": "service",
-      "defaultPriceUsdt": "19.00",
-      "steps": ["intent", "basics", "publish", "review"],
-      "seedComponents": {
-        "properties": { "category": "subscription" },
-        "metadata": { "schema_version": "1", "buff_template_id": "", "custom_fields": {} }
-      },
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "buff_template_id": {
-            "type": "string",
-            "title": "Buff template id",
-            "enum": ["vip_monthly", "pro_tier", "founder_pass"]
-          }
-        }
-      },
-      "postCreateActions": [{ "action": "buffs.openModule", "optional": true }]
-    },
-    {
-      "id": "physical_sku",
-      "name": "Physical product",
-      "description": "Shippable SKU",
-      "category": "sell",
-      "assetType": "physical_item",
-      "defaultPriceUsdt": "29.00",
-      "steps": ["intent", "basics", "media", "publish", "review"],
-      "seedComponents": {
-        "properties": { "tradeable": false },
-        "metadata": { "schema_version": "1", "custom_fields": { "shipping_hint": "" } }
-      },
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "shipping_hint": {
-            "type": "string",
-            "title": "Shipping notes",
-            "enum": ["Standard 5–7 days", "Express 2–3 days", "Digital + physical bundle"]
-          }
-        }
-      },
-      "postCreateActions": [{ "action": "marketplace.createListing", "optional": true }]
-    },
-    {
-      "id": "exchange_pair",
-      "name": "Trade pair asset",
-      "description": "Asset used in exchange (wood/gold)",
-      "category": "game",
-      "assetType": "currency",
-      "defaultPriceUsdt": "1.00",
-      "steps": ["intent", "basics", "publish", "review"],
-      "seedComponents": {
-        "properties": { "tradeable": true, "cross_project": false },
-        "metadata": { "schema_version": "1", "exchange_pair": { "quote_asset_name": "" }, "custom_fields": {} }
-      },
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "quote_asset_name": {
-            "type": "string",
-            "title": "Quote asset name",
-            "enum": ["Gold", "Silver", "USDT", "Credits"]
-          }
-        }
-      },
-      "postCreateActions": [{ "action": "exchange.openHelper", "optional": true }]
-    },
-    {
-      "id": "asset_bundle",
-      "name": "Item bundle",
-      "description": "Pack of multiple asset definitions",
-      "category": "sell",
-      "assetType": "digital_item",
-      "defaultPriceUsdt": "15.00",
-      "steps": ["intent", "basics", "media", "review"],
-      "seedComponents": {
-        "properties": { "description": "Bundle" },
-        "metadata": { "schema_version": "1", "bundle_asset_ids": [], "custom_fields": {} }
-      },
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "bundle_asset_ids": { "type": "string", "title": "Asset IDs (comma-separated)" }
-        }
-      },
-      "postCreateActions": []
-    },
-    {
-      "id": "project_transfer_v1",
-      "name": "Project transfer",
-      "description": "Sell or transfer full project ownership to buyer",
-      "category": "sell",
-      "assetType": "digital_item",
-      "defaultPriceUsdt": "99.00",
-      "steps": ["intent", "basics", "review", "publish"],
-      "seedComponents": {
-        "properties": { "tradeable": false, "category": "project_transfer" },
-        "metadata": {
-          "schema_version": "1",
-          "transfer_project_id": 0,
-          "included_path_manifest": ["config", "ecosystem"],
-          "detach_from_business": true,
-          "custom_fields": {}
-        }
-      },
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "transfer_project_id": {
-            "type": "integer",
-            "title": "Project to transfer",
-            "minimum": 1
-          }
-        },
-        "required": ["transfer_project_id"]
-      },
-      "postCreateActions": [{ "action": "marketplace.createListing", "optional": true }]
-    },
-    {
-      "id": "agent_template_v1",
-      "name": "Agent template pack",
-      "description": "Marketplace SKU wrapping a built-in Agents Fleet template",
-      "category": "sell",
-      "assetType": "service",
-      "defaultPriceUsdt": "9.00",
-      "steps": ["intent", "basics", "review", "publish"],
-      "seedComponents": {
-        "properties": { "category": "agent_fleet", "tradeable": true },
-        "metadata": { "schema_version": "1", "custom_fields": {} },
-        "extensions": {
-          "agent_fleet": {
-            "template_id": "support_responder@v1",
-            "spec_patch": {},
-            "version": 1
-          }
-        }
-      },
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "template_id": {
-            "type": "string",
-            "title": "Agent template id",
-            "default": "support_responder@v1"
-          }
-        }
-      },
-      "postCreateActions": [{ "action": "agents.importPreset", "optional": false }]
-    },
-    {
-      "id": "agent_orchestration_pack_v1",
-      "name": "Agent orchestration pack",
-      "description": "Template plus triggers/reactions/workflow snapshot for Fleet Automation",
-      "category": "sell",
-      "assetType": "service",
-      "defaultPriceUsdt": "19.00",
-      "steps": ["intent", "basics", "review", "publish"],
-      "seedComponents": {
-        "properties": { "category": "agent_orchestration", "tradeable": true },
-        "metadata": { "schema_version": "1", "custom_fields": {} },
-        "extensions": {
-          "agent_fleet": {
-            "template_id": "scheduler_bot@v1",
-            "orchestration_pack": {
-              "bindings": { "triggers": ["scheduler.tick"], "schedule_preset": "hourly" },
-              "reactions": []
-            },
-            "version": 1
-          }
-        }
-      },
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "schedule_preset": {
-            "type": "string",
-            "title": "Schedule preset",
-            "default": "hourly",
-            "enum": ["every_15m", "hourly", "daily_09"]
-          }
-        }
-      },
-      "postCreateActions": [{ "action": "agents.importPreset", "optional": false }]
-    }
-  ]
-}
+{
+  "version": 1,
+  "branchingQuestions": [
+    {
+      "id": "primary_goal",
+      "title": "What are you building?",
+      "options": [
+        { "id": "game", "label": "Game economy", "categories": ["game"] },
+        { "id": "sell", "label": "Sell or monetize", "categories": ["sell"] },
+        { "id": "education", "label": "Courses & content", "categories": ["education"] },
+        {
+          "id": "agents",
+          "label": "AI agents & orchestrator",
+          "categories": ["agent_orchestration", "project_orchestrator", "agent_fleet"]
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "id": "game_currency",
+      "name": "In-game currency",
+      "description": "Gold, gems, credits — stackable tradeable currency",
+      "category": "game",
+      "assetType": "currency",
+      "defaultPriceUsdt": "1.00",
+      "steps": ["intent", "basics", "publish", "review"],
+      "seedComponents": {
+        "properties": { "stackable": true, "tradeable": true, "category": "currency" },
+        "game": { "game_metadata": {} },
+        "metadata": { "schema_version": "1", "custom_fields": {} }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "display_unit": {
+            "type": "string",
+            "title": "Display unit",
+            "default": "coins",
+            "enum": ["coins", "gems", "credits", "gold", "tokens"]
+          }
+        }
+      },
+      "postCreateActions": [{ "action": "logic.openTemplate", "templateId": "commerce.asset.currency_created", "optional": true }]
+    },
+    {
+      "id": "game_resource",
+      "name": "Game resource",
+      "description": "Wood, ore, food — harvestable resources",
+      "category": "game",
+      "assetType": "digital_item",
+      "defaultPriceUsdt": "0.10",
+      "steps": ["intent", "basics", "media", "publish", "review"],
+      "seedComponents": {
+        "properties": { "category": "resource", "stackable": true, "tradeable": true, "rarity": "common" },
+        "game": { "stats": {} },
+        "metadata": { "schema_version": "1", "custom_fields": {} }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "max_stack": { "type": "number", "title": "Max stack", "default": 999 }
+        }
+      },
+      "postCreateActions": []
+    },
+    {
+      "id": "game_card",
+      "name": "Game item / card",
+      "description": "RPG or TCG item with stats",
+      "category": "game",
+      "assetType": "digital_item",
+      "defaultPriceUsdt": "5.00",
+      "steps": ["intent", "basics", "media", "publish", "review"],
+      "seedComponents": {
+        "properties": { "rarity": "common", "tradeable": true, "transferable": true },
+        "game": { "stats": { "attack": 0, "hp": 0 }, "level_requirement": 0 },
+        "visual": {},
+        "metadata": { "schema_version": "1", "custom_fields": {} }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "attack": { "type": "number", "title": "Attack", "default": 10 },
+          "hp": { "type": "number", "title": "HP", "default": 50 }
+        }
+      },
+      "postCreateActions": []
+    },
+    {
+      "id": "marketplace_product",
+      "name": "Marketplace product",
+      "description": "Sell on the project marketplace",
+      "category": "sell",
+      "assetType": "digital_item",
+      "defaultPriceUsdt": "9.99",
+      "steps": ["intent", "basics", "media", "publish", "review"],
+      "seedComponents": {
+        "properties": { "tradeable": true, "transferable": true, "description": "" },
+        "visual": {},
+        "metadata": { "schema_version": "1", "lifecycle": "published", "custom_fields": {} }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listing_price": {
+            "type": "string",
+            "title": "Listing price (USDT)",
+            "enum": ["4.99", "9.99", "19.99", "49.00"]
+          }
+        }
+      },
+      "postCreateActions": [
+        { "action": "marketplace.createListing", "optional": false },
+        { "action": "logic.openTemplate", "templateId": "commerce.marketplace.product", "optional": true }
+      ]
+    },
+    {
+      "id": "course_digital",
+      "name": "Digital course",
+      "description": "Course, guide, or downloadable content",
+      "category": "education",
+      "assetType": "service",
+      "defaultPriceUsdt": "49.00",
+      "steps": ["intent", "basics", "media", "publish", "review"],
+      "seedComponents": {
+        "properties": { "category": "education", "description": "" },
+        "visual": {},
+        "metadata": {
+          "schema_version": "1",
+          "custom_fields": { "delivery_url": "" }
+        }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "delivery_url": { "type": "string", "title": "Delivery URL", "format": "uri" }
+        },
+        "required": ["delivery_url"]
+      },
+      "postCreateActions": [
+        { "action": "integrate.openSection", "section": "gallery", "optional": true }
+      ]
+    },
+    {
+      "id": "consumable",
+      "name": "Consumable",
+      "description": "Potions, boosts, one-time use items",
+      "category": "game",
+      "assetType": "digital_item",
+      "defaultPriceUsdt": "2.00",
+      "steps": ["intent", "basics", "media", "review"],
+      "seedComponents": {
+        "properties": { "stackable": true, "rarity": "common" },
+        "game": { "effects": [{ "type": "buff", "value": 10 }] },
+        "metadata": { "schema_version": "1", "custom_fields": {} }
+      },
+      "inputSchema": { "type": "object", "properties": {} },
+      "postCreateActions": []
+    },
+    {
+      "id": "subscription_entitlement",
+      "name": "Subscription access",
+      "description": "Entitlement linked to buffs",
+      "category": "sell",
+      "assetType": "service",
+      "defaultPriceUsdt": "19.00",
+      "steps": ["intent", "basics", "publish", "review"],
+      "seedComponents": {
+        "properties": { "category": "subscription" },
+        "metadata": { "schema_version": "1", "buff_template_id": "", "custom_fields": {} }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "buff_template_id": {
+            "type": "string",
+            "title": "Buff template id",
+            "enum": ["vip_monthly", "pro_tier", "founder_pass"]
+          }
+        }
+      },
+      "postCreateActions": [{ "action": "buffs.openModule", "optional": true }]
+    },
+    {
+      "id": "physical_sku",
+      "name": "Physical product",
+      "description": "Shippable SKU",
+      "category": "sell",
+      "assetType": "physical_item",
+      "defaultPriceUsdt": "29.00",
+      "steps": ["intent", "basics", "media", "publish", "review"],
+      "seedComponents": {
+        "properties": { "tradeable": false },
+        "metadata": { "schema_version": "1", "custom_fields": { "shipping_hint": "" } }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "shipping_hint": {
+            "type": "string",
+            "title": "Shipping notes",
+            "enum": ["Standard 5–7 days", "Express 2–3 days", "Digital + physical bundle"]
+          }
+        }
+      },
+      "postCreateActions": [{ "action": "marketplace.createListing", "optional": true }]
+    },
+    {
+      "id": "exchange_pair",
+      "name": "Trade pair asset",
+      "description": "Asset used in exchange (wood/gold)",
+      "category": "game",
+      "assetType": "currency",
+      "defaultPriceUsdt": "1.00",
+      "steps": ["intent", "basics", "publish", "review"],
+      "seedComponents": {
+        "properties": { "tradeable": true, "cross_project": false },
+        "metadata": { "schema_version": "1", "exchange_pair": { "quote_asset_name": "" }, "custom_fields": {} }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "quote_asset_name": {
+            "type": "string",
+            "title": "Quote asset name",
+            "enum": ["Gold", "Silver", "USDT", "Credits"]
+          }
+        }
+      },
+      "postCreateActions": [{ "action": "exchange.openHelper", "optional": true }]
+    },
+    {
+      "id": "asset_bundle",
+      "name": "Item bundle",
+      "description": "Pack of multiple asset definitions",
+      "category": "sell",
+      "assetType": "digital_item",
+      "defaultPriceUsdt": "15.00",
+      "steps": ["intent", "basics", "media", "review"],
+      "seedComponents": {
+        "properties": { "description": "Bundle" },
+        "metadata": { "schema_version": "1", "bundle_asset_ids": [], "custom_fields": {} }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bundle_asset_ids": { "type": "string", "title": "Asset IDs (comma-separated)" }
+        }
+      },
+      "postCreateActions": []
+    },
+    {
+      "id": "project_transfer_v1",
+      "name": "Project transfer",
+      "description": "Sell or transfer full project ownership to buyer",
+      "category": "sell",
+      "assetType": "digital_item",
+      "defaultPriceUsdt": "99.00",
+      "steps": ["intent", "basics", "review", "publish"],
+      "seedComponents": {
+        "properties": { "tradeable": false, "category": "project_transfer" },
+        "metadata": {
+          "schema_version": "1",
+          "transfer_project_id": 0,
+          "included_path_manifest": ["config", "ecosystem"],
+          "detach_from_business": true,
+          "custom_fields": {}
+        }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "transfer_project_id": {
+            "type": "integer",
+            "title": "Project to transfer",
+            "minimum": 1
+          }
+        },
+        "required": ["transfer_project_id"]
+      },
+      "postCreateActions": [{ "action": "marketplace.createListing", "optional": true }]
+    },
+    {
+      "id": "agent_template_v1",
+      "name": "Agent template pack",
+      "description": "Marketplace SKU wrapping a built-in Agents Fleet template",
+      "category": "agent_fleet",
+      "assetType": "service",
+      "defaultPriceUsdt": "9.00",
+      "steps": ["intent", "basics", "review", "publish"],
+      "seedComponents": {
+        "properties": { "category": "agent_fleet", "tradeable": true },
+        "metadata": { "schema_version": "1", "custom_fields": {} },
+        "extensions": {
+          "agent_fleet": {
+            "template_id": "support_responder@v1",
+            "spec_patch": {},
+            "version": 1
+          }
+        }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "template_id": {
+            "type": "string",
+            "title": "Agent template id",
+            "default": "support_responder@v1"
+          }
+        }
+      },
+      "postCreateActions": [{ "action": "agents.importPreset", "optional": false }]
+    },
+    {
+      "id": "agent_orchestration_pack_v1",
+      "name": "Agent orchestration pack",
+      "description": "Template plus triggers/reactions/workflow snapshot for Fleet Automation",
+      "category": "agent_orchestration",
+      "assetType": "service",
+      "defaultPriceUsdt": "19.00",
+      "steps": ["intent", "basics", "review", "publish"],
+      "seedComponents": {
+        "properties": { "category": "agent_orchestration", "tradeable": true },
+        "metadata": { "schema_version": "1", "custom_fields": {} },
+        "extensions": {
+          "agent_fleet": {
+            "template_id": "scheduler_bot@v1",
+            "orchestration_pack": {
+              "bindings": { "triggers": ["scheduler.tick"], "schedule_preset": "hourly" },
+              "reactions": []
+            },
+            "version": 1
+          }
+        }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "schedule_preset": {
+            "type": "string",
+            "title": "Schedule preset",
+            "default": "hourly",
+            "enum": ["every_15m", "hourly", "daily_09"]
+          }
+        }
+      },
+      "postCreateActions": [{ "action": "agents.importPreset", "optional": false }]
+    },
+    {
+      "id": "project_orchestrator_pack_v2",
+      "name": "Project AI Orchestrator (full pack)",
+      "description": "Supervisor + FAQ/support specialists + automation — import into any project",
+      "category": "project_orchestrator",
+      "assetType": "service",
+      "defaultPriceUsdt": "49.00",
+      "steps": ["intent", "basics", "review", "publish"],
+      "seedComponents": {
+        "properties": { "category": "project_orchestrator", "tradeable": true },
+        "metadata": { "schema_version": "1", "custom_fields": {} },
+        "extensions": {
+          "project_orchestrator": {
+            "pack_version": 1,
+            "primary_template_id": "project_operator@v1",
+            "child_agents": [
+              { "role": "support", "template_id": "project_support@v1" },
+              { "role": "specialist", "template_id": "handoff_specialist@v1" }
+            ],
+            "orchestrator": {
+              "channel_persona": {
+                "workspace": "dev_operator",
+                "messenger": "support",
+                "bot": "faq"
+              },
+              "memory_profile": { "enabled": true, "sources": ["rag", "memory"] }
+            },
+            "invoke_surfaces": ["workspace", "messenger", "bot", "mcp"]
+          }
+        }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pack_name": {
+            "type": "string",
+            "title": "Pack display name",
+            "default": "Project Orchestrator"
+          }
+        }
+      },
+      "postCreateActions": [{ "action": "orchestrator.importPack", "optional": false }]
+    }
+  ]
+}

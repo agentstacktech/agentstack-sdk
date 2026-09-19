@@ -1,6 +1,6 @@
 # SDK i18n doc registry (auto-generated)
 
-Generated: 2026-09-08T20:52:57.028Z · `npm run generate:docs-i18n`
+Generated: 2026-09-08T21:36:43.744Z · `npm run generate:docs-i18n`
 
 | EN | RU | Role | Lines EN/RU | Ratio | Status |
 |----|-----|------|-------------|-------|--------|

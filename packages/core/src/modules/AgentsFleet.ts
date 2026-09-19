@@ -573,6 +573,88 @@ export class AgentsFleet {
     return res.data as { success: boolean };
   }
 
+  private orchestratorBase(projectId: number): string {
+    return `/api/projects/${projectId}/orchestrator`;
+  }
+
+  async getOrchestrator(projectId: number): Promise<{
+    success: boolean;
+    orchestrator?: Record<string, unknown>;
+    task_list?: { tasks?: Array<Record<string, unknown>> };
+    effective_persona?: string;
+    competence_tier?: string;
+  }> {
+    const res = await this.client.get(this.orchestratorBase(projectId));
+    return res.data as {
+      success: boolean;
+      orchestrator?: Record<string, unknown>;
+      task_list?: { tasks?: Array<Record<string, unknown>> };
+      effective_persona?: string;
+      competence_tier?: string;
+    };
+  }
+
+  async getOrchestratorThread(
+    projectId: number,
+    limit = 40,
+  ): Promise<{
+    success: boolean;
+    turns?: Array<{ role: string; text: string; index?: number }>;
+  }> {
+    const res = await this.client.get(`${this.orchestratorBase(projectId)}/thread`, {
+      params: { limit },
+    });
+    return res.data as {
+      success: boolean;
+      turns?: Array<{ role: string; text: string; index?: number }>;
+    };
+  }
+
+  async patchOrchestrator(
+    projectId: number,
+    patch: Record<string, unknown>,
+  ): Promise<{ success: boolean; orchestrator?: Record<string, unknown> }> {
+    const res = await this.client.patch(this.orchestratorBase(projectId), { patch });
+    return res.data as { success: boolean; orchestrator?: Record<string, unknown> };
+  }
+
+  async exportOrchestratorPack(
+    projectId: number,
+  ): Promise<{ success: boolean; pack: Record<string, unknown> }> {
+    const res = await this.client.get(`${this.orchestratorBase(projectId)}/export-pack`);
+    return res.data as { success: boolean; pack: Record<string, unknown> };
+  }
+
+  async orchestrate(
+    projectId: number,
+    message: string,
+    options: {
+      channel?: 'workspace' | 'messenger' | 'bot' | 'mcp' | 'api';
+      conversationId?: string;
+      botUuid?: string;
+      wait?: boolean;
+    } = {},
+  ): Promise<{ success: boolean; run: Record<string, unknown> }> {
+    const res = await this.client.post(`${this.orchestratorBase(projectId)}/run`, {
+      message,
+      channel: options.channel ?? 'api',
+      conversation_id: options.conversationId,
+      bot_uuid: options.botUuid,
+      wait: options.wait ?? true,
+    });
+    return res.data as { success: boolean; run: Record<string, unknown> };
+  }
+
+  async importOrchestratorPack(
+    projectId: number,
+    pack: Record<string, unknown>,
+  ): Promise<{ success: boolean; orchestrator?: Record<string, unknown> }> {
+    const res = await this.client.post(`${this.orchestratorBase(projectId)}/import-pack`, {
+      pack,
+    });
+    return res.data as { success: boolean; orchestrator?: Record<string, unknown> };
+  }
+
   async startRun(
     projectId: number,
     agentId: string,

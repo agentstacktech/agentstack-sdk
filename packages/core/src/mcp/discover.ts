@@ -11,6 +11,56 @@ export interface McpDiscoverOptions {
   projectId?: number;
 }
 
+export interface McpActionEffect {
+  kind?: 'read' | 'mutate' | 'destructive' | 'evaluate';
+  generation?: boolean;
+  budget?: string;
+  write_mode?: boolean;
+  destructive?: boolean;
+  external_side_effect?: boolean;
+  audit_side_effect?: boolean;
+}
+
+export interface McpInstructionSlice {
+  when_to_use?: string;
+  instruction_hint?: string;
+  related_tools?: string[];
+  related_prompts?: string[];
+  organ_id?: string;
+  owner_gene?: string;
+  onboarding_tier?: string;
+  capability_descriptor?: Record<string, unknown>;
+  error_hints?: Array<{ code: string; tip: string }>;
+  effect?: McpActionEffect;
+}
+
+export interface McpDiscoverIntentRow {
+  intent_id: string;
+  intent_name: string;
+  category: string;
+  description: string;
+  required_tools: string[];
+  optional_tools: string[];
+  workflow_id?: string;
+  estimated_steps?: number;
+  difficulty?: string;
+  confidence?: number;
+  example_params?: Record<string, unknown>;
+  primary_tool?: string;
+  instruction_slice?: McpInstructionSlice;
+  note?: string;
+}
+
+export interface McpDiscoverByIntentResult {
+  success: boolean;
+  data: {
+    intents: McpDiscoverIntentRow[];
+    total: number;
+    query: string;
+    message?: string;
+  };
+}
+
 async function mcpRestJson(
   apiBase: string,
   path: string,
@@ -35,8 +85,8 @@ async function mcpRestJson(
 export async function mcpDiscoverByIntent(
   intent: string,
   opts: McpDiscoverOptions & { projectId: number },
-): Promise<unknown> {
-  return mcpRestJson(
+): Promise<McpDiscoverByIntentResult> {
+  const raw = await mcpRestJson(
     opts.apiBase,
     '/mcp/discover/by_intent',
     {
@@ -46,6 +96,7 @@ export async function mcpDiscoverByIntent(
     },
     opts,
   );
+  return raw as McpDiscoverByIntentResult;
 }
 
 /** GET /mcp/discovery — API key capability context. */

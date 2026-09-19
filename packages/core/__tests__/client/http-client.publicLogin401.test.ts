@@ -126,6 +126,42 @@ describe('HTTPClient public /login 401 handling', () => {
     expect((events[0] as { jti_prefix?: string }).jti_prefix).toBe('cf4c064c9c3e');
   });
 
+  it('GET /auth/me session_not_found absent does not purge bearer (G-A24)', async () => {
+    const live = makeJwt('cf4c064c9c3e-live');
+    client.setAuthToken(live);
+    window.localStorage.setItem('access_token', live);
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce(
+      makeJsonResponse({
+        ok: false,
+        status: 401,
+        body: {
+          detail: {
+            code: 'session_not_found',
+            project_id: 1438,
+            jti_prefix: 'cf4c064c9c3e',
+            reason: 'absent',
+          },
+        },
+      }),
+    );
+
+    try {
+      await client.get('/auth/me/bootstrap', undefined, {
+        skipCache: true,
+        skipBatching: true,
+        skipAuthStateCheck: true,
+        retry: { maxAttempts: 0 },
+      });
+      expect('unreachable').toBe(true);
+    } catch (err) {
+      expect(err).toBeInstanceOf(UnauthorizedError);
+    }
+
+    expect(client.getAuthToken()).toBe(live);
+    expect(window.localStorage.getItem('access_token')).toBe(live);
+  });
+
   it('GET /auth/me cache_epoch_stale clears client epoch', async () => {
     client.setAuthToken(makeJwt('abc123'));
     // Seed epoch via private field through a successful capture path: set directly.

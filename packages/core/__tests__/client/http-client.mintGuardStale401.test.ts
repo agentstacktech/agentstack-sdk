@@ -90,6 +90,30 @@ describe('HTTPClient mint guard stale 401', () => {
     expect(auth.getState()).toBe('authenticated');
   });
 
+  it('does not mark session_expired on admin 401 when bearer is present (scope miss)', async () => {
+    const live = makeJwt('admin-scope-miss-jti');
+    client.setAuthToken(live);
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce(
+      makeJsonResponse({
+        ok: false,
+        status: 401,
+        body: { detail: 'Ecosystem admin access required' },
+      }),
+    );
+
+    await expect(
+      client.get('/api/admin/data/snapshot', { project_id: 1 }, {
+        skipCache: true,
+        skipBatching: true,
+        retry: { maxAttempts: 0 },
+      }),
+    ).rejects.toBeInstanceOf(UnauthorizedError);
+
+    expect(client.getAuthToken()).toBe(live);
+    expect(auth.getState()).toBe('authenticated');
+  });
+
   it('does not mark session_expired when response is 401 and client has no bearer', async () => {
     auth.setState({ state: 'unauthenticated' });
     client.setAuthToken(null);

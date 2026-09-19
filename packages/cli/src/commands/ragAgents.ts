@@ -223,6 +223,12 @@ function genSettingsPatchMcp(): CommandSpec['run'] {
     }
     const strategy = parseFlagValue(args, 'auto-promote-strategy');
     if (strategy) params.auto_promote_strategy = strategy;
+    if (parseFlagValue(args, 'auto-checkpoint-before-promote') === 'true') {
+      params.auto_checkpoint_before_promote = true;
+    }
+    if (parseFlagValue(args, 'require-gates-on-promote') === 'true') {
+      params.require_gates_passed_on_promote = true;
+    }
     rt.print(await mcpAction(rt, 'generation.settings.patch', params));
   };
 }

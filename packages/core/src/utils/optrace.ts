@@ -141,20 +141,33 @@ const levelMap: Record<OpTraceLevel, LogLevel> = {
 /**
  * Logs locally with a stable `event` field; does not call the server OpTrace API.
  */
+const OPTRACE_DEDUPE_MS = 2_000;
+const optraceDedupeAt = new Map<string, number>();
+
 export function optraceLog(
   level: OpTraceLevel,
   event: string,
   msg: string,
   attrs?: Record<string, unknown>
 ): void {
+  const now = Date.now();
+  const lastAt = optraceDedupeAt.get(event) ?? 0;
+  const skipLocalLog = now - lastAt < OPTRACE_DEDUPE_MS;
+  if (!skipLocalLog) {
+    optraceDedupeAt.set(event, now);
+  }
+
   const lv = levelMap[level] ?? LogLevel.INFO;
   const payload = { event, ...(attrs && Object.keys(attrs).length ? { attrs } : {}) };
-  if (lv === LogLevel.DEBUG) logger.debug(msg, payload);
-  else if (lv === LogLevel.INFO) logger.info(msg, payload);
-  else if (lv === LogLevel.WARN) logger.warn(msg, payload);
-  else logger.error(msg, payload);
+  if (!skipLocalLog) {
+    if (lv === LogLevel.DEBUG) logger.debug(msg, payload);
+    else if (lv === LogLevel.INFO) logger.info(msg, payload);
+    else if (lv === LogLevel.WARN) logger.warn(msg, payload);
+    else logger.error(msg, payload);
+  }
 
   if (!isClientOpTraceBatchEnabled()) return;
+  if (skipLocalLog) return;
   OPTRACE_BUFFER.push({
     level,
     event,

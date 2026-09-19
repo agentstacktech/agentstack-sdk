@@ -29,6 +29,7 @@ export type {
   NeuralGraphHostSlice,
   NeuralGraphInclude,
   NeuralGraphL1CacheNsStats,
+  NeuralGraphOrganIndex,
   NeuralGraphOrganismCell,
   NeuralGraphRouterInfo,
 } from './neuralGraph';

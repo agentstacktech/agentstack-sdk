@@ -2,8 +2,12 @@ import { describe, expect, it } from '@jest/globals';
 import {
   classifyAuthFailure,
   isNonRetryableAuthOrShed,
+  isTransientSessionBootstrapError,
+  isTransientSessionMissReason,
+  shouldPurgeClientSessionOnMiss,
   isTypedDna503Code,
 } from '../../src/utils/classifyAuthFailure';
+import { UnauthorizedError } from '../../src/types/shared/HTTPTypes';
 
 describe('classifyAuthFailure', () => {
   it('classifies typed 503 DNA codes', () => {
@@ -63,5 +67,42 @@ describe('classifyAuthFailure', () => {
       expect(isNonRetryableAuthOrShed({ status: 503, apiCode: code })).toBe(true);
     }
     expect(isNonRetryableAuthOrShed({ status: 500, message: 'boom' })).toBe(false);
+  });
+
+  it('isNonRetryableAuthOrShed treats 403 and server_busy as final', () => {
+    expect(isNonRetryableAuthOrShed({ status: 403, apiCode: 'forbidden' })).toBe(true);
+    expect(isNonRetryableAuthOrShed({ status: 503, apiCode: 'server_busy' })).toBe(true);
+  });
+
+  it('isTransientSessionMissReason covers post-restart races (G-A24)', () => {
+    expect(isTransientSessionMissReason('absent')).toBe(true);
+    expect(isTransientSessionMissReason('session_resolve_busy')).toBe(true);
+    expect(isTransientSessionMissReason('dna_timeout')).toBe(true);
+    expect(isTransientSessionMissReason('terminated')).toBe(false);
+  });
+
+  it('shouldPurgeClientSessionOnMiss respects grace and transient reasons', () => {
+    expect(shouldPurgeClientSessionOnMiss({ reason: 'absent' })).toBe(false);
+    expect(
+      shouldPurgeClientSessionOnMiss({ reason: 'terminated', inPostLoginGrace: true }),
+    ).toBe(false);
+    expect(shouldPurgeClientSessionOnMiss({ reason: 'terminated' })).toBe(true);
+  });
+
+  it('isTransientSessionBootstrapError covers UnauthorizedError with absent reason', () => {
+    const err = new UnauthorizedError('miss', {
+      code: 'session_not_found',
+      sessionMissReason: 'absent',
+    });
+    expect(isTransientSessionBootstrapError(err)).toBe(true);
+  });
+
+  it('isNonRetryableAuthOrShed allows RQ retry on transient session_not_found', () => {
+    const err = new UnauthorizedError('miss', {
+      status: 401,
+      code: 'session_not_found',
+      sessionMissReason: 'absent',
+    });
+    expect(isNonRetryableAuthOrShed(err)).toBe(false);
   });
 });

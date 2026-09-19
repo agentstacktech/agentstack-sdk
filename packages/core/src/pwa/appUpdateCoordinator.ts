@@ -585,9 +585,10 @@ export function createAppUpdateCoordinator(config: AppUpdateCoordinatorConfig): 
       config.onPersistBust?.();
     }
     const strategy = resolveReloadStrategy(opts.mode);
-    // Capture for fallback: probes must not cancel navigation via acknowledgeHealthy.
+    // Only deep recovery needs a delayed fallback — user/controller/background strategies
+    // already call runSwUpdate(true) or hardReload (parallel 2.5s fallback caused double reload).
     let expectNavigationFallback =
-      (opts.mode === 'user' || opts.mode === 'policy_deep_recovery') &&
+      opts.mode === 'policy_deep_recovery' &&
       (typeof window !== 'undefined' || Boolean(config.onNavigationFallback));
     try {
       if (opts.mode === 'policy_deep_recovery' && config.acquireDeepRecoveryLock) {
@@ -781,7 +782,8 @@ export function createAppUpdateCoordinator(config: AppUpdateCoordinatorConfig): 
 
   function scheduleControllerReload(): void {
     emitBeacon({ type: 'pwa.update.controllerchange' });
-    if (mobileRelaxed) return;
+    // Mobile browser tabs: user must tap banner. Installed standalone PWA may auto-apply.
+    if (mobileRelaxed && !readEnv().isStandaloneDisplay) return;
     if (controllerReloadTimer != null) clearScheduleTimeout(controllerReloadTimer);
     controllerReloadTimer = scheduleTimeout(() => {
       if (getVisibility() !== 'visible') return;

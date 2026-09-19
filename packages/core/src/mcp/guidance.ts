@@ -44,6 +44,8 @@ export const MCP_ONBOARDING_RECIPE_IDS = [
   'mcp_integrations_checkout_crm',
   'mcp_agents_run_approve',
   'mcp_knowledge_ingest',
+  'mcp_knowledge_answer_tune',
+  'mcp_knowledge_acceptance_promote',
   'mcp_crm_contact_deal',
   'mcp_hosted_vertical_bootstrap',
   'mcp_key2unity_auth_portal',
@@ -215,7 +217,7 @@ export interface McpSessionSetupLadderPhase {
 
 /** Mandatory session order (auth → project → context → work). Parity with ``session_setup_ladder_steps``. */
 export function sessionSetupLadderPhases(): McpSessionSetupLadderPhase[] {
-          return [
+              return [
     { phase: 1, id: 'authenticate', title: 'Authenticate' },
     { phase: 2, id: 'project', title: 'Select or create project', recipeId: 'mcp_session_setup' },
     { phase: 3, id: 'bind_context', title: 'Bind context.project_id' },
@@ -232,7 +234,7 @@ export interface McpDiscoveryLadderStep {
 
 /** Parity with onboarding bundle ``discovery_ladder`` (relative paths). */
 export function discoveryLadderSteps(): McpDiscoveryLadderStep[] {
-          return [
+              return [
     {
       step: 0,
       label: 'Session setup (auth → project → context)',

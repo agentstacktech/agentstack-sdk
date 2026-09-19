@@ -17,6 +17,7 @@ const commerceSubpackages = [
   'money',
   'topup',
   'storefront',
+  'hosted',
   'errors',
   'entitlements',
   'sell',

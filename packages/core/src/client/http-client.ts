@@ -38,10 +38,16 @@ import {
   isTransientBrowserNetworkError,
   noteTransientNetworkError,
 } from './networkErrors';
-import { isTypedDna503Code } from '../utils/classifyAuthFailure';
+import {
+  isTypedDna503Code,
+  isTransportShed503Code,
+  shouldPurgeClientSessionOnMiss,
+} from '../utils/classifyAuthFailure';
 import {
   API_WARMING_UP_CODE,
+  dispatchBackendReconnectingEvent,
   isApiWarmingUpError,
+  isBackendReconnectingError,
   parseApiWarmingFromBody,
   warmingRetryDelayMs,
 } from './apiWarming';
@@ -57,7 +63,12 @@ import {
   jwtProjectIdFromToken,
   resolveRequestProjectContext,
 } from './resolveRequestProjectContext';
-import { isEcosystemScopedApiPath, isIdentityScopedApiPath, isUserScopedSessionPath } from './routeScopeClassifier';
+import {
+  isAdminScopedApiPath,
+  isEcosystemScopedApiPath,
+  isIdentityScopedApiPath,
+  isUserScopedSessionPath,
+} from './routeScopeClassifier';
 import {
   isExpectedAuthMintPollResponse,
   isSessionAuthEndpoint,
@@ -401,7 +412,9 @@ export class HTTPClient extends SimpleEventEmitter {
         {
           batchTimeout: this.config.batchTimeout,
           maxBatchSize: this.config.maxBatchSize,
-          maxBatchWaitMs: this.config.maxBatchWaitMs
+          maxBatchWaitMs: this.config.maxBatchWaitMs,
+          shouldDeferFlush: () =>
+            this.isInAuthCriticalSection() || this.isInPostLoginGrace(),
         }
       );
     }
@@ -730,10 +743,11 @@ export class HTTPClient extends SimpleEventEmitter {
     // ✅ CRITICAL FIX: Use request batcher if enabled and request is batchable
     // Never batch skipCache GETs (profile, /auth/me, sessions, etc.) — batch path must not
     // substitute or reorder user-specific responses.
-    const hasAuth =
-      Boolean(this.getAuthToken()) || Boolean(this.getApiKey());
+    const hasBearer = Boolean(this.getAuthToken()?.trim());
     const isBatchable = activeConfig.method === HTTPMethod.GET &&
-                       hasAuth &&
+                       hasBearer &&
+                       !this.isInAuthCriticalSection() &&
+                       !this.isInPostLoginGrace() &&
                        !activeConfig.skipCache &&
                        !activeConfig.skipBatching &&
                        this.requestBatcher &&
@@ -1482,7 +1496,7 @@ export class HTTPClient extends SimpleEventEmitter {
             );
           } else if (
             response.status === 503 &&
-            isTypedDna503Code(
+            isTransportShed503Code(
               (() => {
                 const root = responseData as { code?: string; detail?: { code?: string } };
                 return root?.code ?? root?.detail?.code;
@@ -1709,6 +1723,7 @@ export class HTTPClient extends SimpleEventEmitter {
 
     // Создаем новый lock для refresh
     this.refreshLock = (async () => {
+      let terminalRefreshFailure = false;
       try {
         this.refreshAttempts++;
         this.globalRefreshAttempts++;
@@ -1805,7 +1820,7 @@ export class HTTPClient extends SimpleEventEmitter {
 
         if (response.ok) {
           const data = await response.json();
-          
+
           // Обновляем токены в storage
           if (getStorageItem('access_token')) {
             setStorageItem('access_token', data.access_token);
@@ -1838,8 +1853,22 @@ export class HTTPClient extends SimpleEventEmitter {
 
           return true;
         }
+
+        if (response.status === 401) {
+          terminalRefreshFailure = true;
+        } else if (isBackendReconnectingError({ status: response.status })) {
+          this.refreshAttempts = Math.max(0, this.refreshAttempts - 1);
+          dispatchBackendReconnectingEvent();
+          return false;
+        }
       } catch (error) {
         logger.error('Token refresh failed:', error);
+        if (isBackendReconnectingError(error)) {
+          this.refreshAttempts = Math.max(0, this.refreshAttempts - 1);
+          dispatchBackendReconnectingEvent();
+          return false;
+        }
+        terminalRefreshFailure = true;
       } finally {
         // ✅ MEMORY LEAK FIX: Сбрасываем глобальную глубину и освобождаем lock
         // Сбрасываем только если это был последний уровень (глубина вернется к 0)
@@ -1850,8 +1879,8 @@ export class HTTPClient extends SimpleEventEmitter {
         this.refreshLock = null;
       }
 
-      // Если refresh не удался, очищаем токены и отправляем событие только после 3 попыток
-      if (this.refreshAttempts >= 3) {
+      // Terminal auth failure only — never logout on deploy recycle / edge warm-up (G-A24).
+      if (this.refreshAttempts >= 3 && terminalRefreshFailure) {
         removeStorageItem('access_token');
         removeStorageItem('refresh_token');
         removeStorageItem('api_key');
@@ -1891,6 +1920,9 @@ export class HTTPClient extends SimpleEventEmitter {
         }
 
         logger.warn('Token refresh failed after 3 attempts, user needs to re-login manually');
+      } else if (this.refreshAttempts >= 3) {
+        this.refreshAttempts = 0;
+        dispatchBackendReconnectingEvent();
       }
 
       // ✅ MEMORY LEAK FIX: Отклоняем все ожидающие запросы при неудачном refresh
@@ -2120,7 +2152,14 @@ export class HTTPClient extends SimpleEventEmitter {
       rawDetail && typeof rawDetail === 'object' && !Array.isArray(rawDetail)
         ? (rawDetail as { jti_prefix?: string; reason?: string; project_id?: number; code?: string })
         : null;
-    if (sessionMiss && detailObj?.jti_prefix) {
+    const missReason = String(detailObj?.reason || '').toLowerCase();
+    const purgeMiss =
+      sessionMiss &&
+      shouldPurgeClientSessionOnMiss({
+        reason: missReason || detailObj?.code,
+        inPostLoginGrace: this.isInPostLoginGrace(),
+      });
+    if (purgeMiss && detailObj?.jti_prefix) {
       const prefix = String(detailObj.jti_prefix).replace(/-/g, '');
       const memTok = this.getAuthToken() || '';
       const memJti = HTTPClient.jwtClaim(memTok, 'jti');
@@ -2297,12 +2336,16 @@ export class HTTPClient extends SimpleEventEmitter {
           });
           break;
         }
+        const isAdminPermissionMiss =
+          isAdminScopedApiPath(url) && hasBearer && !sessionMissEarly;
         const shouldMarkSessionExpired =
           hasBearer &&
           !config?.skipAuthStateCheck &&
           !isAuthEndpoint &&
           !isSettingsFieldGet &&
-          !inMintGuard;
+          !inMintGuard &&
+          !config?.omittedBearerForMismatch &&
+          !isAdminPermissionMiss;
 
         if (shouldMarkSessionExpired) {
           this.authStateStore.setState({
@@ -2370,6 +2413,10 @@ export class HTTPClient extends SimpleEventEmitter {
             this.purgeDeadSessionFromClient(rawDetail);
           }
           logger.debug(`🚫 Skipping token refresh for auth endpoint: ${url}`);
+          const missReason =
+            detailObj401 && typeof detailObj401.reason === 'string'
+              ? detailObj401.reason
+              : undefined;
           error = new UnauthorizedError(message || 'Unauthorized', {
             status: 401,
             code: sessionMiss
@@ -2378,6 +2425,7 @@ export class HTTPClient extends SimpleEventEmitter {
                 ? 'cache_epoch_stale'
                 : 'unauthorized',
             traceId,
+            sessionMissReason: missReason,
           });
           break;
         }
@@ -3637,6 +3685,22 @@ export class HTTPClient extends SimpleEventEmitter {
             omittedBearerForMismatch = true;
             if (config) {
               config.omittedBearerForMismatch = true;
+            }
+            const targetPid = Number(headerPid);
+            if (
+              typeof window !== 'undefined' &&
+              Number.isFinite(targetPid) &&
+              targetPid > 0
+            ) {
+              try {
+                window.dispatchEvent(
+                  new CustomEvent('agentstack.auth.project_session_required', {
+                    detail: { project_id: targetPid },
+                  }),
+                );
+              } catch {
+                /* ignore */
+              }
             }
           }
         }

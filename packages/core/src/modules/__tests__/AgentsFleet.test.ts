@@ -147,6 +147,49 @@ describe('AgentsFleet approvals', () => {
     });
   });
 
+  it('routes project orchestrator REST via orchestratorBase', async () => {
+    const get = jest.fn().mockImplementation((url: string) => {
+      if (url.endsWith('/thread')) {
+        return Promise.resolve({ data: { success: true, turns: [] } });
+      }
+      if (url.endsWith('/export-pack')) {
+        return Promise.resolve({ data: { success: true, pack: {} } });
+      }
+      return Promise.resolve({
+        data: { success: true, orchestrator: { agent_uuid: 'a1' }, task_list: { tasks: [] } },
+      });
+    });
+    const patch = jest.fn().mockResolvedValue({
+      data: { success: true, orchestrator: { agent_uuid: 'a1' } },
+    });
+    const post = jest.fn().mockResolvedValue({ data: { success: true, run: { status: 'ok' } } });
+    const agents = new AgentsFleet({ get, patch, post } as never);
+
+    await agents.getOrchestrator(9);
+    await agents.getOrchestratorThread(9, 20);
+    await agents.patchOrchestrator(9, { competence_tier: 'dev_operator' });
+    await agents.exportOrchestratorPack(9);
+    await agents.orchestrate(9, 'hello', { channel: 'workspace' });
+    await agents.importOrchestratorPack(9, { pack_version: 1 });
+
+    expect(get).toHaveBeenCalledWith('/api/projects/9/orchestrator');
+    expect(get).toHaveBeenCalledWith('/api/projects/9/orchestrator/thread', { params: { limit: 20 } });
+    expect(get).toHaveBeenCalledWith('/api/projects/9/orchestrator/export-pack');
+    expect(patch).toHaveBeenCalledWith('/api/projects/9/orchestrator', {
+      patch: { competence_tier: 'dev_operator' },
+    });
+    expect(post).toHaveBeenCalledWith('/api/projects/9/orchestrator/run', {
+      message: 'hello',
+      channel: 'workspace',
+      conversation_id: undefined,
+      bot_uuid: undefined,
+      wait: true,
+    });
+    expect(post).toHaveBeenCalledWith('/api/projects/9/orchestrator/import-pack', {
+      pack: { pack_version: 1 },
+    });
+  });
+
   it('passes pending approval filters including camelCase stale flag', async () => {
     const get = jest.fn().mockResolvedValue({ data: { success: true, project_id: 1, items: [] } });
     const agents = new AgentsFleet({ get } as never);

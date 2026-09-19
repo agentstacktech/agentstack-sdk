@@ -28,6 +28,7 @@ export interface SDKQueryOptions<T> {
   placeholderData?: UseQueryOptions<T, Error>['placeholderData'];
   select?: UseQueryOptions<T, Error>['select'];
   retry?: UseQueryOptions<T, Error>['retry'];
+  retryDelay?: UseQueryOptions<T, Error>['retryDelay'];
   initialData?: UseQueryOptions<T, Error>['initialData'];
   initialDataUpdatedAt?: UseQueryOptions<T, Error>['initialDataUpdatedAt'];
   refetchOnReconnect?: UseQueryOptions<T, Error>['refetchOnReconnect'];
@@ -177,6 +178,7 @@ export function useSDKQuery<T = unknown>(
       ? { select: options.select as UseQueryOptions<T, Error>['select'] }
       : {}),
     ...(options?.retry !== undefined ? { retry: options.retry } : {}),
+    ...(options?.retryDelay !== undefined ? { retryDelay: options.retryDelay } : {}),
     ...(options?.initialData !== undefined ? { initialData: options.initialData } : {}),
     ...(options?.initialDataUpdatedAt !== undefined
       ? { initialDataUpdatedAt: options.initialDataUpdatedAt }

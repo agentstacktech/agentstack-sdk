@@ -16,6 +16,8 @@ export interface McpExecuteOptions {
   mcpUrl: string;
   /** Passed to agentstack.execute options when set. */
   idempotencyKey?: string;
+  /** Expand recipe steps server-side (`options.recipe_id`). */
+  recipeId?: string;
   stopOnError?: boolean;
   timeoutMs?: number;
   maxAttempts?: number;
@@ -35,6 +37,9 @@ export interface McpExecuteResult {
   raw: unknown;
   error?: string;
   status?: number;
+  partial_success?: boolean;
+  succeeded_count?: number;
+  failed_step_ids?: string[];
 }
 
 function isServerBusy(payload: unknown, status?: number): boolean {
@@ -64,6 +69,7 @@ export async function mcpExecute(
     options: {
       stopOnError: opts.stopOnError !== false,
       ...(opts.idempotencyKey ? { idempotency_key: opts.idempotencyKey } : {}),
+      ...(opts.recipeId ? { recipe_id: opts.recipeId } : {}),
     },
   };
 
@@ -108,15 +114,17 @@ export async function mcpExecute(
         continue;
       }
       const results = extractResults(lastRaw);
-      const ok =
-        res.ok &&
-        (results.length === 0 || results.every((r) => r.ok !== false && !r.error));
+      const batchMeta = extractBatchMeta(lastRaw);
+      const stepsOk =
+        results.length === 0 || results.every((r) => r.ok !== false && !r.error);
+      const ok = res.ok && (batchMeta.partial_success === true || stepsOk);
       return {
         ok,
         results,
         raw: lastRaw,
         status: res.status,
         error: ok ? undefined : summarizeError(lastRaw, results),
+        ...batchMeta,
       };
     } catch (err) {
       lastRaw = { error: err instanceof Error ? err.message : String(err) };
@@ -142,6 +150,22 @@ export async function mcpExecute(
     status: lastStatus,
     error: 'mcp_execute_exhausted',
   };
+}
+
+function extractBatchMeta(payload: unknown): Pick<
+  McpExecuteResult,
+  'partial_success' | 'succeeded_count' | 'failed_step_ids'
+> {
+  if (!payload || typeof payload !== 'object') return {};
+  const p = payload as Record<string, unknown>;
+  const inner = (p.result as Record<string, unknown> | undefined) ?? p;
+  const out: Pick<McpExecuteResult, 'partial_success' | 'succeeded_count' | 'failed_step_ids'> = {};
+  if (typeof inner.partial_success === 'boolean') out.partial_success = inner.partial_success;
+  if (typeof inner.succeeded_count === 'number') out.succeeded_count = inner.succeeded_count;
+  if (Array.isArray(inner.failed_step_ids)) {
+    out.failed_step_ids = inner.failed_step_ids.map((id) => String(id));
+  }
+  return out;
 }
 
 function extractResults(payload: unknown): McpStepResult[] {
@@ -174,6 +198,40 @@ function extractResults(payload: unknown): McpStepResult[] {
     }));
   }
   return [];
+}
+
+/** True when batch completed with mixed step outcomes (server partial_success). */
+export function isMcpPartialSuccess(
+  result: Pick<McpExecuteResult, 'partial_success' | 'ok'>,
+): boolean {
+  return Boolean(result.partial_success);
+}
+
+/** Compact UI/agent summary for execute batch outcomes. */
+export function summarizeMcpBatchOutcome(result: McpExecuteResult): {
+  state: 'success' | 'partial_success' | 'error';
+  message: string;
+  succeededCount?: number;
+  failedStepIds?: string[];
+} {
+  if (result.partial_success) {
+    const n = result.succeeded_count ?? 0;
+    const failed = result.failed_step_ids ?? [];
+    return {
+      state: 'partial_success',
+      message: `Partial success: ${n} step(s) ok, ${failed.length} failed`,
+      succeededCount: n,
+      failedStepIds: failed,
+    };
+  }
+  if (result.ok) {
+    return { state: 'success', message: 'All steps succeeded' };
+  }
+  return {
+    state: 'error',
+    message: result.error ?? 'MCP execute failed',
+    failedStepIds: result.failed_step_ids,
+  };
 }
 
 function summarizeError(raw: unknown, results: McpStepResult[]): string {

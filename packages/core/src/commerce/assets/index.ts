@@ -27,6 +27,13 @@ export type {
 } from './schemas';
 
 export {
+  projectOrchestratorPackSchema,
+  composeOrchestratorPackFromProject,
+} from './orchestratorPackCompose';
+
+export type { ProjectOrchestratorPack } from './orchestratorPackCompose';
+
+export {
   parseAssetsSearchParams,
   writeAssetsSearchParams,
   buildAssetsModuleSearchParams,

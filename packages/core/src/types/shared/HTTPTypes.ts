@@ -24,6 +24,7 @@ export type AuthErrorCode =
   | 'session_expired'
   | 'session_revoked'
   | 'session_not_found'
+  | 'session_resolve_busy'
   | 'auth_mint_timeout'
   | 'backend_unavailable'
   | 'unauthorized'
@@ -35,6 +36,8 @@ export class UnauthorizedError extends Error {
   public readonly status: number;
   public readonly code: AuthErrorCode;
   public readonly traceId?: string;
+  /** Bearer contour miss reason from FastAPI ``detail.reason`` (G-A24). */
+  public readonly sessionMissReason?: string;
 
   constructor(
     message: string,
@@ -42,6 +45,7 @@ export class UnauthorizedError extends Error {
       status?: number;
       code?: AuthErrorCode;
       traceId?: string;
+      sessionMissReason?: string;
     },
   ) {
     super(message);
@@ -49,6 +53,7 @@ export class UnauthorizedError extends Error {
     this.status = options?.status ?? 401;
     this.code = options?.code ?? 'unauthorized';
     this.traceId = options?.traceId;
+    this.sessionMissReason = options?.sessionMissReason;
   }
 }
 

@@ -48,6 +48,8 @@ export * as topup from './topup';
 
 export * as storefront from './storefront';
 
+export * as hosted from './hosted';
+
 
 
 export * as errors from './errors';

@@ -25,6 +25,7 @@ export type GrantOsApplication = {
   blocker_ids?: string[];
   next_action?: string;
   talent_is_not_grant?: boolean;
+  primary_metric?: string;
   notes?: string;
   milestones?: GrantMilestone[];
   follow_up_at?: string | null;
@@ -42,6 +43,14 @@ export type GrantOsScoreBreakdown = {
   next_action: string;
 };
 
+export type GrantOsBlockerHint = {
+  id: string;
+  raw: string;
+  label: string;
+  fix: string;
+  doc_path?: string;
+};
+
 export type GrantOsOperatorHint = {
   kind: string;
   label: string;
@@ -54,6 +63,7 @@ export type GrantOsApplicationDetail = {
   score: GrantOsScoreBreakdown;
   earning_playbooks?: Array<Record<string, unknown>>;
   operator_hints?: GrantOsOperatorHint[];
+  blocker_hints?: GrantOsBlockerHint[];
 };
 
 export type GrantOsPipelineData = {
@@ -140,6 +150,7 @@ export type GrantOsApplicationPatch = {
   notes?: string;
   video_url?: string;
   farcaster_url?: string;
+  follow_up_at?: string;
 };
 
 /** One-shot catalog + optional CRM seed. */
@@ -159,11 +170,13 @@ export type GrantOsHubSnapshot = {
   pipeline: GrantOsPipelineData;
   reminders: { reminders: Array<{ program_id: string; action: string; due: string }> };
   integrity: { ok: boolean; failures: string[] };
+  earning?: GrantOsEarningSnapshot;
 };
 
 export type EarningPlaybook = {
   id: string;
   title: string;
+  category?: string;
   genetic_tag?: string;
   revenue_model?: string;
   grant_synergy?: string[];
@@ -171,4 +184,23 @@ export type EarningPlaybook = {
   mcp_actions?: string[];
   evidence_metric?: string;
   public_demo?: string;
+};
+
+/** Partial earning playbook row for EARNING_PLAYBOOKS.yaml upsert. */
+export type GrantOsEarningPlaybookPatch = {
+  title?: string;
+  category?: string;
+  genetic_tag?: string;
+  revenue_model?: string;
+  grant_synergy?: string[];
+  hot_path?: string;
+  mcp_actions?: string[];
+  evidence_metric?: string;
+  public_demo?: string;
+};
+
+export type GrantOsEarningSnapshot = {
+  playbooks: EarningPlaybook[];
+  count: number;
+  by_category: Record<string, EarningPlaybook[]>;
 };

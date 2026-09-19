@@ -36,7 +36,8 @@ export type {
 export { useAuditData } from './useAuditData';
 export type { 
   UseAuditDataOptions, 
-  UseAuditDataResult 
+  UseAuditDataResult,
+  AuditLogsPage,
 } from './useAuditData';
 
 export { useAnalyticsData } from './useAnalyticsData';
