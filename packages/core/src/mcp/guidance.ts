@@ -29,10 +29,22 @@ export const PRODUCT_ARCHETYPE_IDS = [
   'backend_api',
   'project_setup',
   'static_site',
+  'hosted_site_edit',
   'bot_channel',
+  'showcase_portfolio_storefront',
   'migrate_legacy',
   'hosted_vertical_saas',
   'key2unity_auth_portal',
+  'service_business',
+  'marketplace',
+  'community',
+  'ai_product',
+  'support_bot',
+  'knowledge_assistant',
+  'internal_tool',
+  'agency',
+  'freelancer',
+  'content_site',
 ] as const;
 
 export type ProductArchetypeId = (typeof PRODUCT_ARCHETYPE_IDS)[number];
@@ -43,16 +55,18 @@ export const MCP_ONBOARDING_RECIPE_IDS = [
   'mcp_hosting_quickstart',
   'mcp_integrations_checkout_crm',
   'mcp_agents_run_approve',
+  'mcp_agents_fleet_orient',
+  'mcp_agents_create_from_template',
   'mcp_knowledge_ingest',
   'mcp_knowledge_answer_tune',
   'mcp_knowledge_acceptance_promote',
   'mcp_crm_contact_deal',
   'mcp_hosted_vertical_bootstrap',
-  'mcp_key2unity_auth_portal',
   'mcp_support_inbox',
   'mcp_support_respond_v1',
   'mcp_analyst_readonly_v1',
   'mcp_integration_ops_v1',
+  'mcp_integrations_universal_connect_v1',
   'mcp_content_writer_v1',
   'mcp_business_composite_v1',
   'mcp_bots_simulate',
@@ -60,9 +74,16 @@ export const MCP_ONBOARDING_RECIPE_IDS = [
   'mcp_universal_safe_change',
   'mcp_bot_ai_release',
   'mcp_hosting_edit_site_safe',
+  'mcp_hosting_edit_text_file_v1',
+  'mcp_hosting_static_landing_v1',
+  'mcp_site_growth_v1',
+  'mcp_notify_channels_v1',
+  'mcp_platform_flows_v1',
+  'mcp_hosting_react_dist_v1',
   'mcp_project_data_safe_patch',
   'mcp_user_access_safe',
   'mcp_project_operator_session',
+  'mcp_agent_knowledge_memory_setup',
   'mcp_readonly_audit_v1',
   'mcp_agent_certification_v1',
   'mcp_ecosystem_cert_wave_a_v1',
@@ -203,7 +224,7 @@ export function recommendedMcpRecipes(): readonly McpOnboardingRecipeId[] {
   return MCP_ONBOARDING_RECIPE_IDS;
 }
 
-/** Eight-step discovery ladder (parity with ``instruction_plane.discovery_ladder_steps``). */
+/** Ten-step discovery ladder (parity with ``instruction_plane.discovery_ladder_steps``). */
 export function recommendedDiscoveryLadder(): string[] {
   return discoveryLadderSteps().map((row) => row.url);
 }
@@ -217,7 +238,7 @@ export interface McpSessionSetupLadderPhase {
 
 /** Mandatory session order (auth → project → context → work). Parity with ``session_setup_ladder_steps``. */
 export function sessionSetupLadderPhases(): McpSessionSetupLadderPhase[] {
-              return [
+  return [
     { phase: 1, id: 'authenticate', title: 'Authenticate' },
     { phase: 2, id: 'project', title: 'Select or create project', recipeId: 'mcp_session_setup' },
     { phase: 3, id: 'bind_context', title: 'Bind context.project_id' },
@@ -234,10 +255,10 @@ export interface McpDiscoveryLadderStep {
 
 /** Parity with onboarding bundle ``discovery_ladder`` (relative paths). */
 export function discoveryLadderSteps(): McpDiscoveryLadderStep[] {
-              return [
+  return [
     {
       step: 0,
-      label: 'Session setup (auth → project → context)',
+      label: 'Session probe',
       url: `${MCP_GUIDANCE_URLS.promptGet}?name=agentstack_session_setup`,
       method: 'GET',
     },
@@ -249,47 +270,76 @@ export function discoveryLadderSteps(): McpDiscoveryLadderStep[] {
     },
     {
       step: 2,
-      label: 'Session bootstrap',
-      url: `${MCP_GUIDANCE_URLS.aiPrompt}?mode=contract`,
-      method: 'GET',
-    },
-    {
-      step: 3,
-      label: 'Catalog totals',
-      url: MCP_GUIDANCE_URLS.actionsSummary,
-      method: 'GET',
-    },
-    {
-      step: 4,
-      label: 'Catalog search / describe',
-      url: 'discovery.search / discovery.describe',
+      label: 'Intent search',
+      url: 'discovery.search',
       method: 'MCP',
     },
     {
-      step: 5,
-      label: 'Intent routing (NL)',
-      url: MCP_GUIDANCE_URLS.discoverByIntent,
-      method: 'POST',
+      step: 3,
+      label: 'Describe chosen action',
+      url: 'discovery.describe',
+      method: 'MCP',
     },
     {
-      step: 6,
-      label: 'Hot schemas',
-      url: `${MCP_GUIDANCE_URLS.actions}?schemas=hot`,
-      method: 'GET',
-    },
-    {
-      step: 7,
-      label: 'Named playbook',
-      url: `${MCP_GUIDANCE_URLS.promptGet}?name=agentstack_read_bootstrap`,
-      method: 'GET',
-    },
-    {
-      step: 8,
-      label: 'Multi-step recipes',
-      url: MCP_GUIDANCE_URLS.recipes,
-      method: 'GET',
+      step: 4,
+      label: 'Preflight then execute',
+      url: 'preflight.check',
+      method: 'MCP',
     },
   ];
+}
+
+/** Unified discovery.search response (parity with discovery_search_facade). */
+export interface DiscoverySearchRecipeMatch {
+  id: string;
+  name?: string;
+  category?: string;
+  score?: number;
+}
+
+/** GTPI admin debug slice (discovery.search / discover/by_intent when tokens param set). */
+export interface GtpiDebugBinding {
+  binding_id?: string;
+  genetic_tag?: string;
+  entity_key?: string;
+  score?: number;
+}
+
+export interface GtpiDebugPayload {
+  tokens?: string[];
+  bindings?: GtpiDebugBinding[];
+}
+
+/** Product archetype row from instruction_plane.match_product_archetypes */
+export interface ProductArchetypeMatch {
+  id: ProductArchetypeId | string;
+  name?: string;
+  mcp_recipe_id?: string | null;
+  flow_id?: string | null;
+  sdk_hint?: string | null;
+  signals?: string[];
+}
+
+export interface DiscoverySearchResult {
+  catalog_scope?: string;
+  registry_total?: number;
+  public_total?: number;
+  principal_visible_total?: number;
+  query?: string | null;
+  actions?: McpCatalogActionRow[];
+  total_matched?: number;
+  next_cursor?: string | null;
+  catalog_etag?: string;
+  intents?: unknown[];
+  product_archetypes?: ProductArchetypeMatch[];
+  recommended_archetype?: string | null;
+  recommended_recipe?: string | null;
+  supporting_recipes?: string[];
+  recipe_matches?: DiscoverySearchRecipeMatch[];
+  requires_project?: boolean;
+  requires_generation?: boolean;
+  source?: string;
+  gtpi_debug?: GtpiDebugPayload;
 }
 
 export interface BuildMcpCatalogActionsUrlOptions {
@@ -376,22 +426,66 @@ export async function mcpListOrgans(opts: McpListOrgansOptions): Promise<unknown
 }
 
 /** GET /mcp/actions/summary — lightweight catalog totals (no auth required on public plane). */
-export async function fetchMcpActionsSummary(
-  apiBase: string,
-): Promise<{ total_actions: number; version?: string; entrypoint?: string }> {
+export type McpActionsSummary = {
+  total_actions: number;
+  catalog_actions_public?: number;
+  domains_public?: number;
+  registry_tools?: number;
+  registry_total?: number;
+  version?: string;
+  entrypoint?: string;
+};
+
+export async function fetchMcpActionsSummary(apiBase: string): Promise<McpActionsSummary> {
   const origin = resolveMcpGuidanceUrl(apiBase, MCP_GUIDANCE_URLS.actionsSummary);
   const res = await fetch(origin);
-  const data = (await res.json().catch(() => ({}))) as {
+  const data = (await res.json().catch(() => ({}))) as McpActionsSummary & {
     total_actions?: number;
-    version?: string;
-    entrypoint?: string;
   };
   if (!res.ok) throw new Error(JSON.stringify(data));
   return {
     total_actions: Number(data.total_actions ?? 0),
+    catalog_actions_public: data.catalog_actions_public,
+    domains_public: data.domains_public,
+    registry_tools: data.registry_tools,
+    registry_total: data.registry_total,
     version: data.version,
     entrypoint: data.entrypoint,
   };
+}
+
+/** Normalized catalog facts for marketing UI and CLI consumers. */
+export type McpCatalogFacts = {
+  publicActions: number;
+  totalActions: number;
+  domainsPublic?: number;
+  registryTools?: number;
+};
+
+/** GET /mcp/actions/summary — convenience wrapper with stable field names. */
+export async function getMcpCatalogFacts(apiBase: string): Promise<McpCatalogFacts> {
+  const summary = await fetchMcpActionsSummary(apiBase);
+  const publicActions = Number(
+    summary.catalog_actions_public ?? summary.total_actions ?? 0,
+  );
+  return {
+    publicActions,
+    totalActions: Number(summary.total_actions ?? publicActions),
+    domainsPublic: summary.domains_public,
+    registryTools: summary.registry_tools ?? summary.registry_total,
+  };
+}
+
+/** Marketing slot: floor÷50 on public catalog (ADR MCP_MARKETING_SHORTHAND_POLICY). */
+export function formatMcpCatalogShorthandSocial(publicActions: number): string {
+  const base = Math.floor(publicActions / 50) * 50;
+  return `${base}+`;
+}
+
+/** Marketing slot: floor÷10 on public catalog (SEO / JSON-LD). */
+export function formatMcpCatalogShorthandSeo(publicActions: number): string {
+  const base = Math.floor(publicActions / 10) * 10;
+  return `${base}+`;
 }
 
 export interface McpListActionsOptions {
@@ -617,6 +711,10 @@ export interface DiscoveryStatusDomainSlice {
 }
 
 export interface DiscoveryStatusPayload {
+  catalog_scope?: string;
+  registry_total?: number;
+  public_total?: number;
+  principal_visible_total?: number;
   registry_version?: string;
   registry_revision?: string;
   schema_version?: string;
@@ -637,6 +735,38 @@ export interface DiscoveryStatusPayload {
 }
 
 /** MCP discovery.status (registry totals + version). */
+/** Mirror Python ``resolve_mcp_error`` for SDK consumers. */
+export function parseMcpRecoveryError(
+  code: string | null | undefined,
+  context?: Record<string, unknown>,
+): {
+  code: string;
+  hint?: string;
+  suggested_actions: string[];
+  category?: string;
+} {
+  const key = String(code || 'internal');
+  const hints: Record<string, string> = {
+    auth_required:
+      'Authenticate first, then run agentstack_session_setup to bind context.project_id.',
+    validation_error: 'Fix params using GET /mcp/actions input schema.',
+    action_not_found: 'Use discovery.list or discovery.search for exact action names.',
+    permission_denied: 'Widen RBAC or use rbac.check_permission before retry.',
+    not_ready: 'Resource not yet visible — poll list/status with retry_after_ms.',
+    mcp_sync_heavy_limit: 'Split batch or set options.async=true and poll discovery.job_status.',
+  };
+  const hint = hints[key];
+  const suggested_actions = hint ? [hint] : [];
+  if (context?.suggested_actions && Array.isArray(context.suggested_actions)) {
+    for (const item of context.suggested_actions) {
+      if (typeof item === 'string' && !suggested_actions.includes(item)) {
+        suggested_actions.push(item);
+      }
+    }
+  }
+  return { code: key, hint, suggested_actions };
+}
+
 export async function fetchDiscoveryStatus(opts: {
   apiBase: string;
   token: string;
