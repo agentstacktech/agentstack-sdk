@@ -1,9 +1,12 @@
-import { readFileSync } from 'fs';
-import { join } from 'path';
+import { readMonorepoFixture } from './monorepoFixture';
 
-const FIXTURE_ROOT = join(__dirname, '../../../../shared/fixtures');
-
+/** Load a monorepo `shared/fixtures` JSON file. Throws when the sibling tree is absent. */
 export function loadSharedFixture(relPath: string): unknown {
-  const raw = readFileSync(join(FIXTURE_ROOT, relPath), 'utf8');
-  return JSON.parse(raw);
+  const found = readMonorepoFixture(__dirname, ...relPath.split('/').filter(Boolean));
+  if (found === null) {
+    throw new Error(
+      `shared fixture not in this checkout (standalone SDK repo): ${relPath}`,
+    );
+  }
+  return found;
 }

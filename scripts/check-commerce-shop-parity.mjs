@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
+import { findMonorepoFile } from './monorepo-layout.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const pkg = JSON.parse(
@@ -37,13 +38,15 @@ for (const sym of [
   }
 }
 
-const pagesMap = fs.readFileSync(
-  path.join(root, '../docs/dual-shell/PAGES_MAP.md'),
-  'utf8',
-);
-if (!pagesMap.includes('/user/shop')) {
-  console.error('PAGES_MAP missing /user/shop');
-  process.exit(1);
+const pagesMapPath = findMonorepoFile(root, 'docs', 'dual-shell', 'PAGES_MAP.md');
+if (!pagesMapPath) {
+  console.log('check:commerce-shop-parity: skip PAGES_MAP (standalone SDK repo)');
+} else {
+  const pagesMap = fs.readFileSync(pagesMapPath, 'utf8');
+  if (!pagesMap.includes('/user/shop')) {
+    console.error('PAGES_MAP missing /user/shop');
+    process.exit(1);
+  }
 }
 
 console.log('OK: commerce shop parity');

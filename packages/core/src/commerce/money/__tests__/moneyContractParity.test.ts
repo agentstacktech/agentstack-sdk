@@ -1,29 +1,23 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { readMonorepoFixture } from '../../../../__tests__/helpers/monorepoFixture';
 
 import { MoneySchema } from '../schemas';
-
-const fixturePath = join(
-  __dirname,
-  '../../../../../../../shared/fixtures/commerce_money_v1.json',
-);
 
 type MoneyFixture = {
   cases: Array<{ amount: number; currency: string; decimals: number }>;
 };
 
-function loadCases() {
-  const raw = JSON.parse(readFileSync(fixturePath, 'utf8')) as MoneyFixture;
-  expect(raw.cases.length).toBeGreaterThan(0);
-  return raw.cases;
-}
+const moneyFixture = readMonorepoFixture(__dirname, 'commerce_money_v1.json') as MoneyFixture | null;
 
 describe('MoneySchema contract parity (shared.commerce.money.gen1)', () => {
-  it.each(loadCases())('round-trips fixture case %#', (caseRow) => {
+  if (moneyFixture && moneyFixture.cases.length > 0) {
+    it.each(moneyFixture.cases)('round-trips fixture case %#', (caseRow) => {
     const parsed = MoneySchema.parse(caseRow);
     expect(MoneySchema.parse(parsed)).toEqual(parsed);
     expect(parsed).toEqual(caseRow);
-  });
+    });
+  } else {
+    it.skip('round-trips fixture cases (monorepo shared/fixtures)', () => {});
+  }
 
   it('rejects decimals above 8', () => {
     expect(() =>

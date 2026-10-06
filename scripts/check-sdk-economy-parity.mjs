@@ -6,6 +6,7 @@
 import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { findMonorepoFile } from './monorepo-layout.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ledgerSrc = readFileSync(
@@ -36,9 +37,18 @@ const identitySrc = readFileSync(
   join(root, 'packages/core/src/economy/agentnetIdentity.ts'),
   'utf8',
 );
-const economyFixture = JSON.parse(
-  readFileSync(join(root, '../shared/fixtures/agentnet_economy_v1.json'), 'utf8'),
+const economyFixturePath = findMonorepoFile(
+  root,
+  'shared',
+  'fixtures',
+  'agentnet_economy_v1.json',
 );
+const economyFixture = economyFixturePath
+  ? JSON.parse(readFileSync(economyFixturePath, 'utf8'))
+  : null;
+if (!economyFixture) {
+  console.log('check-sdk-economy-parity: skip shared fixture (standalone SDK repo)');
+}
 const agentAdminSrc = readFileSync(
   join(root, 'packages/core/src/modules/AgentAdmin.ts'),
   'utf8',
@@ -177,24 +187,33 @@ for (const chainId of [97, 421614, 84532]) {
   }
 }
 
-const fixtureChecks = [
-  ['network.id', economyFixture.network?.id, 'agentnet'],
-  ['network.displayName', economyFixture.network?.displayName, 'AgentNet'],
-  ['native.code', economyFixture.native?.code, 'AGNT'],
-  ['stable.code', economyFixture.stable?.code, 'AGUSD'],
-  ['stable.vaultStandard', economyFixture.stable?.vaultStandard, 'erc4626'],
-];
-for (const [label, actual, expected] of fixtureChecks) {
-  if (actual !== expected) {
-    console.error(`agentnet_economy_v1.json ${label}: expected ${expected}, got ${actual}`);
-    process.exit(1);
+const identitySnippets = economyFixture
+  ? [
+      ['AGENTNET_NETWORK.id', economyFixture.network.id],
+      ['AGENTNET_NATIVE.code', economyFixture.native.code],
+      ['AGENTNET_STABLE.code', economyFixture.stable.code],
+    ]
+  : [
+      ['AGENTNET_NETWORK.id', 'agentnet'],
+      ['AGENTNET_NATIVE.code', 'AGNT'],
+      ['AGENTNET_STABLE.code', 'AGUSD'],
+    ];
+if (economyFixture) {
+  const fixtureChecks = [
+    ['network.id', economyFixture.network?.id, 'agentnet'],
+    ['network.displayName', economyFixture.network?.displayName, 'AgentNet'],
+    ['native.code', economyFixture.native?.code, 'AGNT'],
+    ['stable.code', economyFixture.stable?.code, 'AGUSD'],
+    ['stable.vaultStandard', economyFixture.stable?.vaultStandard, 'erc4626'],
+  ];
+  for (const [label, actual, expected] of fixtureChecks) {
+    if (actual !== expected) {
+      console.error(`agentnet_economy_v1.json ${label}: expected ${expected}, got ${actual}`);
+      process.exit(1);
+    }
   }
 }
-for (const [label, snippet] of [
-  ['AGENTNET_NETWORK.id', economyFixture.network.id],
-  ['AGENTNET_NATIVE.code', economyFixture.native.code],
-  ['AGENTNET_STABLE.code', economyFixture.stable.code],
-]) {
+for (const [label, snippet] of identitySnippets) {
   if (!identitySrc.includes(`'${snippet}'`) && !identitySrc.includes(`"${snippet}"`)) {
     console.error(`agentnetIdentity.ts missing ${label} (${snippet})`);
     process.exit(1);

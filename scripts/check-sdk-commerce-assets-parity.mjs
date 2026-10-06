@@ -6,6 +6,7 @@
 import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { findMonorepoFile } from './monorepo-layout.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const core = join(root, 'packages/core');
@@ -27,16 +28,22 @@ if (!agentAssets.includes('/asset-presets')) {
 }
 
 const sdkSchemas = readFileSync(join(core, 'src/commerce/assets/schemas.ts'), 'utf8');
-const feSchemas = readFileSync(
-  join(root, '../agentstack-frontend/src/lib/assets/assetDraftSchema.ts'),
-  'utf8',
+const feSchemasPath = findMonorepoFile(
+  root,
+  'agentstack-frontend',
+  'src',
+  'lib',
+  'assets',
+  'assetDraftSchema.ts',
 );
-
-const fePreset = readFileSync(
-  join(root, '../agentstack-frontend/src/lib/assets/assetPresetSchema.ts'),
-  'utf8',
+const fePresetPath = findMonorepoFile(
+  root,
+  'agentstack-frontend',
+  'src',
+  'lib',
+  'assets',
+  'assetPresetSchema.ts',
 );
-const feReexportsSdk = fePreset.includes("@agentstack/sdk/commerce/assets");
 
 for (const literal of [
   "'currency'",
@@ -49,14 +56,30 @@ for (const literal of [
     console.error('SDK schemas missing:', literal);
     process.exit(1);
   }
-  if (!feReexportsSdk && !feSchemas.includes(literal) && !fePreset.includes(literal)) {
-    console.error('Frontend schemas missing:', literal);
+}
+
+if (!feSchemasPath || !fePresetPath) {
+  console.log('check:commerce-assets-parity: skip frontend schemas (standalone SDK repo)');
+} else {
+  const feSchemas = readFileSync(feSchemasPath, 'utf8');
+  const fePreset = readFileSync(fePresetPath, 'utf8');
+  const feReexportsSdk = fePreset.includes('@agentstack/sdk/commerce/assets');
+  for (const literal of [
+    "'currency'",
+    "'digital_item'",
+    "'draft', 'published', 'archived'",
+    "'intent'",
+    "'review'",
+  ]) {
+    if (!feReexportsSdk && !feSchemas.includes(literal) && !fePreset.includes(literal)) {
+      console.error('Frontend schemas missing:', literal);
+      process.exit(1);
+    }
+  }
+  if (!feReexportsSdk) {
+    console.error('frontend assetPresetSchema should re-export @agentstack/sdk/commerce/assets');
     process.exit(1);
   }
-}
-if (!feReexportsSdk) {
-  console.error('frontend assetPresetSchema should re-export @agentstack/sdk/commerce/assets');
-  process.exit(1);
 }
 
 const indexCommerce = readFileSync(join(core, 'src/commerce/assets/index.ts'), 'utf8');
