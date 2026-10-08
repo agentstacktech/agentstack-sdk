@@ -8,6 +8,7 @@
  */
 
 import { HTTPClient } from '../client/http-client';
+import type { RunErrorV1 } from '../agents/runError';
 
 export interface AgentRowDTO {
   uuid: string;
@@ -120,6 +121,8 @@ export interface AgentRunDetailDTO {
   input: Record<string, unknown>;
   output: Record<string, unknown>;
   error?: string | null;
+  /** Parity with MCP resume + ``shared.atoms.run_error.RunErrorV1``. */
+  error_detail?: RunErrorV1 | null;
   started_at?: string | null;
   finished_at?: string | null;
   hlc?: number | null;
@@ -534,15 +537,25 @@ export class AgentsFleet {
 
   async createFromTemplate(
     projectId: number,
-    body: { template_id: string; name?: string; description?: string; template_input?: Record<string, unknown> },
-  ): Promise<{ success: boolean; agent: AgentRowDTO }> {
+    body: {
+      template_id: string;
+      name?: string;
+      description?: string;
+      template_input?: Record<string, unknown>;
+      node_id?: string;
+      env_uuid?: string;
+    },
+  ): Promise<{ success: boolean; agent: AgentRowDTO; bound_node_id?: string }> {
+    const env = String(body.env_uuid ?? '').trim();
     const res = await this.client.post(`${this.base(projectId)}/from-template`, {
       template_id: body.template_id,
       name: body.name ?? 'Agent',
       description: body.description ?? '',
       template_input: body.template_input ?? {},
+      ...(body.node_id ? { node_id: body.node_id } : {}),
+      ...(env ? { env_uuid: env } : {}),
     });
-    return res.data as { success: boolean; agent: AgentRowDTO };
+    return res.data as { success: boolean; agent: AgentRowDTO; bound_node_id?: string };
   }
 
   async approveRun(
@@ -577,45 +590,545 @@ export class AgentsFleet {
     return `/api/projects/${projectId}/orchestrator`;
   }
 
-  async getOrchestrator(projectId: number): Promise<{
+  async getOrchestrator(
+    projectId: number,
+    options?: {
+      include_analytics?: boolean;
+      include_execution_eligibility?: boolean;
+      compact?: boolean;
+      env_uuid?: string;
+    },
+  ): Promise<{
     success: boolean;
     orchestrator?: Record<string, unknown>;
     task_list?: { tasks?: Array<Record<string, unknown>> };
+    plan_claim?: Record<string, unknown>;
+    plan_focus?: Record<string, unknown>;
+    plan_analytics?: Record<string, unknown>;
+    plan_metrics?: Record<string, unknown>;
+    execution_eligibility?: Record<string, unknown>;
+    focus_path?: string[];
     effective_persona?: string;
     competence_tier?: string;
   }> {
-    const res = await this.client.get(this.orchestratorBase(projectId));
+    const params: Record<string, string> = {};
+    if (options?.include_analytics === true) params.include_analytics = 'true';
+    if (options?.include_execution_eligibility === true) {
+      params.include_execution_eligibility = 'true';
+    }
+    if (options?.compact === true) params.compact = 'true';
+    const envUuid = String(options?.env_uuid ?? '').trim();
+    if (envUuid) params.env_uuid = envUuid;
+    const res = await this.client.get(this.orchestratorBase(projectId), {
+      params: Object.keys(params).length ? params : undefined,
+    });
     return res.data as {
       success: boolean;
       orchestrator?: Record<string, unknown>;
       task_list?: { tasks?: Array<Record<string, unknown>> };
+      plan_claim?: Record<string, unknown>;
+      plan_focus?: Record<string, unknown>;
+      plan_analytics?: Record<string, unknown>;
+      plan_metrics?: Record<string, unknown>;
+      execution_eligibility?: Record<string, unknown>;
+      focus_path?: string[];
       effective_persona?: string;
       competence_tier?: string;
     };
   }
 
+  /** Alias for orchestrator GET — mirrors ``agents.plan_get`` (project scope). */
+  async planGet(
+    projectId: number,
+    options?: {
+      include_analytics?: boolean;
+      include_execution_eligibility?: boolean;
+      compact?: boolean;
+      env_uuid?: string;
+    },
+  ): Promise<Awaited<ReturnType<AgentsFleet['getOrchestrator']>>> {
+    return this.getOrchestrator(projectId, options);
+  }
+
   async getOrchestratorThread(
     projectId: number,
-    limit = 40,
+    optionsOrLimit:
+      | number
+      | { conversationId?: string; limit?: number; beforeIndex?: number } = 40,
   ): Promise<{
     success: boolean;
     turns?: Array<{ role: string; text: string; index?: number }>;
+    has_more?: boolean;
   }> {
+    const options =
+      typeof optionsOrLimit === 'number' ? { limit: optionsOrLimit } : optionsOrLimit;
+    const params: Record<string, string | number> = { limit: options.limit ?? 40 };
+    const conversationId = options.conversationId?.trim();
+    if (conversationId) params.conversation_id = conversationId;
+    if (options.beforeIndex != null && options.beforeIndex >= 0) {
+      params.before_index = options.beforeIndex;
+    }
     const res = await this.client.get(`${this.orchestratorBase(projectId)}/thread`, {
-      params: { limit },
+      params,
     });
     return res.data as {
       success: boolean;
       turns?: Array<{ role: string; text: string; index?: number }>;
+      has_more?: boolean;
     };
   }
 
   async patchOrchestrator(
     projectId: number,
     patch: Record<string, unknown>,
+    envUuid?: string,
   ): Promise<{ success: boolean; orchestrator?: Record<string, unknown> }> {
-    const res = await this.client.patch(this.orchestratorBase(projectId), { patch });
+    const env = String(envUuid ?? '').trim();
+    const res = await this.client.patch(this.orchestratorBase(projectId), {
+      patch,
+      ...(env ? { env_uuid: env } : {}),
+    });
     return res.data as { success: boolean; orchestrator?: Record<string, unknown> };
+  }
+
+  async refreshPlanAffinities(
+    projectId: number,
+    body?: {
+      node_id?: string;
+      pin_skills?: boolean;
+      pin_genes?: boolean;
+      env_uuid?: string;
+    },
+  ): Promise<{ success: boolean; task_list?: Record<string, unknown> }> {
+    const res = await this.client.post(
+      `${this.orchestratorBase(projectId)}/plan/refresh-affinities`,
+      body ?? {},
+    );
+    return res.data as { success: boolean; task_list?: Record<string, unknown> };
+  }
+
+  async refreshAgentPlanAffinities(
+    projectId: number,
+    agentId: string,
+    body?: {
+      node_id?: string;
+      pin_skills?: boolean;
+      pin_genes?: boolean;
+      env_uuid?: string;
+    },
+  ): Promise<{ success: boolean; task_list?: Record<string, unknown> }> {
+    const res = await this.client.post(
+      `${this.orchestratorBase(projectId)}/plan/agent/${encodeURIComponent(agentId)}/refresh-affinities`,
+      body ?? {},
+    );
+    return res.data as { success: boolean; task_list?: Record<string, unknown> };
+  }
+
+  async suggestPlanDraft(
+    projectId: number,
+    body: {
+      title: string;
+      parent_prompt?: string;
+      max_children?: number;
+      use_llm?: boolean;
+    },
+  ): Promise<{
+    success: boolean;
+    draft_children?: Array<Record<string, string>>;
+    source?: string;
+    intent_id?: string;
+    heavy_llm?: boolean;
+    llm_skipped?: string;
+  }> {
+    const res = await this.client.post(
+      `${this.orchestratorBase(projectId)}/plan/suggest-draft`,
+      body,
+    );
+    return res.data as {
+      success: boolean;
+      draft_children?: Array<Record<string, string>>;
+      source?: string;
+      intent_id?: string;
+    };
+  }
+
+  /** Nested plan tree draft — mirrors ``agents.plan_suggest_tree`` (read-only). */
+  async suggestPlanTreeDraft(
+    projectId: number,
+    body: {
+      goal_text: string;
+      max_depth?: number;
+      max_nodes?: number;
+      use_llm?: boolean;
+    },
+  ): Promise<{
+    success: boolean;
+    draft_tree?: {
+      version?: number;
+      root_prompt?: string;
+      tasks?: Array<Record<string, unknown>>;
+    };
+    source?: string;
+    heavy_llm?: boolean;
+    llm_skipped?: string;
+    validation?: { ok?: boolean; errors?: string[]; node_count?: number; depth?: number };
+  }> {
+    const res = await this.client.post(
+      `${this.orchestratorBase(projectId)}/plan/suggest-tree-draft`,
+      body,
+    );
+    return res.data as {
+      success: boolean;
+      draft_tree?: {
+        version?: number;
+        root_prompt?: string;
+        tasks?: Array<Record<string, unknown>>;
+      };
+      source?: string;
+      heavy_llm?: boolean;
+      llm_skipped?: string;
+      validation?: { ok?: boolean; errors?: string[]; node_count?: number; depth?: number };
+    };
+  }
+
+  async claimPlanNodes(
+    projectId: number,
+    body: {
+      agent_id: string;
+      limit?: number;
+      node_ids?: string[];
+      /** CAS from plan_get / work_next next_action.params (REST PlanClaimBody). */
+      if_match_revision?: number;
+      /** Sandbox generation anchor — same slice as plan_get. */
+      env_uuid?: string;
+    },
+  ): Promise<{
+    success: boolean;
+    claimed?: string[];
+    task_list?: Record<string, unknown>;
+    wip_full?: boolean;
+  }> {
+    const res = await this.client.post(`${this.orchestratorBase(projectId)}/plan/claim`, body);
+    return res.data as {
+      success: boolean;
+      claimed?: string[];
+      task_list?: Record<string, unknown>;
+      wip_full?: boolean;
+    };
+  }
+
+  /** Thin REST wrapper for ``agents.plan_reclaim_stale`` (expired claim leases). */
+  async reclaimStalePlanClaims(
+    projectId: number,
+    body?: { env_uuid?: string },
+  ): Promise<{
+    success: boolean;
+    reclaimed?: string[];
+    task_list?: Record<string, unknown>;
+  }> {
+    const env = String(body?.env_uuid ?? '').trim();
+    const res = await this.client.post(
+      `${this.orchestratorBase(projectId)}/plan/reclaim-stale`,
+      {},
+      env ? { params: { env_uuid: env } } : undefined,
+    );
+    return res.data as {
+      success: boolean;
+      reclaimed?: string[];
+      task_list?: Record<string, unknown>;
+    };
+  }
+
+  /** Build planner proposal (draft) — mirrors ``agents.plan_propose``. */
+  async planPropose(
+    projectId: number,
+    body?: import('../agents/planGraph').PlanProposeRequestBody,
+  ): Promise<import('../agents/planGraph').PlanProposeResult> {
+    const res = await this.client.post(
+      `${this.orchestratorBase(projectId)}/plan/propose`,
+      body ?? {},
+    );
+    return res.data as import('../agents/planGraph').PlanProposeResult;
+  }
+
+  /** Persist planner proposal with CAS — mirrors ``agents.plan_apply_proposal``. */
+  async planApplyProposal(
+    projectId: number,
+    body: {
+      proposal: import('../agents/planGraph').PlannerProposal | Record<string, unknown>;
+      if_match_revision?: number;
+      env_uuid?: string;
+    },
+  ): Promise<import('../agents/planGraph').PlanApplyProposalResult> {
+    const res = await this.client.post(
+      `${this.orchestratorBase(projectId)}/plan/apply-proposal`,
+      body,
+    );
+    return res.data as import('../agents/planGraph').PlanApplyProposalResult;
+  }
+
+  /** Build planner proposal for an agent-scoped plan graph. */
+  async planProposeAgent(
+    projectId: number,
+    agentId: string,
+    body?: import('../agents/planGraph').PlanProposeRequestBody,
+  ): Promise<import('../agents/planGraph').PlanProposeResult> {
+    const res = await this.client.post(
+      `${this.orchestratorBase(projectId)}/plan/agent/${encodeURIComponent(agentId)}/propose`,
+      body ?? {},
+    );
+    return res.data as import('../agents/planGraph').PlanProposeResult;
+  }
+
+  /** Persist planner proposal to an agent-scoped plan graph with CAS. */
+  async planApplyProposalAgent(
+    projectId: number,
+    agentId: string,
+    body: {
+      proposal: import('../agents/planGraph').PlannerProposal | Record<string, unknown>;
+      if_match_revision?: number;
+      env_uuid?: string;
+    },
+  ): Promise<import('../agents/planGraph').PlanApplyProposalResult> {
+    const res = await this.client.post(
+      `${this.orchestratorBase(projectId)}/plan/agent/${encodeURIComponent(agentId)}/apply-proposal`,
+      body,
+    );
+    return res.data as import('../agents/planGraph').PlanApplyProposalResult;
+  }
+
+  /**
+   * MCP-only — ``agents.work_next`` next-work packet (read-only unless claim=true).
+   * Thread the same ``env_uuid`` across plan_get, plan_propose, plan_apply_proposal,
+   * plan_process_backlog, plan_recovery_scan, and work_next on sandbox forks
+   * (atom ``WG_ENV_UUID_PARITY``).
+   */
+  async workNext(
+    projectId: number,
+    body?: {
+      goal_id?: string;
+      agent_id?: string;
+      claim?: boolean;
+      prefer_agent_id?: string;
+      handoff?: boolean;
+      node_id?: string;
+      env_uuid?: string;
+      locale?: string;
+    },
+  ): Promise<import('../agents/planGraph').WorkNextPacket> {
+    const { locale, ...params } = body ?? {};
+    return this.mcpAgentsAction(projectId, 'agents.work_next', params, {
+      locale,
+    }) as Promise<import('../agents/planGraph').WorkNextPacket>;
+  }
+
+  /**
+   * MCP-only — ``agents.work_status`` lightweight plan summary (summary_only packet).
+   */
+  async workStatus(
+    projectId: number,
+    body?: { locale?: string; goal_id?: string; env_uuid?: string },
+  ): Promise<import('../agents/planGraph').WorkNextPacket> {
+    const { locale, ...params } = body ?? {};
+    return this.mcpAgentsAction(projectId, 'agents.work_status', params, {
+      locale,
+    }) as Promise<import('../agents/planGraph').WorkNextPacket>;
+  }
+
+  /** MCP-only — ``agents.plan_execute`` closed-loop execute for a plan node. */
+  async planExecute(
+    projectId: number,
+    body: {
+      node_id: string;
+      agent_id?: string;
+      goal_text?: string;
+      mode?: string;
+      env_uuid?: string;
+    },
+  ): Promise<Record<string, unknown>> {
+    return this.mcpAgentsAction(projectId, 'agents.plan_execute', body);
+  }
+
+  /** MCP-only — ``agents.ensure_agent`` preview or provision+bind for a plan node. */
+  async ensureAgent(
+    projectId: number,
+    body: {
+      node_id: string;
+      create?: boolean;
+      name?: string;
+      env_uuid?: string;
+    },
+  ): Promise<import('../agents/planGraph').EnsureAgentResult> {
+    return this.mcpAgentsAction(
+      projectId,
+      'agents.ensure_agent',
+      body,
+    ) as Promise<import('../agents/planGraph').EnsureAgentResult>;
+  }
+
+  /** MCP-only — ``agents.plan_recovery_scan`` verify_failed + stale claim preview. */
+  async planRecoveryScan(
+    projectId: number,
+    body?: { limit?: number; env_uuid?: string },
+  ): Promise<Record<string, unknown>> {
+    return this.mcpAgentsAction(projectId, 'agents.plan_recovery_scan', body ?? {});
+  }
+
+  private async mcpAgentsAction(
+    projectId: number,
+    action: string,
+    params: Record<string, unknown> = {},
+    options?: { locale?: string },
+  ): Promise<Record<string, unknown>> {
+    const context: Record<string, unknown> = { project_id: projectId };
+    const locale = String(options?.locale ?? '').trim();
+    if (locale) {
+      context.locale = locale;
+    }
+    const res = await this.client.post('/mcp', {
+      steps: [
+        {
+          id: action,
+          action,
+          params: { project_id: projectId, ...params },
+        },
+      ],
+      context,
+    });
+    const envelope = res.data as {
+      ok?: boolean;
+      error_code?: string;
+      results?: Array<{
+        result?: Record<string, unknown>;
+        data?: Record<string, unknown>;
+        error?: string;
+        error_code?: string;
+        status?: string;
+      }>;
+      data?: Record<string, unknown>;
+    };
+    const step = envelope.results?.[0];
+    const failed =
+      envelope.ok === false ||
+      step?.status === 'error' ||
+      Boolean(step?.error || step?.error_code);
+    if (failed) {
+      const code = String(step?.error_code || step?.error || envelope.error_code || 'mcp_error');
+      const err = new Error(code) as Error & { error_code?: string; step?: unknown };
+      err.error_code = code;
+      err.step = step;
+      throw err;
+    }
+    const payload = (step?.result ?? step?.data ?? envelope.data ?? envelope) as Record<
+      string,
+      unknown
+    >;
+    return payload;
+  }
+
+  /** Deterministic planner backlog — mirrors ``agents.plan_process_backlog``. */
+  async processPlanBacklog(
+    projectId: number,
+    body?: {
+      auto_apply?: boolean;
+      auto_apply_policy?: 'off' | 'safe' | 'force';
+      max_nodes?: number;
+      node_id?: string;
+      env_uuid?: string;
+      validation_mode?: 'strict' | 'persist_unexecutable';
+    },
+  ): Promise<{
+    success: boolean;
+    candidates?: string[];
+    processed?: number;
+    results?: Array<Record<string, unknown>>;
+    graph_revision?: number;
+    auto_apply_policy?: string;
+  }> {
+    const res = await this.client.post(
+      `${this.orchestratorBase(projectId)}/plan/process-backlog`,
+      body ?? {},
+    );
+    return res.data as {
+      success: boolean;
+      candidates?: string[];
+      processed?: number;
+      results?: Array<Record<string, unknown>>;
+      graph_revision?: number;
+      auto_apply_policy?: string;
+    };
+  }
+
+  async patchPlan(
+    projectId: number,
+    body: {
+      patch: Record<string, unknown>;
+      replace?: boolean;
+      if_match_revision?: number;
+      env_uuid?: string;
+    },
+  ): Promise<{ success: boolean; task_list?: Record<string, unknown> }> {
+    const envUuid = String(body.env_uuid ?? '').trim();
+    const res = await this.client.patch(this.orchestratorBase(projectId), {
+      patch: {
+        task_list: body.patch,
+        task_list_replace: body.replace ?? false,
+        task_list_revision: body.if_match_revision,
+      },
+      ...(envUuid ? { env_uuid: envUuid } : {}),
+    });
+    return res.data as { success: boolean; task_list?: Record<string, unknown> };
+  }
+
+  async getAgentPlan(
+    projectId: number,
+    agentId: string,
+    options?: { include_execution_eligibility?: boolean },
+  ): Promise<{
+    success: boolean;
+    task_list?: Record<string, unknown>;
+    plan_metrics?: Record<string, unknown>;
+    task_list_revision?: number;
+    execution_eligibility?: Record<string, unknown>;
+  }> {
+    const params: Record<string, string> = {};
+    if (options?.include_execution_eligibility === true) {
+      params.include_execution_eligibility = 'true';
+    }
+    const res = await this.client.get(
+      `${this.orchestratorBase(projectId)}/plan/agent/${encodeURIComponent(agentId)}`,
+      { params: Object.keys(params).length ? params : undefined },
+    );
+    return res.data as {
+      success: boolean;
+      task_list?: Record<string, unknown>;
+      plan_metrics?: Record<string, unknown>;
+      task_list_revision?: number;
+      execution_eligibility?: Record<string, unknown>;
+    };
+  }
+
+  async patchAgentPlan(
+    projectId: number,
+    agentId: string,
+    body: {
+      patch: Record<string, unknown>;
+      replace?: boolean;
+      if_match_revision?: number;
+      env_uuid?: string;
+    },
+  ): Promise<{ success: boolean; task_list?: Record<string, unknown> }> {
+    const env = String(body.env_uuid ?? '').trim();
+    const res = await this.client.patch(
+      `${this.orchestratorBase(projectId)}/plan/agent/${encodeURIComponent(agentId)}`,
+      {
+        patch: body.patch,
+        replace: body.replace ?? false,
+        if_match_revision: body.if_match_revision,
+        ...(env ? { env_uuid: env } : {}),
+      },
+    );
+    return res.data as { success: boolean; task_list?: Record<string, unknown> };
   }
 
   async exportOrchestratorPack(
@@ -633,14 +1146,21 @@ export class AgentsFleet {
       conversationId?: string;
       botUuid?: string;
       wait?: boolean;
+      surface?: string;
+      focusNodeId?: string;
+      envUuid?: string;
     } = {},
   ): Promise<{ success: boolean; run: Record<string, unknown> }> {
+    const env = String(options.envUuid ?? '').trim();
     const res = await this.client.post(`${this.orchestratorBase(projectId)}/run`, {
       message,
       channel: options.channel ?? 'api',
       conversation_id: options.conversationId,
       bot_uuid: options.botUuid,
       wait: options.wait ?? true,
+      surface: options.surface,
+      focus_node_id: options.focusNodeId,
+      ...(env ? { env_uuid: env } : {}),
     });
     return res.data as { success: boolean; run: Record<string, unknown> };
   }
@@ -655,6 +1175,11 @@ export class AgentsFleet {
     return res.data as { success: boolean; orchestrator?: Record<string, unknown> };
   }
 
+  /**
+   * Enqueue a fleet run. Server auto-builds orchestration seed from `input.message` /
+   * `input.task` (same spine as MCP `agents.run`) — clients do not send orchestration blobs.
+   * For plan-graph children, pass `plan_node_id` after `agents.plan_claim` (or orchestrator spawn).
+   */
   async startRun(
     projectId: number,
     agentId: string,
