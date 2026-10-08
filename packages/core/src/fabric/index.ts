@@ -52,13 +52,29 @@ export {
   capabilityErrorSchema,
   capabilityCostSchema,
   capabilityCacheInfoSchema,
+  capabilityProjectionSchema,
   parseCapabilityResult,
+  parseMcpRecoveryError,
+  readProjectionState,
+  pollMcpVerificationAction,
+  pollRagIngestUntilDone,
+  readIngestJobDone,
+  batchStepPollFields,
+  isProjectionSettled,
+  isCommittedPartial,
+  MCC_PARTIAL_STATES,
+  extractAsyncProjection,
+  SETTLED_PROJECTION_STATES,
+  ASYNC_PROJECTION_STATES,
+  type PollMcpVerificationOptions,
+  type PollRagIngestOptions,
 } from './capabilityResult';
 export type {
   CapabilityResult,
   CapabilityError,
   CapabilityCost,
   CapabilityCacheInfo,
+  CapabilityProjection,
 } from './capabilityResult';
 
 export {
@@ -66,6 +82,7 @@ export {
   principalContextSchema,
   effectiveCapabilitiesSchema,
   parsePrincipalContext,
+  resolveMcpProjectScope,
 } from './principalContext';
 export type {
   PrincipalKind,

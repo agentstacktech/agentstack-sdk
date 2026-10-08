@@ -175,8 +175,18 @@ export function integrationRebindTriggers(
   });
 }
 
+/** Agent/MCP hints returned with connector setup schema (core.integrations.hub.gen1). */
+export type ConnectorSetupSchemaEnvelope = {
+  provider: string;
+  schema: unknown;
+  mcp_recipe_id?: string;
+  mcp_prompt?: string;
+  suggested_mcp_actions?: string[];
+  suggested_flow?: string;
+};
+
 export function integrationGetConnectorSetupSchema(client: HTTPClient, provider: string) {
-  return client.get<{ provider: string; schema: unknown }>(
+  return client.get<ConnectorSetupSchemaEnvelope>(
     '/integrations/connectors/setup-schema',
     { provider },
     { skipBatching: true, skipCache: true },

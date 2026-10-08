@@ -14,10 +14,22 @@ export interface McpExecuteOptions {
   token: string;
   projectId: number;
   mcpUrl: string;
+  /**
+   * When JWT project_id ≠ tenant workspace, call AgentAuth.switchProject (REST
+   * POST /api/auth/switch-project) and pass the returned access_token here before mutate batches.
+   */
   /** Passed to agentstack.execute options when set. */
   idempotencyKey?: string;
   /** Expand recipe steps server-side (`options.recipe_id`). */
   recipeId?: string;
+  /** Playbook text. The server returns instruction_packet for the current step. */
+  goal?: string;
+  /** Playbook progress. completed_steps holds step ids. */
+  observed?: Record<string, unknown>;
+  /** Server session id from the previous envelope. */
+  workflowRunId?: string;
+  /** Wording only. The allowed action set stays the same. */
+  density?: 'strict' | 'guided' | 'autonomous';
   stopOnError?: boolean;
   timeoutMs?: number;
   maxAttempts?: number;
@@ -70,6 +82,10 @@ export async function mcpExecute(
       stopOnError: opts.stopOnError !== false,
       ...(opts.idempotencyKey ? { idempotency_key: opts.idempotencyKey } : {}),
       ...(opts.recipeId ? { recipe_id: opts.recipeId } : {}),
+      ...(opts.goal ? { goal: opts.goal } : {}),
+      ...(opts.observed ? { observed: opts.observed } : {}),
+      ...(opts.workflowRunId ? { workflow_run_id: opts.workflowRunId } : {}),
+      ...(opts.density ? { density: opts.density } : {}),
     },
   };
 
@@ -198,6 +214,61 @@ function extractResults(payload: unknown): McpStepResult[] {
     }));
   }
   return [];
+}
+
+export interface InversePacket {
+  step_id: string;
+  allowed_actions: string[];
+  text: string;
+  writes_allowed: boolean;
+}
+
+export interface InverseEnvelope {
+  packet: InversePacket | null;
+  observed: Record<string, unknown> | null;
+  workflowRunId: string;
+  workflowStatus: string;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function findInverseBody(payload: unknown): Record<string, unknown> | null {
+  const root = asRecord(payload);
+  if (!root) return null;
+  const result = asRecord(root.result);
+  const layers = [root, result, asRecord(result?.result)];
+  for (const row of layers) {
+    if (!row) continue;
+    if ('instruction_packet' in row || 'next_step' in row || 'completion' in row) return row;
+  }
+  return null;
+}
+
+/** Read the playbook cursor from an execute JSON-RPC payload. Null packet means the graph is finished. */
+export function readInverseEnvelope(raw: unknown): InverseEnvelope | null {
+  const body = findInverseBody(raw);
+  if (!body) return null;
+  const packet = asRecord(body.instruction_packet);
+  const observed = asRecord(body.observed);
+  const completion = asRecord(body.completion);
+  return {
+    packet: packet
+      ? {
+          step_id: String(packet.step_id ?? ''),
+          allowed_actions: Array.isArray(packet.allowed_actions)
+            ? packet.allowed_actions.map((name) => String(name))
+            : [],
+          text: String(packet.text ?? ''),
+          writes_allowed: packet.writes_allowed !== false,
+        }
+      : null,
+    observed,
+    workflowRunId: String(body.workflow_run_id ?? completion?.workflow_run_id ?? ''),
+    workflowStatus: String(completion?.workflow_status ?? ''),
+  };
 }
 
 /** True when batch completed with mixed step outcomes (server partial_success). */

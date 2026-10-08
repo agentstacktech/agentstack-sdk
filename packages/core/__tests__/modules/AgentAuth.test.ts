@@ -52,7 +52,7 @@ describe('AgentAuth', () => {
 
       const expectedResponse = {
         access_token: 'aaa.bbb.ccc',
-        refresh_token: 'api.key.token',
+        refresh_token: 'aaa.bbb.ccc',
         token_type: 'Bearer',
         expires_in: 86400,
         user_id: '1',
@@ -416,21 +416,11 @@ describe('AgentAuth', () => {
       expect(result).toBeUndefined();
     });
 
-    it('should set avatar', async () => {
-      const avatarData = 'data:image/jpeg;base64,newavatar';
-      const expectedResponse = { ...testProfileData, avatar: avatarData };
-
-      mockHttpClient.post.mockResolvedValueOnce({
-        data: expectedResponse,
-      });
-
-      const result = await auth.setAvatar(avatarData);
-
-      expect(mockHttpClient.post).toHaveBeenCalledWith('/auth/profile-data/set', {
-        path: 'avatar',
-        value: avatarData,
-      });
-      expect(result).toBeUndefined();
+    it('should refuse inline avatar bytes', async () => {
+      await expect(auth.setAvatar('data:image/jpeg;base64,newavatar')).rejects.toThrow(
+        /uploadAvatar/,
+      );
+      expect(mockHttpClient.post).not.toHaveBeenCalled();
     });
   });
 

@@ -26,6 +26,19 @@ export type RagStorageRef = {
   relative_path?: string;
 };
 
+/** List response from ``GET /api/rag/collections`` (v12 quota parity). */
+export type RagCollectionListResponse = {
+  success?: boolean;
+  collections?: RagCollection[];
+  collections_count?: number;
+  collections_ready?: number;
+  collections_pending?: number;
+  quota_used?: number;
+  quota_reserved?: number;
+  quota_committed?: number;
+  quota_limit?: number | null;
+};
+
 /** Thin collection row from list/create endpoints. */
 export type RagCollection = {
   uuid: string;

@@ -172,8 +172,12 @@ describe('AgentsFleet approvals', () => {
     await agents.orchestrate(9, 'hello', { channel: 'workspace' });
     await agents.importOrchestratorPack(9, { pack_version: 1 });
 
-    expect(get).toHaveBeenCalledWith('/api/projects/9/orchestrator');
+    expect(get).toHaveBeenCalledWith('/api/projects/9/orchestrator', { params: undefined });
     expect(get).toHaveBeenCalledWith('/api/projects/9/orchestrator/thread', { params: { limit: 20 } });
+    await agents.getOrchestratorThread(9, { limit: 10, beforeIndex: 7 });
+    expect(get).toHaveBeenCalledWith('/api/projects/9/orchestrator/thread', {
+      params: { limit: 10, before_index: 7 },
+    });
     expect(get).toHaveBeenCalledWith('/api/projects/9/orchestrator/export-pack');
     expect(patch).toHaveBeenCalledWith('/api/projects/9/orchestrator', {
       patch: { competence_tier: 'dev_operator' },
@@ -187,6 +191,101 @@ describe('AgentsFleet approvals', () => {
     });
     expect(post).toHaveBeenCalledWith('/api/projects/9/orchestrator/import-pack', {
       pack: { pack_version: 1 },
+    });
+  });
+
+  it('passes env_uuid on workNext MCP batch', async () => {
+    const post = jest.fn().mockResolvedValue({
+      data: { ok: true, results: [{ result: { next_work: null } }] },
+    });
+    const agents = new AgentsFleet({ post } as never);
+
+    await agents.workNext(9, { env_uuid: 'sandbox-env-1', claim: false });
+
+    expect(post).toHaveBeenCalledWith(
+      '/mcp',
+      expect.objectContaining({
+        steps: [
+          expect.objectContaining({
+            action: 'agents.work_next',
+            params: expect.objectContaining({ env_uuid: 'sandbox-env-1', project_id: 9 }),
+          }),
+        ],
+      }),
+    );
+  });
+
+  it('passes env_uuid and execution flags on planGet', async () => {
+    const get = jest.fn().mockResolvedValue({
+      data: { success: true, task_list: { tasks: [] } },
+    });
+    const agents = new AgentsFleet({ get } as never);
+
+    await agents.planGet(9, {
+      include_analytics: true,
+      include_execution_eligibility: true,
+      compact: true,
+      env_uuid: 'sandbox-env-1',
+    });
+
+    expect(get).toHaveBeenCalledWith('/api/projects/9/orchestrator', {
+      params: {
+        include_analytics: 'true',
+        include_execution_eligibility: 'true',
+        compact: 'true',
+        env_uuid: 'sandbox-env-1',
+      },
+    });
+  });
+
+  it('passes env_uuid on planPropose REST body', async () => {
+    const post = jest.fn().mockResolvedValue({
+      data: { success: true, proposal: {}, validation: {} },
+    });
+    const agents = new AgentsFleet({ post } as never);
+
+    await agents.planPropose(9, {
+      mode: 'repair_plan',
+      node_id: 'n-1',
+      env_uuid: 'sandbox-env-1',
+    });
+
+    expect(post).toHaveBeenCalledWith('/api/projects/9/orchestrator/plan/propose', {
+      mode: 'repair_plan',
+      node_id: 'n-1',
+      env_uuid: 'sandbox-env-1',
+    });
+  });
+
+  it('passes env_uuid on planApplyProposal REST body', async () => {
+    const post = jest.fn().mockResolvedValue({
+      data: { success: true, applied: true },
+    });
+    const agents = new AgentsFleet({ post } as never);
+
+    await agents.planApplyProposal(9, {
+      proposal: { base_graph_revision: 1, nodes_to_create: [] },
+      if_match_revision: 3,
+      env_uuid: 'sandbox-env-1',
+    });
+
+    expect(post).toHaveBeenCalledWith('/api/projects/9/orchestrator/plan/apply-proposal', {
+      proposal: { base_graph_revision: 1, nodes_to_create: [] },
+      if_match_revision: 3,
+      env_uuid: 'sandbox-env-1',
+    });
+  });
+
+  it('passes include_execution_eligibility on getAgentPlan', async () => {
+    const get = jest.fn().mockResolvedValue({
+      data: { success: true, task_list: { tasks: [] }, execution_eligibility: { leaves: [] } },
+    });
+    const agents = new AgentsFleet({ get } as never);
+
+    await agents.getAgentPlan(9, 'agent-1', { include_execution_eligibility: true });
+
+    expect(get).toHaveBeenCalledWith('/api/projects/9/orchestrator/plan/agent/agent-1', {
+      params: { include_execution_eligibility: 'true' },
     });
   });
 

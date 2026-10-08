@@ -70,10 +70,12 @@ export function applyPresetInputsFromSchema(
   if (Object.keys(gamePatch).length) {
     merged.game = deepMerge((base.game ?? {}) as Record<string, unknown>, gamePatch);
   }
-  if (Object.keys(custom).length) {
-    merged.metadata = deepMerge((base.metadata ?? {}) as Record<string, unknown>, {
-      custom_fields: custom,
-    });
+  const metaPatch: Record<string, unknown> = {
+    ...((patch.metadata as Record<string, unknown> | undefined) ?? {}),
+  };
+  if (Object.keys(custom).length) metaPatch.custom_fields = custom;
+  if (Object.keys(metaPatch).length) {
+    merged.metadata = deepMerge((base.metadata ?? {}) as Record<string, unknown>, metaPatch);
   }
 
   return deepMerge(base as Record<string, unknown>, merged) as AssetDraft['components'];

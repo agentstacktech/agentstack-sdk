@@ -20,9 +20,12 @@ export type KnowledgeContentItem = {
   chunk_spans?: KnowledgeChunkSpan[];
   gene_stems?: string[];
   access_tier?: string;
+  content_type?: string;
   collection_id?: string;
   product_ids?: string[];
   status?: string;
+  /** Joined ingest metadata (skill lane, gene_tokens, tags, …). */
+  metadata?: Record<string, unknown>;
 };
 
 /** Read-only chunk row from GET /kb/chunks (not a Studio save path). */
@@ -114,6 +117,25 @@ export type KnowledgeConfig = {
   safety_fail_mode?: 'fail_open' | 'fail_closed_crisis';
   safety_term_allowlist?: string[];
   collection_ids?: string[];
+  context_lanes?: Array<{
+    id: 'faq' | 'consult' | 'coding' | 'design' | 'architecture';
+    collection_ids?: string[];
+    preamble?: string;
+  }>;
+  context_limits?: {
+    prompt_tail_chars?: number;
+    lane_preamble_chars?: number;
+    builder_snippet_chars?: number;
+    description_chars?: number;
+    resource_text_chars?: number;
+    evidence_snippet_chars?: number;
+    lane_collection_cap?: number;
+  };
+  skill_subscriptions?: Array<{
+    publisher_project_id: number;
+    skill_id: string;
+    source_doc_id?: string;
+  }>;
   entitlement_sources?: string[];
   getcourse_cache_ttl_sec?: number;
   product_id_map?: Record<string, string>;
@@ -213,6 +235,8 @@ export type KnowledgePlaygroundBody = {
   principal_user_id?: number;
   access_tier?: string;
   product_id?: string;
+  /** Sandbox slice. Empty keeps the production knowledge config. */
+  env_uuid?: string;
 };
 
 export type KnowledgeAccessSimulateBody = {
@@ -519,6 +543,7 @@ export class AgentKnowledge {
     params?: {
       collection_id?: string;
       access_tier?: string;
+      content_type?: string;
       limit?: number;
       q?: string;
       cursor?: string;
@@ -527,6 +552,7 @@ export class AgentKnowledge {
     const qs = new URLSearchParams();
     if (params?.collection_id) qs.set('collection_id', params.collection_id);
     if (params?.access_tier) qs.set('access_tier', params.access_tier);
+    if (params?.content_type) qs.set('content_type', params.content_type);
     if (params?.limit != null) qs.set('limit', String(params.limit));
     if (params?.q) qs.set('q', params.q);
     if (params?.cursor) qs.set('cursor', params.cursor);
@@ -536,6 +562,59 @@ export class AgentKnowledge {
       items: KnowledgeContentItem[];
       next_cursor?: string | null;
     }>(`/projects/${projectId}/knowledge/content${suffix}`);
+  }
+
+  /** Project skill cards (`project_skills`, content_type skill). Same GET as listContent. */
+  listSkills(
+    projectId: number,
+    params?: { limit?: number; q?: string; cursor?: string },
+  ) {
+    return this.listContent(projectId, {
+      collection_id: 'project_skills',
+      content_type: 'skill',
+      limit: params?.limit,
+      q: params?.q,
+      cursor: params?.cursor,
+    });
+  }
+
+  /**
+   * Resolve skill pick for a goal without LLM — MCP `knowledge.playground` `action=skill_preview`.
+   * Prefer when the host already exposes `sdk.mcp`; REST `/playground` remains simulate-only.
+   */
+  async previewSkillPick(
+    projectId: number,
+    text: string,
+    opts?: { principal_user_id?: number; envUuid?: string },
+    executeMcp?: (
+      steps: Array<{ id: string; action: string; params: Record<string, unknown> }>,
+      ctx?: { projectId?: number },
+    ) => Promise<{ ok: boolean; results?: Array<{ data?: unknown }>; error?: string }>,
+  ) {
+    if (!executeMcp) {
+      throw new Error('previewSkillPick requires sdk.mcp.execute');
+    }
+    const res = await executeMcp(
+      [
+        {
+          id: 'skill_preview',
+          action: 'knowledge.playground',
+          params: {
+            project_id: projectId,
+            action: 'skill_preview',
+            text: text.trim(),
+            ...(opts?.principal_user_id != null && opts.principal_user_id > 0
+              ? { principal_user_id: opts.principal_user_id }
+              : {}),
+            ...(opts?.envUuid ? { env_uuid: opts.envUuid } : {}),
+          },
+        },
+      ],
+      { projectId },
+    );
+    if (!res.ok) throw new Error(res.error || 'skill_preview failed');
+    const data = res.results?.[0]?.data;
+    return (data ?? {}) as Record<string, unknown>;
   }
 
   /** Collection read — REST GET (Core `@router.get("/content/relations")`). */
@@ -688,6 +767,7 @@ export class AgentKnowledge {
       eval_mode?: string;
       bot_uuid?: string;
       principal_user_id?: number;
+      env_uuid?: string;
     },
   ) {
     return this.client.post<{

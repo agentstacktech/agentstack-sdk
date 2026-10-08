@@ -30,7 +30,8 @@ export type AuthErrorCode =
   | 'unauthorized'
   | 'cache_epoch_stale'
   | 'stale_jti_discarded'
-  | 'project_session_required';
+  | 'project_session_required'
+  | 'resource_unauthorized';
 
 export class UnauthorizedError extends Error {
   public readonly status: number;

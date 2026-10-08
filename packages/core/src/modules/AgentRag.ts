@@ -8,6 +8,7 @@ import type {
   RagBatchIngestResult,
   RagChunk,
   RagCollection,
+  RagCollectionListResponse,
   RagHealthSnapshot,
   RagIngestJobStatus,
   RagMemoryTurn,
@@ -38,7 +39,7 @@ export class AgentRag {
   }
 
   listCollections(opts?: RagRequestOpts) {
-    return this.client.get<{ success?: boolean; collections?: RagCollection[] }>(
+    return this.client.get<RagCollectionListResponse>(
       '/rag/collections',
       scopedQuery(opts),
     );

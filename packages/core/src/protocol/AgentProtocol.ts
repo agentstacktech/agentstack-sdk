@@ -40,6 +40,10 @@ import { SerialMutationQueue } from './command-queue';
 import type { AgentFinanceFacade } from '../finance/AgentFinanceFacade';
 import type { AgentAPI } from '../modules/AgentAPI';
 import type {
+  AgentHosting,
+  HostingContentPatchBody,
+} from '../modules/AgentHosting';
+import type {
   PatchProjectDataBody,
   ProjectDataPathValue,
   ProjectDataSnapshot,
@@ -52,6 +56,8 @@ export interface AgentProtocolDeps {
   snapshots: EntitySnapshotRepository;
   /** Project REST — `/projects/{id}/data` (same as `sdk.api`, exposed for one entry point). */
   api?: AgentAPI;
+  /** Static hosting REST — `/hosting/*` (optional; used by patchHostedFile). */
+  hosting?: AgentHosting;
   /** Rules Engine — POST `/command` */
   rulesCommand?: AgentCommand;
   /** High-level protein — POST `/protein/execute` */
@@ -970,6 +976,39 @@ export class AgentProtocol {
       ...(writeMode ? { write_mode: writeMode } : {}),
     };
     return this.requireApi().patchProjectData(projectId, body);
+  }
+
+  private requireHosting(): AgentHosting {
+    if (!this.deps.hosting) {
+      throw new Error(
+        'AgentProtocol: hosting dep missing — use sdk.hosting or pass hosting in deps',
+      );
+    }
+    return this.deps.hosting;
+  }
+
+  /** GET digest (optional) + POST content-patch on bucket working tree. */
+  async patchHostedFile(
+    projectId: number,
+    bucketId: string,
+    path: string,
+    patch: Omit<HostingContentPatchBody, 'expected_sha256' | 'dry_run'> & {
+      expected_sha256?: string;
+      dry_run?: boolean;
+      skipPreflightGet?: boolean;
+    },
+  ) {
+    const hosting = this.requireHosting();
+    let expected = patch.expected_sha256;
+    if (!patch.skipPreflightGet && !expected) {
+      const got = await hosting.getFile(projectId, bucketId, path);
+      expected = got.data?.content_sha256;
+    }
+    const { skipPreflightGet: _skip, ...body } = patch;
+    return hosting.contentPatchFile(projectId, bucketId, path, {
+      ...body,
+      expected_sha256: expected,
+    });
   }
 
   /**

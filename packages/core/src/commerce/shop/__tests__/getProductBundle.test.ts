@@ -23,6 +23,27 @@ describe('getProductBundle', () => {
     expect(skipAuth).toBe(true);
   });
 
+  it('sends hosted seller project so buyer workspace does not hide the listing', async () => {
+    let params: unknown;
+    const client = {
+      get: async (_url: string, query: unknown) => {
+        params = query;
+        return {
+          data: {
+            listing: { uuid: 'u1' },
+            asset_card: {},
+            seller: { project_id: 1589, display_name: 'Shop' },
+            policy: { rails: ['wallet_internal'] },
+            buyer_context: {},
+          },
+        };
+      },
+    } as unknown as HTTPClient;
+
+    await getProductBundle(client, 'u1', 1589);
+    expect(params).toEqual({ project: 1589 });
+  });
+
   it('normalizes BFF response', async () => {
     const client = {
       get: async () => ({

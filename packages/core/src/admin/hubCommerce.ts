@@ -3,6 +3,9 @@
  * Genetic tag: `frontend.admin.commerce_ops_hub.gen1`
  */
 
+/** Runtime marker for non-empty Rollup subpath (`import type` consumers). */
+export const ADMIN_HUB_COMMERCE_GENE = 'frontend.admin.commerce_ops_hub.gen1' as const;
+
 export interface CommerceOverview {
   storefront_ready: boolean;
   index_listing_count: number;

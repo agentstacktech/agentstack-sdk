@@ -44,3 +44,28 @@ export type EffectiveCapabilities = z.infer<typeof effectiveCapabilitiesSchema>;
 export function parsePrincipalContext(input: unknown): PrincipalContext {
   return principalContextSchema.parse(input);
 }
+
+/** Resolve tenant project scope from MCP params + context (RAG home_project_id aware). */
+export function resolveMcpProjectScope(
+  params: Record<string, unknown> | undefined,
+  context: Record<string, unknown> | undefined,
+): number {
+  const p = params ?? {};
+  const c = context ?? {};
+  const fromParams =
+    p.home_project_id ?? p.project_id ?? p.homeProjectId ?? p.projectId;
+  if (fromParams != null && String(fromParams).trim() !== '') {
+    const n = Number(fromParams);
+    if (!Number.isNaN(n) && n > 0) {
+      return n;
+    }
+  }
+  const fromCtx = c.project_id ?? c.home_project_id;
+  if (fromCtx != null) {
+    const n = Number(fromCtx);
+    if (!Number.isNaN(n) && n > 0) {
+      return n;
+    }
+  }
+  return 0;
+}

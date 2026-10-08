@@ -6,7 +6,11 @@
 **Type:** Multi-language SDK (TypeScript + Python + React)  
 **Stack:** TypeScript / Python / React / Rollup  
 **Status:** Production Ready  
-**Last Updated:** 2026-07-16
+**Last Updated:** 2026-09-30
+
+**Core deps:** runtime stays `zod`, `eventemitter3`, `tslib`, `@jitsi/rnnoise-wasm`. `rollup-plugin-copy` removed (worklet copy is `bundle-rnnoise-worklet.mjs`). Peer `@tanstack/react-query` stays because [`packages/core/src/rag/react/hooks.ts`](packages/core/src/rag/react/hooks.ts) calls `useQuery` — React Query hooks for the rest of the app live in `@agentstack/react` (`sdk.react.query.gen1`).
+
+**Publish subpaths with zero `@agentstack/sdk/<sub>` imports** in frontend / widget / hosted-sdk-cdn / shared-ui `src` (do not delete `exports` without a semver major — `repo.platform.sdk.publish.gen1`): `capability-tasks`, `commerce/errors`, `commerce/money`, `commerce/orders`, `commerce/subscription`, `commerce/surfaces`, `finance`, `guidance/react`, `i18n`, `i18n/useI18n`, `seo`, `services`, `workspace`. Callers may still reach them through the `./commerce` barrel or npm consumers outside this monorepo.
 
 > **Maintainer note:** этот индекс для навигации по репозиторию. **API-truth для интеграторов:** [AGENTS.md](AGENTS.md), [README.en.md](README.en.md), [docs/DOC_HUB.md](docs/DOC_HUB.md). Псевдокод ниже может отставать от `packages/core/src` — сверяйтесь с исходниками.
 
@@ -39,7 +43,7 @@
 | `sdk.commerce.hosted.gen1` | [packages/core/src/commerce/hosted/AI_INDEX.md](packages/core/src/commerce/hosted/AI_INDEX.md) | Universal `/s/{pid}/` session vault, listings, intents checkout |
 | `repo.tooling.user_cli.gen1` | [packages/cli/AI_INDEX.md](packages/cli/AI_INDEX.md) · [packages/core/src/mcp/AI_INDEX.md](packages/core/src/mcp/AI_INDEX.md) | Product CLI `@agentstack/cli` + `sdk.mcp.execute` |
 
-**Versioning (v0.4.6 platform):** `SDK_VERSION.semantic` and `AGENTSTACK_CORE_VERSION` are generated from **`AGENTSTACK_CORE_VERSION`** in [`shared/constants.py`](../shared/constants.py) via `npm run sync:agentstack-version` in `packages/core` (see `src/generated/agentstack-core-version.ts`). Align `package.json` `"version"` with that string for in-repo releases. See [`docs/VERSIONING.md`](../docs/VERSIONING.md). **AI navigation:** [`docs/AI_NAVIGATION_MAP.md`](../docs/AI_NAVIGATION_MAP.md). **AgentProtocol:** [`packages/core/src/protocol/AI_INDEX.md`](packages/core/src/protocol/AI_INDEX.md). **Relay / social ADRs:** [`docs/adr/AI_INDEX.md`](../docs/adr/AI_INDEX.md). **OpTrace:** [`docs/OPTRACE_FOR_AGENTS.md`](../docs/OPTRACE_FOR_AGENTS.md) — `getOrCreateCorrelationIds` / `optraceLog` in `packages/core/src/utils/optrace.ts` + HTTP client headers.
+**Versioning (v0.4.6 platform):** `SDK_VERSION.semantic` and `AGENTSTACK_CORE_VERSION` are generated from **`AGENTSTACK_CORE_VERSION`** in [`shared/constants.py`](../shared/constants.py) via `npm run sync:agentstack-version` in `packages/core` (see `src/generated/agentstack-core-version.ts`). A standalone `agentstack-sdk` checkout keeps that committed file when `shared/` is absent. Align `package.json` `"version"` with that string for in-repo releases. See [`docs/VERSIONING.md`](../docs/VERSIONING.md). **AI navigation:** [`docs/AI_NAVIGATION_MAP.md`](../docs/AI_NAVIGATION_MAP.md). **AgentProtocol:** [`packages/core/src/protocol/AI_INDEX.md`](packages/core/src/protocol/AI_INDEX.md). **Relay / social ADRs:** [`docs/adr/AI_INDEX.md`](../docs/adr/AI_INDEX.md). **OpTrace:** [`docs/OPTRACE_FOR_AGENTS.md`](../docs/OPTRACE_FOR_AGENTS.md) — `getOrCreateCorrelationIds` / `optraceLog` in `packages/core/src/utils/optrace.ts` + HTTP client headers.
 
 ---
 
@@ -60,6 +64,7 @@
 5. **Neural Integration** - Cache, events, pattern analysis (client-side)
 6. **i18n Module** - Zero-config translations (AgentI18n)
 7. **Admin Module** - Ecosystem operator only (`sdk.admin`, `sdkAudience: platform_operator`); integrators: [docs/INTEGRATOR_SCOPE.md](docs/INTEGRATOR_SCOPE.md)
+7b. **No tenant-specific runtime** — `@agentstack/sdk` modules stay generic (`projectId` param); no flagship PID/brand branches. Gene `repo.engineering.platform_substrate_no_tenant_code.gen1` · [PLATFORM_SUBSTRATE_NO_TENANT_CODE.md](../docs/platform/PLATFORM_SUBSTRATE_NO_TENANT_CODE.md)
 8. **Entity snapshot repository** — `packages/core/src/cache/` (`AgentStackSDK.entitySnapshotRepository`, path helpers, optional persistence helpers)
 9. **Protein command channel** — `modules/ProteinCommandChannel.ts` → `sdk.proteinCommandChannel` (`/commands/execute`, DNA CRUD bus; same `HTTPClient` as REST)
 10. **AgentProtocol** + **AI surface** — `packages/core/src/protocol/` → **`sdk.protocol`** (REST + 8DNA `dna*` + command bus + snapshots + …); стабильный срез для ИИ: **`sdk.platform`** — [docs/SDK_AI_SURFACE.md](../docs/SDK_AI_SURFACE.md) (`repo.platform.sdk.ai_surface.gen1`). Spec: [`docs/AGENT_PROTOCOL.md`](../docs/AGENT_PROTOCOL.md); **единый контур + офлайн-first:** [`docs/sdk/SDK_UNIFIED_CONNECTION_OFFLINE_FIRST_DECOMPOSITION.md`](../docs/sdk/SDK_UNIFIED_CONNECTION_OFFLINE_FIRST_DECOMPOSITION.md); capabilities: [`docs/AGENT_PROTOCOL_CAPABILITIES.md`](../docs/AGENT_PROTOCOL_CAPABILITIES.md); backlog: [`docs/AGENT_PROTOCOL_ENGINEERING_BACKLOG.md`](../docs/AGENT_PROTOCOL_ENGINEERING_BACKLOG.md); quickstart: [`docs/AGENT_PROTOCOL_QUICKSTART.md`](../docs/AGENT_PROTOCOL_QUICKSTART.md); map tag `repo.platform.sdk.agent_protocol.gen1`.

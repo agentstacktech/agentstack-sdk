@@ -8,3 +8,10 @@ export {
   dataBindingSpecSchema,
 } from './schema';
 export type { AppManifestV1, RouteSpecV1, DataBindingSpecV1 } from './schema';
+export type {
+  AppStudioBuildStatus,
+  AppStudioDiagnostic,
+  AppStudioSourceFile,
+} from './appStudio';
+export { createAppStudioClient } from './appStudioClient';
+export type { AppStudioHttp } from './appStudioClient';

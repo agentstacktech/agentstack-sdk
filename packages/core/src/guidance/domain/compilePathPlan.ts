@@ -13,7 +13,7 @@ import {
   postExecuteQuestionsAfter,
   resolveNextFromQuestion,
 } from './postExecuteQuestions';
-import { resolveExecutionStepsLegacy } from './resolveExecutionSteps';
+import { resolveExecutionSteps, resolveExecutionStepsLegacy } from './resolveExecutionSteps';
 
 export type CompassCompileContext = {
   hideOptionIds?: Set<string>;
@@ -112,7 +112,10 @@ export function compilePathPlan(
     .filter((n): n is PlaybookNode => !!n && n.kind === 'question')
     .map((n) => nodeToPlan(n, 'discover'));
 
-  const execIds = resolveExecutionStepsLegacy(playbook, state);
+  const execIds =
+    playbook.executionRules?.length
+      ? resolveExecutionSteps(playbook, state)
+      : resolveExecutionStepsLegacy(playbook, state);
   const execSteps: Omit<PathStepPlan, 'status'>[] = [];
   const plannedIds = new Set<string>();
 
@@ -136,17 +139,11 @@ export function compilePathPlan(
     }
   }
 
-  if (playbook.id === 'sell-digital-content' && state.answers.siteMode === 'host') {
-    const recipe = playbook.nodes.r_host_recipe;
-    if (recipe?.kind === 'recipe' && !execSteps.some((s) => s.nodeId === 'r_host_recipe')) {
-      execSteps.splice(1, 0, nodeToPlan(recipe, 'execute'));
-    }
-  }
-
   const outcomeNode = Object.values(playbook.nodes).find((n) => n.kind === 'outcome');
   const outcomeSteps = outcomeNode ? [nodeToPlan(outcomeNode, 'outcome')] : [];
 
   const raw = [...discoverSteps, ...execSteps, ...outcomeSteps];
+  const explicitFocus = focusedStepId;
   const focus =
     focusedStepId ??
     (state.currentNodeId && raw.some((s) => s.nodeId === state.currentNodeId)
@@ -154,5 +151,9 @@ export function compilePathPlan(
       : null);
 
   const withStatus = deriveStepStatuses(raw, state, focus);
-  return applyAggregateToPlan(withStatus);
+  const aggregated = applyAggregateToPlan(withStatus);
+  if (explicitFocus) {
+    return { ...aggregated, focusedStepId: explicitFocus };
+  }
+  return aggregated;
 }

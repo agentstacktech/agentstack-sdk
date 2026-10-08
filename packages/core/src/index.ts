@@ -67,8 +67,11 @@ export type {
 
 export {
   isAdminScopedApiPath,
+  isPlatformOperatorApiPath,
   isEcosystemScopedApiPath,
   isIdentityScopedApiPath,
+  isUserMePath,
+  isNonSession401Path,
   isIdentityBearerSessionPath,
   isMcpOAuthAuthorizePath,
   isUserScopedSessionPath,
@@ -128,6 +131,12 @@ export { AgentNeural } from './modules/AgentNeural';
 export type { NeuralStatus, NeuralEvent } from './modules/AgentNeural';
 export { AgentDocs } from './modules/AgentDocs';
 export { AgentPayments } from './modules/AgentPayments';
+export {
+  accountTierFromPayload,
+  isLaunchOrAbovePlan,
+  isScaleOrAbovePlan,
+  limitsTierForPlan,
+} from './billing';
 export { AgentCoin, AgentNetLedger } from './economy';
 export type {
   AgentCoinLedgerLine,
@@ -214,7 +223,17 @@ export type {
   TestnetThreeRailSmokeRecipeParams,
   TestnetThreeRailSmokeRecipeResult,
 } from './economy';
-export { PublicGrantsClient, AgentPublicSurface } from './public';
+export {
+  AgentPublicSurface,
+  PublicGrantsClient,
+  PublicShowcaseClient,
+  getPublicShowcaseCatalog,
+} from './public';
+export type {
+  PublicShowcaseCatalogEntry,
+  PublicShowcaseCatalogResponse,
+  PublicShowcaseEntryKind,
+} from './public';
 export { AdminGrantsClient } from './admin/grants';
 export type {
   GrantOsApplication,
@@ -292,7 +311,15 @@ export {
 } from './economy/agentnet/chainControl';
 export type { PaymentData, Payment, PaymentMethod } from './modules/AgentPayments';
 export { AgentAnalytics } from './modules/AgentAnalytics';
-export type { AnalyticsEvent, DashboardMetrics, UsageStats } from './modules/AgentAnalytics';
+export type {
+  AnalyticsEvent,
+  DashboardMetrics,
+  UsageStats,
+  AnalyticsPeriod,
+  AnalyticsSliceName,
+  ProjectAnalyticsSnapshot,
+  PortfolioAnalyticsSnapshot,
+} from './modules/AgentAnalytics';
 export { AgentSupport } from './modules/AgentSupport';
 export type {
   AgentApprovalReviewDTO,
@@ -423,6 +450,12 @@ export {
   createGenerationsClient,
   applyPromoteGatesPolicy,
   resolveRequireGatesPassed,
+  generationReviewRequired,
+  GENERATION_PREFERRED_ENV_BLOCKED,
+  isStaleEnvUuidError,
+  omitEnvUuid,
+  omitSandboxEnvKeys,
+  callWithEnvUuidRetry,
 } from './sandbox';
 export type {
   PromoteStrategy,
@@ -430,6 +463,7 @@ export type {
   PreviewEnvScope,
   GenerationSettingsLike,
   PromoteBodyLike,
+  SandboxEnvUuidRetryOptions,
 } from './sandbox';
 export {
   integrationQueries,

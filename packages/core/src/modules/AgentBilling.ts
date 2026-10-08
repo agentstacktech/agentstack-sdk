@@ -291,7 +291,12 @@ export class AgentBilling {
    * @returns Promise with updated configuration
    */
   async updateOverageConfig(
-    config: { enabled?: boolean; logic_engine_enabled?: boolean; storage_enabled?: boolean },
+    config: {
+      enabled?: boolean;
+      logic_engine_enabled?: boolean;
+      api_calls_enabled?: boolean;
+      storage_enabled?: boolean;
+    },
     projectId?: number
   ): Promise<any> {
     try {
@@ -300,10 +305,11 @@ export class AgentBilling {
       const params: any = {}
       if (config.enabled !== undefined) params.enabled = config.enabled
       if (config.logic_engine_enabled !== undefined) params.logic_engine_enabled = config.logic_engine_enabled
+      if (config.api_calls_enabled !== undefined) params.api_calls_enabled = config.api_calls_enabled
       if (config.storage_enabled !== undefined) params.storage_enabled = config.storage_enabled
       if (projectId) params.project_id = projectId
       
-      const response = await this.httpClient.patch('/billing/overage', {}, params)
+      const response = await this.httpClient.patch('/billing/overage', {}, { params })
       
       this.eventEmitter.emit('billing:overage_config:success', { config, projectId, data: response })
       

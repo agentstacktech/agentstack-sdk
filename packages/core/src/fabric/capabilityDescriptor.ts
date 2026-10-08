@@ -63,6 +63,8 @@ export const capabilityDescriptorSchema = z.object({
   reversible: z.boolean().default(false),
   approval: approvalPolicySchema.default('never'),
   when_to_use: z.string().default(''),
+  when_not_to_use: z.string().optional(),
+  anti_patterns: z.array(z.string()).optional(),
   related_tools: z.array(z.string()).default([]),
   complexity: z.enum(['simple', 'intermediate', 'advanced']).default('intermediate'),
 });
@@ -102,6 +104,7 @@ export const mcpCapabilityDescriptorSlimSchema = z.object({
   source: mcpCapabilityDescriptorSourceSchema,
   genetic_tags: z.array(z.string()).optional(),
   when_to_use: z.string().optional(),
+  when_not_to_use: z.string().optional(),
   related_tools: z.array(z.string()).optional(),
 });
 
@@ -119,7 +122,25 @@ export const mcpCatalogActionRowSchema = z
     safe_action: z.string().optional(),
     summary: z.string().optional(),
     when_to_use: z.string().optional(),
+    do_not_use_when: z.string().optional(),
+    anti_pattern: z.string().optional(),
+    why_this_action: z.string().optional(),
+    plane: z.string().optional(),
+    alternatives: z.array(z.string()).optional(),
+    effect: z
+      .object({
+        kind: z.string().optional(),
+        generation: z.string().optional(),
+        budget: z.string().optional(),
+        external_side_effect: z.boolean().optional(),
+        audit_side_effect: z.boolean().optional(),
+      })
+      .passthrough()
+      .optional(),
     required_cap: z.string().optional(),
+    /** Canonical slim descriptor (SD-04b). */
+    capability_descriptor_slim: mcpCapabilityDescriptorSlimSchema.optional(),
+    /** Backward-compat alias of capability_descriptor_slim. */
     capability_descriptor: mcpCapabilityDescriptorSlimSchema.optional(),
   })
   .passthrough();

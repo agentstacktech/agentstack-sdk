@@ -1,5 +1,10 @@
 import type { HTTPClient } from '../../client/http-client';
 import { mapCommerceHttpError } from '../errors/mapCommerceHttpError';
+import {
+  grantTenantSubscription,
+  type GrantTenantSubscriptionRequest,
+  type GrantTenantSubscriptionResult,
+} from './grantTenantSubscription';
 
 export type SubscriptionPlan = {
   plan_id: string;
@@ -94,6 +99,14 @@ export class SubscriptionClient {
       {},
     );
     return (response.data ?? response) as Record<string, unknown>;
+  }
+
+  /** Tenant operator: grant subscription buff to buyer (MCP buffs.grant_tenant_subscription). */
+  async grantTenant(
+    projectId: number,
+    body: GrantTenantSubscriptionRequest,
+  ): Promise<GrantTenantSubscriptionResult> {
+    return grantTenantSubscription(this.http, projectId, body);
   }
 
   async renew(subscriptionId: string, idempotencyKey?: string): Promise<Record<string, unknown>> {

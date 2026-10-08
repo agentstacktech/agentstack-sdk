@@ -13,6 +13,8 @@ AgentStack distinguishes two SDK audiences:
 
 Ecosystem admin (`/api/admin/*`, `sdk.admin`, `sdk.platform.adminData`, protocol `*AdminExecute`) is for **AgentStack operators** running the platform control plane—not for applications built on AgentStack by customers.
 
+**Platform substrate:** Core and `@agentstack/sdk` must not hardcode tenant flagship PIDs or product brands — see [PLATFORM_SUBSTRATE_NO_TENANT_CODE.md](../../docs/platform/PLATFORM_SUBSTRATE_NO_TENANT_CODE.md) (`repo.engineering.platform_substrate_no_tenant_code.gen1`).
+
 ---
 
 ## What integrators should use instead

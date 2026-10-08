@@ -63,7 +63,7 @@ export class CommerceFacade {
 
   readonly discovery: {
     listOffers: (params?: ListOffersParams) => ReturnType<typeof listStorefrontListings>;
-    getProduct: (listingUuid: string) => Promise<ProductBundle>;
+    getProduct: (listingUuid: string, sellerProjectId?: number) => Promise<ProductBundle>;
     resolveShopSlug: (slug: string) => ReturnType<typeof resolveShopSlug>;
   };
 
@@ -166,7 +166,8 @@ export class CommerceFacade {
     this.merchantClient = new MerchantClient(http);
     this.discovery = {
       listOffers: (params) => listStorefrontListings(http, params),
-      getProduct: (listingUuid) => getProductBundle(http, listingUuid),
+      getProduct: (listingUuid, sellerProjectId) =>
+        getProductBundle(http, listingUuid, sellerProjectId),
       resolveShopSlug: (slug) => resolveShopSlug(http, slug),
     };
     this.merchant = {

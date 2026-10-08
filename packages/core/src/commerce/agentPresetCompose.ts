@@ -51,10 +51,14 @@ export async function importAgentPresetFromAsset(
   },
   projectId: number,
   asset: Record<string, unknown>,
-  options: { name?: string } = {},
+  options: { name?: string; env_uuid?: string } = {},
 ): Promise<unknown> {
   if (typeof agentsFleet.importFromAsset === 'function') {
-    return agentsFleet.importFromAsset(projectId, { asset, name: options.name });
+    return agentsFleet.importFromAsset(projectId, {
+      asset,
+      name: options.name,
+      ...(options.env_uuid ? { env_uuid: options.env_uuid } : {}),
+    });
   }
   const ext = (asset.components as Record<string, unknown> | undefined)?.extensions as
     | Record<string, unknown>
@@ -72,5 +76,6 @@ export async function importAgentPresetFromAsset(
     template_id: String(templateId),
     name: options.name,
     fork_on_collision: true,
+    ...(options.env_uuid ? { env_uuid: options.env_uuid } : {}),
   });
 }

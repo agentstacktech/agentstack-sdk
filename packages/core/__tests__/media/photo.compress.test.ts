@@ -10,12 +10,7 @@ import { compressPhoto } from '../../src/media/photo/compress';
 const hadBitmap = typeof (globalThis as { createImageBitmap?: unknown }).createImageBitmap !== 'undefined';
 
 describe('sdk.media.photo compress', () => {
-  it('rejects when browser bitmap pipeline is unavailable', async () => {
-    if (hadBitmap) {
-      // Skip — running in a real browser harness would use jsdom mocks.
-      expect(true).toBe(true);
-      return;
-    }
+  it.skipIf(hadBitmap)('rejects when browser bitmap pipeline is unavailable', async () => {
     const b = new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'image/jpeg' });
     await expect(compressPhoto(b, { preset: 'messenger_photo' })).rejects.toBeDefined();
   });

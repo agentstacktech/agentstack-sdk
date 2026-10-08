@@ -3,6 +3,7 @@
  * Модуль для работы с основными API операциями
  */
 
+import type { CanonicalL1Cap } from '../mcp/canonicalL1Caps';
 import { HTTPClient } from '../client/http-client';
 import { logger } from '../utils/logger';
 import { executeOrNotFoundFallback } from '../utils/httpDeleteIdempotent';
@@ -138,14 +139,26 @@ export class AgentAPI {
     last_activity?: string;
     [key: string]: any;
   }> {
-    // Philosophy v0.1.40: Use proven pattern!
-    // Try analytics endpoint first, fallback to project data
+    // Prefer analytics snapshot BFF (core.analytics.read_model.gen1).
     try {
-      const response = await this.client.get(`/analytics/projects/${projectId}/stats`);
-      return response.data;
+      const response = await this.client.get(
+        `/projects/${projectId}/analytics/snapshot`,
+        { period: '30d', include: 'activity' },
+      );
+      const body = response.data;
+      const snap = (body?.data ?? body) as {
+        activity?: { members?: number };
+        as_of?: string;
+      };
+      const members = Number(snap?.activity?.members ?? 0) || 0;
+      return {
+        project_id: projectId,
+        total_users: members,
+        active_users: members,
+        last_activity: snap?.as_of,
+      };
     } catch (error) {
       // Philosophy v0.1.16: Graceful degradation!
-      // Return basic stats from project data
       const project = await this.getProject(projectId);
       return {
         project_id: projectId,
@@ -160,6 +173,26 @@ export class AgentAPI {
   async createProject(projectData: CreateProjectData): Promise<Project> {
     const response = await this.client.post('/projects', projectData);
     return response.data;
+  }
+
+  /**
+   * GET /projects/catalog-summaries — batch light KPI/readiness rows (max 40 ids).
+   * Gene: `core.projects.catalog_summaries.gen1`.
+   */
+  async fetchCatalogSummaries(
+    ids: number[],
+    options?: Partial<RequestConfig>,
+  ): Promise<Array<Record<string, unknown>>> {
+    const capped = [...new Set(ids.map(Number).filter((n) => n > 0))].slice(0, 40);
+    if (capped.length === 0) return [];
+    const response = await this.client.get(
+      '/projects/catalog-summaries',
+      { ids: capped.join(',') },
+      options,
+    );
+    const data = response.data?.data ?? response.data;
+    const rows = data?.summaries;
+    return Array.isArray(rows) ? rows : [];
   }
 
   /** POST /projects/import-by-key — import projects from another user's API key. */
@@ -405,11 +438,17 @@ export class AgentAPI {
     );
   }
 
+  /**
+   * Legacy project-key helper. User/agent PATs use `POST /user/api-keys`
+   * with `preset` (`user_full`, `agent_runner`) instead of `permissions_bitmap`.
+   */
   async createApiKey(projectId: number, data: {
     name: string;
     permissions_bitmap: number;
     description?: string;
     expires_at?: string;
+    preset?: string;
+    service_caps?: CanonicalL1Cap[];
   }): Promise<{
     key_id: number;
     key: string;

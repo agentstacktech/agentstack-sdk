@@ -12,11 +12,22 @@ export {
   mcpExecute,
   isMcpPartialSuccess,
   summarizeMcpBatchOutcome,
+  readInverseEnvelope,
   type McpStep,
   type McpExecuteOptions,
   type McpExecuteResult,
   type McpStepResult,
+  type InverseEnvelope,
 } from './execute';
+export {
+  simulatePatAction,
+  simulatePatActionWithToken,
+  type PatActionSimulation,
+  type PatSimulationL1,
+  type PatSimulationL2,
+  type SimulatePatActionOpts,
+  type McpExecuteClient,
+} from './permissions';
 export {
   loginWithDeviceCodeForm,
   deviceCodeActivateUrl,
@@ -25,12 +36,23 @@ export {
   type DeviceAuthorizeResult,
 } from './deviceCode';
 export {
+  pickDiscoveryNextStep,
+  type DiscoverySearchResponse,
+  type RecommendedAction,
+} from './discoveryClient';
+export {
   mcpDiscoverByIntent,
   mcpGetDiscovery,
   type McpDiscoverOptions,
   type McpDiscoverByIntentResult,
   type McpDiscoverIntentRow,
 } from './discover';
+export {
+  resolveGoalRoute,
+  goalRoutePlaybookId,
+  type GoalRouteResult,
+  type ResolveGoalRouteOptions,
+} from './goalRoute';
 export {
   MCP_GUIDANCE_PROMPTS,
   MCP_GUIDANCE_URLS,
@@ -40,13 +62,29 @@ export {
   recommendedMcpRecipes,
   recommendedDiscoveryLadder,
   discoveryLadderSteps,
+  httpBootstrapLadderSteps,
+  closedLoopLadderSteps,
+  WORK_GRAPH_HARNESS_INVARIANTS,
+  WORK_GRAPH_WHEN_BLOCKED,
+  WORK_GRAPH_WHEN_BLOCKED_LOCALES,
+  WAVE_XIX_ATOM_LOCALES,
   sessionSetupLadderPhases,
   type McpSessionSetupLadderPhase,
+  type McpClosedLoopLadderStep,
+  type McpHttpBootstrapLadderStep,
   buildMcpCatalogActionsUrl,
   mergeMcpCatalogDelta,
   resolveMcpGuidanceUrl,
+  readPublicMcpResource,
+  readPublicMcpOnboardingBundle,
+  readPublicMcpWorkGraphLadder,
   fetchMcpActionsSummary,
+  getMcpCatalogFacts,
+  formatMcpCatalogShorthandSocial,
+  formatMcpCatalogShorthandSeo,
   fetchMcpAiPrompt,
+  type McpActionsSummary,
+  type McpCatalogFacts,
   mcpListOrgans,
   type McpListOrgansOptions,
   mcpListActions,
@@ -59,9 +97,17 @@ export {
   buildMcpUserContext,
   parseListProjection,
   fetchDiscoveryStatus,
+  fetchDiscoverySearch,
+  type Bcp47Locale,
+  type DiscoverySearchParams,
   type RunMcpPreflightOptions,
   type DiscoveryStatusPayload,
   type DiscoveryStatusNextAction,
+  type DiscoverySearchResult,
+  type DiscoverySearchRecipeMatch,
+  type ProductArchetypeMatch,
+  type GtpiDebugPayload,
+  type GtpiDebugBinding,
   type McpListProjection,
   buildFlowReceipt,
   buildCertificationReceipt,
@@ -107,6 +153,7 @@ import { loginWithDeviceCodeForm, type DeviceCodeLoginOptions } from './deviceCo
 import { mcpDiscoverByIntent, mcpGetDiscovery } from './discover';
 import {
   fetchDiscoveryStatus,
+  fetchDiscoverySearch,
   fetchMcpActionsSummary,
   fetchMcpAiPrompt,
   mcpListActions,
@@ -135,6 +182,34 @@ export class AgentMcp {
     return resolveMcpUrl(this.getApiBase());
   }
 
+  /** Manual day-ring correction — wraps `analytics.bump` MCP action. */
+  async analyticsBump(params: {
+    project_id?: number;
+    deltas: Record<string, number>;
+    epoch_day?: number;
+    hour?: number;
+    minute?: number;
+  }): Promise<Awaited<ReturnType<typeof mcpExecute>>> {
+    const allowed = new Set(['ae', 'ee', 'pe', 'rc', 'ec', 'eo']);
+    for (const key of Object.keys(params.deltas)) {
+      if (!allowed.has(key) && !key.startsWith('ev.')) {
+        throw new Error(`analytics.bump: unknown catalog key "${key}"`);
+      }
+    }
+    return this.execute([
+      {
+        action: 'analytics.bump',
+        params: {
+          project_id: params.project_id,
+          deltas: params.deltas,
+          epoch_day: params.epoch_day,
+          hour: params.hour,
+          minute: params.minute,
+        },
+      },
+    ]);
+  }
+
   async execute(
     steps: McpStep[],
     overrides?: Partial<McpExecuteOptions>,
@@ -151,6 +226,10 @@ export class AgentMcp {
       mcpUrl: overrides?.mcpUrl ?? this.resolveUrl(),
       idempotencyKey: overrides?.idempotencyKey,
       recipeId: overrides?.recipeId,
+      goal: overrides?.goal,
+      observed: overrides?.observed,
+      workflowRunId: overrides?.workflowRunId,
+      density: overrides?.density,
       stopOnError: overrides?.stopOnError,
       timeoutMs: overrides?.timeoutMs,
       maxAttempts: overrides?.maxAttempts,
@@ -169,7 +248,7 @@ export class AgentMcp {
   /** Intent search — POST /mcp/discover/by_intent (REST, not JSON-RPC). */
   async discoverByIntent(
     intent: string,
-    overrides?: Partial<{ token: string; projectId: number }>,
+    overrides?: Partial<{ token: string; projectId: number; locale: string }>,
   ): Promise<unknown> {
     const token = overrides?.token ?? this.getToken() ?? resolveMcpAuthToken();
     if (!token) throw new Error('mcp.discoverByIntent: missing token');
@@ -181,6 +260,7 @@ export class AgentMcp {
       apiBase: this.getApiBase(),
       token,
       projectId: Number(projectId),
+      locale: overrides?.locale,
     });
   }
 
@@ -275,7 +355,7 @@ export class AgentMcp {
   }
 
   async fetchDiscoveryStatus(
-    overrides?: Partial<{ apiBase: string; token: string; projectId: number }>,
+    overrides?: Partial<{ apiBase: string; token: string; projectId: number; locale: string }>,
   ): Promise<DiscoveryStatusPayload> {
     const token = overrides?.token ?? this.getToken() ?? resolveMcpAuthToken();
     if (!token) throw new Error('mcp.fetchDiscoveryStatus: missing token');
@@ -283,6 +363,29 @@ export class AgentMcp {
       apiBase: overrides?.apiBase ?? this.getApiBase(),
       token,
       projectId: overrides?.projectId ?? this.getProjectId() ?? 1,
+      locale: overrides?.locale,
+    });
+  }
+
+  async fetchDiscoverySearch(
+    q: string,
+    overrides?: Partial<{
+      apiBase: string;
+      token: string;
+      projectId: number;
+      locale: string;
+      limit: number;
+    }>,
+  ): Promise<DiscoverySearchResult> {
+    const token = overrides?.token ?? this.getToken() ?? resolveMcpAuthToken();
+    if (!token) throw new Error('mcp.fetchDiscoverySearch: missing token');
+    return fetchDiscoverySearch({
+      apiBase: overrides?.apiBase ?? this.getApiBase(),
+      token,
+      projectId: overrides?.projectId ?? this.getProjectId() ?? 1,
+      q,
+      locale: overrides?.locale,
+      limit: overrides?.limit,
     });
   }
 

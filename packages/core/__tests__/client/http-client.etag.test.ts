@@ -66,4 +66,32 @@ describe('HTTPClient ETag conditional GET', () => {
     const secondInit = fetchMock.mock.calls[1]?.[1] as RequestInit | undefined;
     expect((secondInit?.headers as Record<string, string>)?.['If-None-Match']).toBe('W/"abc"');
   });
+
+  it('retries a 304 once without If-None-Match when the cache body is missing', async () => {
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      const inm = (init?.headers as Record<string, string>)?.['If-None-Match'];
+      if (inm === 'W/"gone"') {
+        return new Response(null, { status: 304, headers: { ETag: 'W/"gone"' } });
+      }
+      return new Response(JSON.stringify({ projects: [{ id: 1 }] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', ETag: 'W/"fresh"' },
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const cache = (client as unknown as { cache: Map<string, unknown> }).cache;
+    const getCacheKey = (client as unknown as {
+      getCacheKey: (c: { method: string; url: string }) => string;
+    }).getCacheKey.bind(client);
+    const cacheKey = getCacheKey({ method: 'GET', url: '/projects' });
+    cache.set(cacheKey, { etag: 'W/"gone"', timestamp: Date.now(), ttl: 60_000, data: null });
+
+    const result = await client.get('/projects', undefined, { skipCache: false });
+    expect(result.status).toBe(200);
+    expect((result.data as { projects?: unknown[] })?.projects).toEqual([{ id: 1 }]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const secondInit = fetchMock.mock.calls[1]?.[1] as RequestInit | undefined;
+    expect((secondInit?.headers as Record<string, string>)?.['If-None-Match']).toBeUndefined();
+  });
 });

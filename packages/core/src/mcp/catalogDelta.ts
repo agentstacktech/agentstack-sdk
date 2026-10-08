@@ -16,10 +16,10 @@ export function buildMcpCatalogActionsUrl(
   apiBase: string,
   opts: { sinceEtag?: string | null; delta?: boolean; hot?: boolean } = {},
 ): string {
-  const { sinceEtag = null, delta = false, hot = true } = opts;
+  const { sinceEtag = null, delta = false, hot = false } = opts;
   const root = String(apiBase || '').replace(/\/$/, '');
   const url = new URL('/mcp/actions', root.endsWith('/mcp') ? root.replace(/\/mcp$/, '') : root);
-  if (hot) url.searchParams.set('schemas', 'hot');
+  url.searchParams.set('schemas', hot ? 'hot' : 'public');
   if (sinceEtag) url.searchParams.set('since_etag', sinceEtag);
   if (delta && sinceEtag) url.searchParams.set('delta', '1');
   return url.toString();

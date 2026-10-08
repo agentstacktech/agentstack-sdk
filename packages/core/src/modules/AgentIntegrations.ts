@@ -670,4 +670,27 @@ export class AgentIntegrations {
       body,
     );
   }
+
+  /** list | get | send on a connected Gmail or Microsoft mailbox. */
+  mailbox(
+    connectionId: string,
+    body: {
+      op: "list" | "get" | "send";
+      query?: string;
+      message_id?: string;
+      to?: string;
+      subject?: string;
+      text?: string;
+      limit?: number;
+    },
+  ) {
+    return this.client.post<{
+      provider: string;
+      op: string;
+      messages?: Array<{ id: string; subject?: string; from?: string; snippet?: string }>;
+      id?: string;
+      text?: string;
+      sent?: boolean;
+    }>(`/integrations/connections/${encodeURIComponent(connectionId)}/mailbox`, body);
+  }
 }

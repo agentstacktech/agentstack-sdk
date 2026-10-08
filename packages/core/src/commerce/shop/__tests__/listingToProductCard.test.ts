@@ -20,6 +20,12 @@ describe('resolveOfferThumb', () => {
     ).toBe('https://a/visual.png');
   });
 
+  it('reads the first gallery image', () => {
+    expect(
+      resolveOfferThumb({ visual: { images: [{ url: 'https://a/sofa.jpg' }] } }),
+    ).toBe('https://a/sofa.jpg');
+  });
+
   it('returns undefined for empty input', () => {
     expect(resolveOfferThumb(undefined)).toBeUndefined();
     expect(resolveOfferThumb({})).toBeUndefined();

@@ -46,13 +46,18 @@ function simpleSubpackageRollup(input, distDir, externals = ['eventemitter3', 'z
       plugins,
       external: externals,
     },
-    {
-      input,
-      output: [{ file: `${distDir}/index.d.ts`, format: 'esm' }],
-      plugins: [dts()],
-      external: [/\.css$/],
-    },
+    dtsBundle(input, `${distDir}/index.d.ts`),
   ];
+}
+
+/** Declaration bundle only — JS stays in the matching runtime config (one d.ts channel). */
+function dtsBundle(input, file) {
+  return {
+    input,
+    output: [{ file, format: 'esm' }],
+    plugins: [dts()],
+    external: [/\.css$/],
+  };
 }
 
 function commerceSubpackageRollup(name) {
@@ -84,12 +89,7 @@ function commerceSubpackageRollup(name) {
       plugins,
       external: ['zod'],
     },
-    {
-      input,
-      output: [{ file: `dist/commerce/${name}/index.d.ts`, format: 'esm' }],
-      plugins: [dts()],
-      external: [/\.css$/],
-    },
+    dtsBundle(input, `dist/commerce/${name}/index.d.ts`),
   ];
 }
 
@@ -122,8 +122,8 @@ export default [
       commonjs(),
       typescript({
         tsconfig: './tsconfig.json',
-        declaration: true,
-        declarationMap: true
+        declaration: false,
+        declarationMap: false,
       }),
       terser()
     ],
@@ -194,6 +194,20 @@ export default [
       terser(),
     ],
     external: ['zod'],
+  },
+  {
+    input: 'src/agents/index.ts',
+    output: [
+      { file: 'dist/agents/index.js', format: 'cjs', sourcemap: true, inlineDynamicImports: true },
+      { file: 'dist/agents/index.esm.js', format: 'esm', sourcemap: true, inlineDynamicImports: true },
+    ],
+    plugins: [
+      resolve({ browser: true, preferBuiltins: false }),
+      commonjs(),
+      typescript({ tsconfig: './tsconfig.json', declaration: false, declarationMap: false }),
+      terser(),
+    ],
+    external: [],
   },
   {
     input: 'src/finance/index.ts',
@@ -396,101 +410,24 @@ export default [
   ...simpleSubpackageRollup('src/public/services/index.ts', 'dist/services', ['eventemitter3', 'zod']),
   ...simpleSubpackageRollup('src/admin/hubCommerce.ts', 'dist/admin/hubCommerce', ['eventemitter3', 'zod']),
   ...simpleSubpackageRollup('src/admin/hubNeurocache.ts', 'dist/admin/hubNeurocache', ['eventemitter3', 'zod']),
-  // Type definitions
-  {
-    input: 'src/index.ts',
-    output: [{ file: 'dist/index.d.ts', format: 'esm' }],
-    plugins: [dts()],
-    external: [/\.css$/]
-  },
-  {
-    input: 'src/capability-tasks/index.ts',
-    output: [{ file: 'dist/capability-tasks/index.d.ts', format: 'esm' }],
-    plugins: [dts()],
-    external: [/\.css$/],
-  },
-  {
-    input: 'src/manifest/index.ts',
-    output: [{ file: 'dist/manifest/index.d.ts', format: 'esm' }],
-    plugins: [dts()],
-    external: [/\.css$/],
-  },
-  {
-    input: 'src/messaging/index.ts',
-    output: [{ file: 'dist/messaging/index.d.ts', format: 'esm' }],
-    plugins: [dts()],
-    external: [/\.css$/],
-  },
-  {
-    input: 'src/economy/index.ts',
-    output: [{ file: 'dist/economy/index.d.ts', format: 'esm' }],
-    plugins: [dts()],
-    external: [/\.css$/],
-  },
-  {
-    input: 'src/finance/index.ts',
-    output: [{ file: 'dist/finance/index.d.ts', format: 'esm' }],
-    plugins: [dts()],
-    external: [/\.css$/],
-  },
-  {
-    input: 'src/fabric/index.ts',
-    output: [{ file: 'dist/fabric/index.d.ts', format: 'esm' }],
-    plugins: [dts()],
-    external: [/\.css$/],
-  },
-  {
-    input: 'src/cost/explorer.ts',
-    output: [{ file: 'dist/cost/explorer.d.ts', format: 'esm' }],
-    plugins: [dts()],
-    external: [/\.css$/],
-  },
-  {
-    input: 'src/cost/index.ts',
-    output: [{ file: 'dist/cost/index.d.ts', format: 'esm' }],
-    plugins: [dts()],
-    external: [/\.css$/],
-  },
-  {
-    input: 'src/guidance/index.ts',
-    output: [{ file: 'dist/guidance/index.d.ts', format: 'esm' }],
-    plugins: [dts()],
-    external: [/\.css$/],
-  },
-  {
-    input: 'src/commerce/assets/index.ts',
-    output: [{ file: 'dist/commerce/assets/index.d.ts', format: 'esm' }],
-    plugins: [dts()],
-    external: [/\.css$/],
-  },
-  {
-    input: 'src/commerce/marketplace/index.ts',
-    output: [{ file: 'dist/commerce/marketplace/index.d.ts', format: 'esm' }],
-    plugins: [dts()],
-    external: [/\.css$/],
-  },
-  {
-    input: 'src/commerce/index.ts',
-    output: [{ file: 'dist/commerce/index.d.ts', format: 'esm' }],
-    plugins: [dts()],
-    external: [/\.css$/],
-  },
-  {
-    input: 'src/pwa/index.ts',
-    output: [{ file: 'dist/pwa/index.d.ts', format: 'esm' }],
-    plugins: [dts()],
-    external: [/\.css$/],
-  },
-  {
-    input: 'src/mobile/index.ts',
-    output: [{ file: 'dist/mobile/index.d.ts', format: 'esm' }],
-    plugins: [dts()],
-    external: [/\.css$/],
-  },
-  {
-    input: 'src/logic/blueprints/index.ts',
-    output: [{ file: 'dist/logic/blueprints/index.d.ts', format: 'esm' }],
-    plugins: [dts()],
-    external: [/\.css$/],
-  },
+  // Type definitions for entries that are not `simpleSubpackageRollup` (those already emit .d.ts).
+  ...[
+    ['src/index.ts', 'dist/index.d.ts'],
+    ['src/capability-tasks/index.ts', 'dist/capability-tasks/index.d.ts'],
+    ['src/manifest/index.ts', 'dist/manifest/index.d.ts'],
+    ['src/messaging/index.ts', 'dist/messaging/index.d.ts'],
+    ['src/economy/index.ts', 'dist/economy/index.d.ts'],
+    ['src/finance/index.ts', 'dist/finance/index.d.ts'],
+    ['src/fabric/index.ts', 'dist/fabric/index.d.ts'],
+    ['src/cost/explorer.ts', 'dist/cost/explorer.d.ts'],
+    ['src/cost/index.ts', 'dist/cost/index.d.ts'],
+    ['src/guidance/index.ts', 'dist/guidance/index.d.ts'],
+    ['src/agents/index.ts', 'dist/agents/index.d.ts'],
+    ['src/commerce/assets/index.ts', 'dist/commerce/assets/index.d.ts'],
+    ['src/commerce/marketplace/index.ts', 'dist/commerce/marketplace/index.d.ts'],
+    ['src/commerce/index.ts', 'dist/commerce/index.d.ts'],
+    ['src/pwa/index.ts', 'dist/pwa/index.d.ts'],
+    ['src/mobile/index.ts', 'dist/mobile/index.d.ts'],
+    ['src/logic/blueprints/index.ts', 'dist/logic/blueprints/index.d.ts'],
+  ].map(([input, file]) => dtsBundle(input, file)),
 ];

@@ -115,5 +115,15 @@
     "id": "agents-project-scoped",
     "input": { "headerProjectId": 6, "jwtProjectId": 1, "requestPath": "/api/projects/6/agents" },
     "expect": { "mode": "guest", "projectId": 6, "hasBearer": false }
+  },
+  {
+    "id": "shell-identity-session-keeps-bearer",
+    "input": {
+      "headerProjectId": 2,
+      "jwtProjectId": 1,
+      "vaultToken": "h.eyJwcm9qZWN0X2lkIjoxfQ==.s",
+      "requestPath": "/api/projects/2/users"
+    },
+    "expect": { "mode": "shell", "projectId": 2, "hasBearer": true }
   }
 ]

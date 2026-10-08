@@ -3,6 +3,9 @@
  * Genetic tag: `frontend.admin.scale_hub.gen1`
  */
 
+/** Runtime marker for non-empty Rollup subpath (`import type` consumers). */
+export const ADMIN_HUB_NEUROCACHE_GENE = 'frontend.admin.scale_hub.gen1' as const;
+
 export interface NamespaceMemoryDetail {
   entries: number;
   bytes: number;

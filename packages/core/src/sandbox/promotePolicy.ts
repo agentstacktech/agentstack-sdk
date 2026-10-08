@@ -3,10 +3,9 @@
  * Genetic tags: sdk.sandbox.generation.gen1 · core.tenant.8dna_generation_supply.gen1
  */
 
-export type GenerationSettingsLike = {
-  auto_generation_mode?: boolean;
-  require_gates_passed_on_promote?: boolean;
-};
+import type { GenerationSettingsLike } from './generationReview';
+
+export type { GenerationSettingsLike };
 
 export type PromoteBodyLike = {
   require_gates_passed?: boolean;

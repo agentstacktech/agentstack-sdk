@@ -8,6 +8,7 @@ export const PlaybookIdSchema = z.enum([
   'host-sell-scale-one-project',
   'host-and-sell-15',
   'hosting-upgrade',
+  'choose-billing-plane',
   'host-automate',
   'start-selling',
   'try-hosting-demo-5',
@@ -20,6 +21,8 @@ export const PlaybookIdSchema = z.enum([
   'api-keys',
   'logic-first',
   'scheduler-job',
+  'scheduled-agent-run',
+  'work-graph-agent-loop',
   'wallet-payments',
   'micropath-synthetic',
   'project-safe-exit',
@@ -49,6 +52,8 @@ export const PlaybookIdSchema = z.enum([
   'business-operate',
   'list-project-for-sale',
   'llm-energy-setup',
+  'explore-live-proofs',
+  'explore-mcp-catalog',
 ]);
 
 export type PlaybookId = z.infer<typeof PlaybookIdSchema>;

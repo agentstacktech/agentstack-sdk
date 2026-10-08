@@ -9,6 +9,8 @@ export interface McpDiscoverOptions {
   apiBase: string;
   token: string;
   projectId?: number;
+  /** BCP-47 locale for localized instruction slices (en-US, pt-BR, ru-RU). */
+  locale?: string;
 }
 
 export interface McpActionEffect {
@@ -23,6 +25,9 @@ export interface McpActionEffect {
 
 export interface McpInstructionSlice {
   when_to_use?: string;
+  when_not_to_use?: string;
+  do_not_use_when?: string;
+  anti_patterns?: string[];
   instruction_hint?: string;
   related_tools?: string[];
   related_prompts?: string[];
@@ -75,6 +80,10 @@ async function mcpRestJson(
   if (opts.projectId != null && !headers['X-Project-ID']) {
     headers['X-Project-ID'] = String(opts.projectId);
   }
+  const locale = opts.locale?.trim();
+  if (locale && !headers['Accept-Language']) {
+    headers['Accept-Language'] = locale;
+  }
   const res = await fetch(`${origin}${path}`, { ...init, headers });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(JSON.stringify(data));
@@ -92,7 +101,11 @@ export async function mcpDiscoverByIntent(
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ intent, project_id: opts.projectId }),
+      body: JSON.stringify({
+        intent,
+        project_id: opts.projectId,
+        ...(opts.locale?.trim() ? { locale: opts.locale.trim() } : {}),
+      }),
     },
     opts,
   );

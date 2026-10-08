@@ -36,6 +36,20 @@ export function isAdminScopedApiPath(urlOrPath: string): boolean {
   return path.startsWith('/api/admin/');
 }
 
+/**
+ * Platform operator reads: admin BFF, diagnostics, health.
+ * Workspace neural feeds (`/api/neural/events`) follow X-Project-ID.
+ * These stay on the ecosystem session even when the workspace header is a tenant.
+ */
+export function isPlatformOperatorApiPath(urlOrPath: string): boolean {
+  const path = normalizeApiPath(urlOrPath);
+  return (
+    path.startsWith('/api/admin/') ||
+    path.startsWith('/api/diagnostics/') ||
+    path.startsWith('/api/health/')
+  );
+}
+
 /** True when the request targets personal/ecosystem treasury (not hosted storefront). */
 export function isEcosystemScopedApiPath(urlOrPath: string): boolean {
   const path = normalizeApiPath(urlOrPath);
@@ -48,6 +62,25 @@ export function isIdentityScopedApiPath(urlOrPath: string): boolean {
   const path = normalizeApiPath(urlOrPath);
   const rest = path.startsWith('/api/') ? path.slice(4) : path;
   return rest === USER_PAT_PATH || rest.startsWith(`${USER_PAT_PATH}/`);
+}
+
+function apiRestPath(urlOrPath: string): string {
+  const path = normalizeApiPath(urlOrPath);
+  return path.startsWith('/api/') ? path.slice(4) : path;
+}
+
+/**
+ * Profile resources under `/api/users/me/*` (AI runtime, prefs).
+ * A 401 here is a resource miss, not proof the shell JWT is dead.
+ */
+export function isUserMePath(urlOrPath: string): boolean {
+  const rest = apiRestPath(urlOrPath);
+  return rest === '/users/me' || rest.startsWith('/users/me/');
+}
+
+/** 401 must not flip shell auth to `session_expired` or enter the refresh lock. */
+export function isNonSession401Path(urlOrPath: string): boolean {
+  return isIdentityScopedApiPath(urlOrPath) || isUserMePath(urlOrPath);
 }
 
 /** User-scoped session paths: keep live JWT when header pid ≠ JWT pid (G-A157). */

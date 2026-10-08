@@ -4,10 +4,34 @@
  * Genetic tag: repo.plugins.oauth_device_code.gen1 · repo.tooling.user_cli.gen1
  */
 
+import type { DeviceScope } from './canonicalL1Caps';
 import { resolvePublicOrigin } from './urls';
 
-export const DEFAULT_DEVICE_SCOPES =
-  'mcp:execute mcp:read projects:read projects:write projects:admin 8dna:read 8dna:write logic:write logic:dry_run rag:read rag:write storage:read storage:write agents:run bots:run bots:admin support:read buffs:read buffs:write apikeys:write';
+const OPERATOR_DEVICE_SCOPES = [
+  'mcp:execute',
+  'mcp:read',
+  'projects:read',
+  'projects:write',
+  'projects:admin',
+  '8dna:read',
+  '8dna:write',
+  'logic:write',
+  'logic:dry_run',
+  'rag:read',
+  'rag:write',
+  'storage:read',
+  'storage:write',
+  'agents:run',
+  'agents:admin',
+  'bots:run',
+  'bots:admin',
+  'support:read',
+  'buffs:read',
+  'buffs:write',
+  'apikeys:write',
+] as const satisfies readonly DeviceScope[];
+
+export const DEFAULT_DEVICE_SCOPES = OPERATOR_DEVICE_SCOPES.join(' ');
 
 export interface DeviceAuthorizeResult {
   device_code: string;

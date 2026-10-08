@@ -405,9 +405,30 @@ export type WorkNextNextWork = {
   [key: string]: unknown;
 };
 
+export type WorkNextViewerUrls = {
+  dev?: string;
+  user?: string;
+  copilot_dev?: string;
+  copilot_user?: string;
+};
+
 export type WorkNextPacket = {
   goal?: { id?: string; title?: string; progress?: unknown };
   state?: WorkNextState;
+  /** Present on compact loop packets and full packets from build_work_next_packet. */
+  project_id?: number;
+  /** ``compact`` (default MCP) vs ``full`` — mirrors ``agents.work_next`` detail param. */
+  detail?: 'compact' | 'full' | string;
+  /** Focus node on compact projections; also on next_work.node_id when full. */
+  node_id?: string;
+  /** SPA deep links when server knows project_id + focus node (WG-P2-C). */
+  viewer_urls?: WorkNextViewerUrls;
+  planning_artifacts?: WorkNextBlockedRow[];
+  planning_required?: WorkNextBlockedRow[];
+  /** CAS revision on compact loop packets. */
+  revision?: number;
+  /** Blocked reason or recovery reason on compact loop packets. */
+  reason?: string;
   next_work?: WorkNextNextWork;
   blocked_work?: WorkNextBlockedRow[];
   plan_summary?: Record<string, unknown> & { scoped_to_goal?: boolean };
@@ -766,6 +787,12 @@ export function recoveryNodeIdForBlockedWork(
   return first || undefined;
 }
 
+/** Wire name is `actionable`; `executable` is the pre-0.4.22 alias. */
+export function isWorkNextActionableState(state?: string | null): boolean {
+  const name = String(state ?? '').trim();
+  return name === 'actionable' || name === 'executable';
+}
+
 /** False when server RBAC/fleet marked claim unavailable (W13-03). */
 export function canClaimFromWorkNext(packet?: WorkNextPacket | null): boolean {
   if (!packet) return false;
@@ -853,6 +880,8 @@ export function primaryWorkGraphAction(
 export function parseWorkNextPacket(raw: unknown): WorkNextPacket {
   if (!raw || typeof raw !== 'object') return {};
   const row = raw as Record<string, unknown>;
+  const isCompact = row.detail === 'compact';
+  const topNodeId = typeof row.node_id === 'string' ? row.node_id.trim() : '';
   const blocked = Array.isArray(row.blocked_work)
     ? row.blocked_work
         .filter((item) => item && typeof item === 'object')
@@ -910,20 +939,54 @@ export function parseWorkNextPacket(raw: unknown): WorkNextPacket {
     row.goal && typeof row.goal === 'object'
       ? (row.goal as { id?: string; title?: string; progress?: unknown })
       : undefined;
+  const viewerUrls =
+    row.viewer_urls && typeof row.viewer_urls === 'object'
+      ? (row.viewer_urls as WorkNextViewerUrls)
+      : undefined;
+  const planningArtifacts = Array.isArray(row.planning_artifacts)
+    ? (row.planning_artifacts.filter((item) => item && typeof item === 'object') as WorkNextBlockedRow[])
+    : undefined;
+  const planningRequired = Array.isArray(row.planning_required)
+    ? (row.planning_required.filter((item) => item && typeof item === 'object') as WorkNextBlockedRow[])
+    : undefined;
+  let nextWork: WorkNextNextWork | undefined;
+  if (row.next_work && typeof row.next_work === 'object') {
+    const nw = { ...(row.next_work as Record<string, unknown>) };
+    const sid = String(nw.suggested_agent_id ?? '').trim();
+    if (sid) nw.suggested_agent_id = sid;
+    else delete nw.suggested_agent_id;
+    nextWork = nw as WorkNextNextWork;
+  } else if (isCompact && topNodeId) {
+    nextWork = { node_id: topNodeId };
+  }
+  const topReadiness =
+    row.action_readiness && typeof row.action_readiness === 'object'
+      ? (row.action_readiness as WorkNextNextWork['action_readiness'])
+      : undefined;
+  if (nextWork && topReadiness && !nextWork.action_readiness) {
+    nextWork = { ...nextWork, action_readiness: topReadiness };
+  }
+  const projectId =
+    typeof row.project_id === 'number' && row.project_id > 0 ? row.project_id : undefined;
+  const nodeId = topNodeId || (nextWork?.node_id ? String(nextWork.node_id) : undefined);
   return {
     ...(goal ? { goal } : {}),
-    ...(typeof row.state === 'string' ? { state: row.state as WorkNextState } : {}),
-    ...(row.next_work && typeof row.next_work === 'object'
+    ...(typeof row.state === 'string'
       ? {
-          next_work: (() => {
-            const nw = { ...(row.next_work as Record<string, unknown>) };
-            const sid = String(nw.suggested_agent_id ?? '').trim();
-            if (sid) nw.suggested_agent_id = sid;
-            else delete nw.suggested_agent_id;
-            return nw;
-          })(),
+          state: (row.state === 'executable' ? 'actionable' : row.state) as WorkNextState,
         }
       : {}),
+    ...(projectId ? { project_id: projectId } : {}),
+    ...(typeof row.detail === 'string' && row.detail.trim()
+      ? { detail: row.detail.trim() }
+      : {}),
+    ...(nodeId ? { node_id: nodeId } : {}),
+    ...(viewerUrls ? { viewer_urls: viewerUrls } : {}),
+    ...(planningArtifacts?.length ? { planning_artifacts: planningArtifacts } : {}),
+    ...(planningRequired?.length ? { planning_required: planningRequired } : {}),
+    ...(typeof row.revision === 'number' ? { revision: row.revision } : {}),
+    ...(typeof row.reason === 'string' && row.reason.trim() ? { reason: row.reason.trim() } : {}),
+    ...(nextWork ? { next_work: nextWork } : {}),
     ...(blocked?.length ? { blocked_work: blocked } : {}),
     ...(row.plan_summary && typeof row.plan_summary === 'object'
       ? { plan_summary: row.plan_summary as Record<string, unknown> }
@@ -1077,6 +1140,34 @@ type WorkGraphFleetLike = {
     projectId: number,
     body?: Record<string, unknown>,
   ): Promise<Record<string, unknown>>;
+  planPropose?(
+    projectId: number,
+    body?: Record<string, unknown>,
+  ): Promise<Record<string, unknown>>;
+  planApplyProposal?(
+    projectId: number,
+    body: Record<string, unknown>,
+  ): Promise<Record<string, unknown>>;
+  reclaimStalePlanClaims?(
+    projectId: number,
+    body?: Record<string, unknown>,
+  ): Promise<Record<string, unknown>>;
+  createFromTemplate?(
+    projectId: number,
+    body: Record<string, unknown>,
+  ): Promise<Record<string, unknown>>;
+  planGet?(
+    projectId: number,
+    options?: Record<string, unknown>,
+  ): Promise<Record<string, unknown>>;
+  teamCreate?(
+    projectId: number,
+    body: Record<string, unknown>,
+  ): Promise<Record<string, unknown>>;
+  processPlanBacklog?(
+    projectId: number,
+    body?: Record<string, unknown>,
+  ): Promise<Record<string, unknown>>;
 };
 
 /** H5 ensure saga — preview before create=true. */
@@ -1114,6 +1205,16 @@ function mergeGoalIdParam(
   return { params: { ...params, goal_id: scoped }, goalId: scoped };
 }
 
+function mergeEnvUuidParam(
+  params: Record<string, unknown>,
+  envUuid?: string,
+): Record<string, unknown> {
+  const fromParams = typeof params.env_uuid === 'string' ? params.env_uuid.trim() : '';
+  const scoped = fromParams || String(envUuid ?? '').trim();
+  if (!scoped || fromParams) return params;
+  return { ...params, env_uuid: scoped };
+}
+
 function refreshWorkNext(
   fleet: WorkGraphFleetLike,
   projectId: number,
@@ -1135,12 +1236,14 @@ export async function followWorkGraphAction(
   projectId: number,
   action: { action?: string; params?: Record<string, unknown> },
   goalId?: string,
+  envUuid?: string,
+  hooks?: { onPropose?: (result: PlanProposeResult) => void },
 ): Promise<WorkNextPacket> {
   const name = String(action.action ?? '').trim();
-  const merged = mergeGoalIdParam(action.params ?? {}, goalId);
+  const merged = mergeGoalIdParam(mergeEnvUuidParam(action.params ?? {}, envUuid), goalId);
   const params = merged.params;
-  const envUuid = typeof params.env_uuid === 'string' ? params.env_uuid.trim() : '';
-  const refresh = () => refreshWorkNext(fleet, projectId, merged.goalId, envUuid || undefined);
+  const resolvedEnv = typeof params.env_uuid === 'string' ? params.env_uuid.trim() : '';
+  const refresh = () => refreshWorkNext(fleet, projectId, merged.goalId, resolvedEnv || undefined);
   switch (name) {
     case 'agents.work_next':
       return fleet.workNext(projectId, params);
@@ -1154,38 +1257,159 @@ export async function followWorkGraphAction(
           ? [String(params.node_id)]
           : [];
       const ifMatch = params.if_match_revision;
-      await fleet.claimPlanNodes(projectId, {
+      const limit = typeof params.limit === 'number' ? params.limit : undefined;
+      const claimed = await fleet.claimPlanNodes(projectId, {
         agent_id: agentId,
-        node_ids: nodeIds,
+        ...(nodeIds.length ? { node_ids: nodeIds } : {}),
+        ...(limit != null ? { limit } : {}),
         ...(typeof ifMatch === 'number' ? { if_match_revision: ifMatch } : {}),
-        ...(envUuid ? { env_uuid: envUuid } : {}),
+        ...(resolvedEnv ? { env_uuid: resolvedEnv } : {}),
       });
+      const claimedAction = (claimed as { next_action?: { action?: string } }).next_action;
+      if (claimedAction?.action) return parseWorkNextPacket(claimed);
       return refresh();
     }
-    case 'agents.plan_execute':
-      await fleet.planExecute(projectId, {
-        node_id: String(params.node_id ?? ''),
-        agent_id: params.agent_id ? String(params.agent_id) : undefined,
-        goal_text: params.goal_text ? String(params.goal_text) : undefined,
-        mode: params.mode ? String(params.mode) : undefined,
-        ...(envUuid ? { env_uuid: envUuid } : {}),
-      });
+    case 'agents.plan_execute': {
+      try {
+        const executed = await fleet.planExecute(projectId, {
+          node_id: String(params.node_id ?? ''),
+          agent_id: params.agent_id ? String(params.agent_id) : undefined,
+          goal_text: params.goal_text ? String(params.goal_text) : undefined,
+          mode: params.mode ? String(params.mode) : undefined,
+          ...(resolvedEnv ? { env_uuid: resolvedEnv } : {}),
+        });
+        const next = (executed as { next_action?: { action?: string } }).next_action;
+        if (next?.action) return parseWorkNextPacket(executed);
+      } catch (err) {
+        const coded = err as {
+          error_code?: string;
+          step?: {
+            data?: { next_action?: { action?: string; params?: Record<string, unknown> } };
+            result?: { next_action?: { action?: string; params?: Record<string, unknown> } };
+          };
+        };
+        if (coded.error_code === 'plan_claim_required') {
+          const fromStep = coded.step?.data?.next_action ?? coded.step?.result?.next_action;
+          const base = fromStep?.action
+            ? fromStep
+            : {
+                action: 'agents.plan_claim',
+                params: {
+                  project_id: projectId,
+                  node_id: String(params.node_id ?? ''),
+                  ...(params.agent_id ? { agent_id: String(params.agent_id) } : {}),
+                },
+              };
+          const stampedParams = {
+            ...((base.params as Record<string, unknown>) || {}),
+            ...(resolvedEnv ? { env_uuid: resolvedEnv } : {}),
+          };
+          return parseWorkNextPacket({
+            state: 'actionable',
+            next_action: { ...base, params: stampedParams },
+          });
+        }
+        if (coded.error_code === 'plan_completion_blocked') {
+          const fromStep = coded.step?.data?.next_action ?? coded.step?.result?.next_action;
+          const name =
+            fromStep && typeof fromStep === 'object' ? String(fromStep.action ?? '') : '';
+          if (name && name !== 'agents.plan_execute') {
+            return parseWorkNextPacket({ state: 'blocked', next_action: fromStep });
+          }
+          return parseWorkNextPacket({
+            state: 'blocked',
+            node_id: String(params.node_id ?? ''),
+            reason: 'plan_completion_blocked',
+          });
+        }
+        throw err;
+      }
       return refresh();
+    }
     case 'agents.ensure_agent': {
       const nodeId = String(params.node_id ?? '');
       const ensureBody = {
         node_id: nodeId,
-        ...(envUuid ? { env_uuid: envUuid } : {}),
+        ...(resolvedEnv ? { env_uuid: resolvedEnv } : {}),
       };
       if (params.create === false) {
         await fleet.ensureAgent(projectId, { ...ensureBody, create: false });
       } else {
-        await ensureAgentSaga(fleet, projectId, nodeId, envUuid || undefined);
+        await ensureAgentSaga(fleet, projectId, nodeId, resolvedEnv || undefined);
       }
       return refresh();
     }
     case 'agents.plan_recovery_scan':
-      await fleet.planRecoveryScan(projectId, params);
+      await fleet.planRecoveryScan(projectId, {
+        ...params,
+        ...(resolvedEnv ? { env_uuid: resolvedEnv } : {}),
+      });
+      return refresh();
+    case 'agents.plan_propose':
+      if (!fleet.planPropose) break;
+      {
+        const proposed = await fleet.planPropose(projectId, {
+          mode: params.mode ? String(params.mode) : undefined,
+          node_id: params.node_id ? String(params.node_id) : undefined,
+          goal_text: params.goal_text ? String(params.goal_text) : undefined,
+          routed_goal: params.routed_goal,
+          ...(resolvedEnv ? { env_uuid: resolvedEnv } : {}),
+        });
+        hooks?.onPropose?.(proposed as PlanProposeResult);
+      }
+      return refresh();
+    case 'agents.plan_apply_proposal':
+      if (!fleet.planApplyProposal) break;
+      await fleet.planApplyProposal(projectId, {
+        proposal: params.proposal as Record<string, unknown>,
+        ...(typeof params.if_match_revision === 'number'
+          ? { if_match_revision: params.if_match_revision }
+          : {}),
+        ...(resolvedEnv ? { env_uuid: resolvedEnv } : {}),
+      });
+      return refresh();
+    case 'agents.plan_reclaim_stale':
+      if (!fleet.reclaimStalePlanClaims) break;
+      await fleet.reclaimStalePlanClaims(
+        projectId,
+        resolvedEnv ? { env_uuid: resolvedEnv } : undefined,
+      );
+      return refresh();
+    case 'agents.create_from_template':
+      if (!fleet.createFromTemplate) break;
+      await fleet.createFromTemplate(projectId, {
+        template_id: String(params.template_id ?? ''),
+        name: params.name ? String(params.name) : undefined,
+        description: params.description ? String(params.description) : undefined,
+        node_id: params.node_id ? String(params.node_id) : undefined,
+        template_input:
+          params.template_input && typeof params.template_input === 'object'
+            ? (params.template_input as Record<string, unknown>)
+            : undefined,
+        ...(resolvedEnv ? { env_uuid: resolvedEnv } : {}),
+      });
+      return refresh();
+    case 'agents.plan_get':
+      if (fleet.planGet) {
+        await fleet.planGet(projectId, {
+          ...(resolvedEnv ? { env_uuid: resolvedEnv } : {}),
+        });
+      }
+      return refresh();
+    case 'agents.team':
+    case 'agents.team.create':
+      if (!fleet.teamCreate) break;
+      await fleet.teamCreate(projectId, {
+        message: String(params.message ?? params.goal_text ?? ''),
+        ...(resolvedEnv ? { env_uuid: resolvedEnv } : {}),
+      });
+      return refresh();
+    case 'agents.plan_process_backlog':
+      if (!fleet.processPlanBacklog) break;
+      await fleet.processPlanBacklog(projectId, {
+        ...(params.node_id ? { node_id: String(params.node_id) } : {}),
+        ...(resolvedEnv ? { env_uuid: resolvedEnv } : {}),
+      });
       return refresh();
     default:
       return refresh();
@@ -1201,17 +1425,43 @@ export async function runWorkGraphLoop(
     onPacket?: (packet: WorkNextPacket) => void;
     /** Sent as ``goal_id`` on every ``workNext`` refresh (AgentsFleet body). */
     goalId?: string;
+    /** Sandbox generation anchor for every refresh and follow action. */
+    envUuid?: string;
   },
 ): Promise<WorkNextPacket> {
   const goalId = explicitGoalId(opts?.goalId);
-  let packet = await refreshWorkNext(fleet, projectId, goalId);
+  const env = String(opts?.envUuid ?? '').trim() || undefined;
+  let packet = parseWorkNextPacket(await refreshWorkNext(fleet, projectId, goalId, env));
   const max = opts?.maxIterations ?? 20;
+  let lastProgressKey = '';
   for (let i = 0; i < max; i += 1) {
     opts?.onPacket?.(packet);
     if (packet.state === 'idle') break;
-    const next = primaryWorkGraphAction(packet);
-    if (!next?.action) break;
-    packet = await followWorkGraphAction(fleet, projectId, next, goalId);
+    let step = primaryWorkGraphAction(packet);
+    if (!step?.action) break;
+    if (
+      step.action === 'agents.plan_claim' &&
+      !canClaimFromWorkNext(packet)
+    ) {
+      const rec = packet.recovery?.next_actions?.[0];
+      if (rec?.action && rec.action !== 'agents.plan_claim') {
+        step = {
+          action: rec.action,
+          params: (rec.params as Record<string, unknown>) ?? {},
+        };
+      } else {
+        break;
+      }
+    }
+    const nodeId = String(step.params?.node_id ?? packet.node_id ?? '');
+    const rev = String(packet.revision ?? step.params?.if_match_revision ?? '');
+    const progressKey = `${step.action}|${nodeId}|${rev}`;
+    if (step.action === 'agents.plan_execute' && progressKey === lastProgressKey) break;
+    lastProgressKey = progressKey;
+    const params = env ? { ...step.params, env_uuid: env } : step.params;
+    packet = parseWorkNextPacket(
+      await followWorkGraphAction(fleet, projectId, { ...step, params }, goalId, env || undefined),
+    );
     if (packet.state === 'idle') break;
   }
   return packet;

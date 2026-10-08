@@ -5,7 +5,13 @@
 
 import { useState, useCallback } from 'react';
 import { useSDK } from '../context/SDKContext';
-import { AnalyticsEvent, DashboardMetrics, UsageStats } from '@agentstack/sdk';
+import {
+  AnalyticsEvent,
+  AnalyticsPeriod,
+  AnalyticsSliceName,
+  DashboardMetrics,
+  UsageStats,
+} from '@agentstack/sdk';
 
 export interface AnalyticsState {
   isLoading: boolean;
@@ -19,6 +25,20 @@ export interface AnalyticsActions {
   getPaymentStats: (params?: any) => Promise<any>;
   getUserStats: (params?: any) => Promise<any>;
   getProjectStats: (projectId?: number) => Promise<any>;
+  getProjectSnapshot: (params: {
+    project_id: number;
+    period?: AnalyticsPeriod;
+    include?: AnalyticsSliceName[];
+    compare?: 'previous_period';
+  }) => Promise<any>;
+  getPortfolioSnapshot: (params?: { period?: AnalyticsPeriod }) => Promise<any>;
+  bumpAnalyticsRing: (params: {
+    project_id?: number;
+    deltas: Record<string, number>;
+    epoch_day?: number;
+    hour?: number;
+    minute?: number;
+  }) => Promise<any>;
   getTopEvents: (params?: any) => Promise<any>;
   getConversionFunnel: (params?: any) => Promise<any>;
   createCustomReport: (report: any) => Promise<any>;
@@ -235,7 +255,7 @@ export function useAnalytics(): AnalyticsState & AnalyticsActions {
     try {
       setLoading(true);
       setError(null);
-      const result = await sdk.analytics.exportAnalytics(data);
+      const result = await sdk.analytics.exportData(data);
       setLoading(false);
       return result;
     } catch (error: any) {
@@ -263,7 +283,7 @@ export function useAnalytics(): AnalyticsState & AnalyticsActions {
     try {
       setLoading(true);
       setError(null);
-      const result = await sdk.analytics.getRealTimeMetrics();
+      const result = await sdk.analytics.getRealtimeMetrics();
       setLoading(false);
       return result;
     } catch (error: any) {
@@ -301,6 +321,68 @@ export function useAnalytics(): AnalyticsState & AnalyticsActions {
     }
   }, [sdk.analytics, setLoading, setError]);
 
+  const getProjectSnapshot = useCallback(
+    async (params: {
+      project_id: number;
+      period?: AnalyticsPeriod;
+      include?: AnalyticsSliceName[];
+      compare?: 'previous_period';
+    }) => {
+      try {
+        setLoading(true);
+        setError(null);
+        const result = await sdk.analytics.getProjectSnapshot(params);
+        setLoading(false);
+        return result;
+      } catch (error: any) {
+        setLoading(false);
+        setError(error.message || 'Failed to get project snapshot');
+        throw error;
+      }
+    },
+    [sdk.analytics, setLoading, setError],
+  );
+
+  const getPortfolioSnapshot = useCallback(
+    async (params?: { period?: AnalyticsPeriod }) => {
+      try {
+        setLoading(true);
+        setError(null);
+        const result = await sdk.analytics.getPortfolioSnapshot(params);
+        setLoading(false);
+        return result;
+      } catch (error: any) {
+        setLoading(false);
+        setError(error.message || 'Failed to get portfolio snapshot');
+        throw error;
+      }
+    },
+    [sdk.analytics, setLoading, setError],
+  );
+
+  const bumpAnalyticsRing = useCallback(
+    async (params: {
+      project_id?: number;
+      deltas: Record<string, number>;
+      epoch_day?: number;
+      hour?: number;
+      minute?: number;
+    }) => {
+      try {
+        setLoading(true);
+        setError(null);
+        const result = await sdk.mcp.analyticsBump(params);
+        setLoading(false);
+        return result;
+      } catch (error: any) {
+        setLoading(false);
+        setError(error.message || 'Failed to bump analytics ring');
+        throw error;
+      }
+    },
+    [sdk.mcp, setLoading, setError],
+  );
+
   const createMetric = useCallback(async (projectId: number, metric: any) => {
     try {
       setLoading(true);
@@ -323,6 +405,9 @@ export function useAnalytics(): AnalyticsState & AnalyticsActions {
     getPaymentStats,
     getUserStats,
     getProjectStats,
+    getProjectSnapshot,
+    getPortfolioSnapshot,
+    bumpAnalyticsRing,
     getTopEvents,
     getConversionFunnel,
     createCustomReport,

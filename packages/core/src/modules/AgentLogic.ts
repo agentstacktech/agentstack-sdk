@@ -416,6 +416,23 @@ export class AgentLogic {
     return response.data;
   }
 
+  /**
+   * Graph dry-run (`POST /logic/{id}/dry-run`). Distinct from {@link dryRun},
+   * which still posts `/execute` with `context.dry_run`.
+   */
+  async simulateDryRun(
+    logicId: string,
+    data: {
+      command_data?: Record<string, any>;
+      trigger_id?: string;
+      mocks?: Record<string, any>;
+      pin_data?: Record<string, any>;
+    },
+  ): Promise<Record<string, any>> {
+    const response = await this.client.post(`/logic/${logicId}/dry-run`, data);
+    return response.data;
+  }
+
   /** Dry-run alias for simulate UI (`frontend.logic.run_console.gen1`). */
   async dryRun(logicId: string, data: ExecuteLogicRequest): Promise<ExecuteLogicResponse> {
     return this.executeLogic(logicId, {

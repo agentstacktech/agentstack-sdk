@@ -1,7 +1,11 @@
 /** SDK RAG module types (`sdk.rag.gen1`). */
 import { describe, expect, it } from 'vitest';
 
-import type { RagCollection, RagHealthSnapshot } from '../types';
+import type {
+  RagCollection,
+  RagCollectionListResponse,
+  RagHealthSnapshot,
+} from '../types';
 import { AgentRag } from '../../modules/AgentRag';
 
 describe('sdk.rag types', () => {
@@ -12,6 +16,20 @@ describe('sdk.rag types', () => {
       collections_count: 2,
     };
     expect(snap.persistence_mode).toBe('cell_sqlite');
+  });
+
+  it('accepts collection list quota fields (v12)', () => {
+    const list: RagCollectionListResponse = {
+      success: true,
+      collections_count: 2,
+      quota_used: 2,
+      quota_reserved: 1,
+      quota_committed: 1,
+      quota_limit: 10,
+      collections: [],
+    };
+    expect(list.collections_count).toBe(2);
+    expect(list.quota_limit).toBe(10);
   });
 
   it('accepts collection with user scope', () => {

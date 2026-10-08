@@ -10,6 +10,7 @@ export const MCP_GUIDANCE_PROMPTS = {
   system: 'agentstack_system_instructions',
   sessionSetup: 'agentstack_session_setup',
   readBootstrap: 'agentstack_read_bootstrap',
+  closedLoopAutonomy: 'agentstack_closed_loop_autonomy',
   executeBudget: 'agentstack_execute_budget',
   writeModes: 'agentstack_write_modes',
   apiKeySafety: 'agentstack_api_key_safety',
@@ -34,14 +35,14 @@ export const PRODUCT_ARCHETYPE_IDS = [
   'showcase_portfolio_storefront',
   'migrate_legacy',
   'hosted_vertical_saas',
-  'key2unity_auth_portal',
   'service_business',
-  'marketplace',
-  'community',
   'ai_product',
+  'marketplace',
+  'internal_tool',
+  'community',
+  'key2unity_auth_portal',
   'support_bot',
   'knowledge_assistant',
-  'internal_tool',
   'agency',
   'freelancer',
   'content_site',
@@ -51,6 +52,7 @@ export type ProductArchetypeId = (typeof PRODUCT_ARCHETYPE_IDS)[number];
 
 export const MCP_ONBOARDING_RECIPE_IDS = [
   'mcp_session_setup',
+  'mcp_work_loop_v1',
   'mcp_read_bootstrap',
   'mcp_hosting_quickstart',
   'mcp_integrations_checkout_crm',
@@ -224,7 +226,10 @@ export function recommendedMcpRecipes(): readonly McpOnboardingRecipeId[] {
   return MCP_ONBOARDING_RECIPE_IDS;
 }
 
-/** Ten-step discovery ladder (parity with ``instruction_plane.discovery_ladder_steps``). */
+/**
+ * MCP discovery ladder URLs (parity with ``instruction_plane.discovery_ladder_steps`` /
+ * onboarding bundle ``machine_discovery_ladder``). HTTP bootstrap: ``http_bootstrap_ladder``.
+ */
 export function recommendedDiscoveryLadder(): string[] {
   return discoveryLadderSteps().map((row) => row.url);
 }
@@ -238,11 +243,11 @@ export interface McpSessionSetupLadderPhase {
 
 /** Mandatory session order (auth → project → context → work). Parity with ``session_setup_ladder_steps``. */
 export function sessionSetupLadderPhases(): McpSessionSetupLadderPhase[] {
-  return [
+          return [
     { phase: 1, id: 'authenticate', title: 'Authenticate' },
     { phase: 2, id: 'project', title: 'Select or create project', recipeId: 'mcp_session_setup' },
     { phase: 3, id: 'bind_context', title: 'Bind context.project_id' },
-    { phase: 4, id: 'domain_work', title: 'Domain actions', recipeId: 'mcp_read_bootstrap' },
+    { phase: 4, id: 'domain_work', title: 'Work Graph loop', recipeId: 'mcp_work_loop_v1' },
   ];
 }
 
@@ -253,9 +258,330 @@ export interface McpDiscoveryLadderStep {
   method: string;
 }
 
+export interface McpHttpBootstrapLadderStep {
+  step: number;
+  label: string;
+  url: string;
+  method: string;
+}
+
+export interface McpClosedLoopLadderStep {
+  step: number;
+  stepId: string;
+  label: string;
+  detail: string;
+}
+
+/** Parity with onboarding bundle ``closed_loop_ladder``. */
+export function closedLoopLadderSteps(): McpClosedLoopLadderStep[] {
+                                                    return [
+    {
+      step: 0,
+      stepId: 'session',
+      label: 'Session + project',
+      detail: '/mcp/prompts/get?name=agentstack_session_setup — bind context.project_id',
+    },
+    {
+      step: 1,
+      stepId: 'route',
+      label: 'Route goal',
+      detail: 'Cold start: no project_id → agentstack_session_setup only. Do not discovery.search until context.project_id is set. Bound project: agents.work_next first; discovery.search only when packet.next_action is absent. Status-only poll → agents.work_status (no claim params).',
+    },
+    {
+      step: 2,
+      stepId: 'plan_read',
+      label: 'Plan read + sandbox',
+      detail: 'agents.plan_get — include_execution_eligibility=true; optional env_uuid for sandbox slice',
+    },
+    {
+      step: 3,
+      stepId: 'work_pick',
+      label: 'Pick next work',
+      detail: 'agents.work_next — read dependency_ready (structural) vs execution_ready (fleet) separately; blocked_work.execution_summary + instruction_packet.execution_summary; dependency_ready=false → wait deps; execution_ready=false with deps ok → provision before claim',
+    },
+    {
+      step: 4,
+      stepId: 'plan_draft',
+      label: 'Draft / decompose (optional)',
+      detail: 'agents.plan_propose → validation.plan_valid + execution.execution_summary → agents.plan_apply_proposal (same env_uuid and validation_mode); persist_unexecutable for intake-only (H8); plan_process_backlog auto_apply=off; facet_repair bounded max 2 (H9); planning_artifact evidence-only (H10)',
+    },
+    {
+      step: 5,
+      stepId: 'claim_execute',
+      label: 'Claim + execute',
+      detail: 'agents.plan_claim — CAS revision; role_mismatch → handoff not retry loop → agents.plan_execute — only after claim; attach evidence for completion_predicates; ensure_agent create=false then create=true when provision_required (H5/H7)',
+    },
+    {
+      step: 6,
+      stepId: 'verify_recover',
+      label: 'Verify + recover',
+      detail: 'completion not_evaluable ≠ passed; verification_failed → agents.plan_recovery_scan — verification_failed candidates + stale claims; optional env_uuid; agents.plan_propose mode=repair_plan — target node_id; allow_generic_acceptance repair-only; agents.plan_apply_proposal — same env_uuid as propose on sandbox forks; agents.work_next handoff=true node_id=… — re-resolve after repair or provision; diagnostics reconcile',
+    },
+    {
+      step: 7,
+      stepId: 'business_team',
+      label: 'Business / team (optional)',
+      detail: '/mcp/prompts/get?name=agentstack_business_organism for head+organs; agents.team.create + templates for specialist fleet',
+    },
+  ];
+}
+
+/** Harness H6–H11 — parity with agentstack_closed_loop_autonomy + WAVE_XIX atoms. */
+export const WORK_GRAPH_HARNESS_INVARIANTS = [
+  {
+    id: 'H6',
+    atom: 'WG_CAPABILITY_HARD_GATE',
+    summary: "required_capabilities are mandatory — capability_mismatch blocks claim; route agents.ensure_agent create=false (H5) then create=true, or plan_propose mode=repair_plan; not handoff (capability_hard_gate_v1).",
+  },
+  {
+    id: 'H7',
+    atom: 'WG_ENSURE_CREATE_SAGA',
+    summary: "Commit-last provision: work_next blocked → ensure_agent create=false (H5 template_id) → create=true provisions with bind_node=False → eligibility gate → rollback on created_agent_not_eligible → next_action agents.plan_claim (bind+lease, if_match_revision); idempotent_replay when bound eligible agent exists.",
+  },
+  {
+    id: 'H8',
+    atom: 'WG_PLANNER_PLANE',
+    summary: "Backlog scan uses planner eligibility (decomposition_status=needed) — not execution_ready; validation_ok reflects plan_valid (structural+semantic), not fleet gaps.",
+  },
+  {
+    id: 'H9',
+    atom: 'WG_FACET_REPAIR',
+    summary: "plan_propose runs ensure_proposal_facet_coverage (facet_repair, max 2 passes) after enrich for create_plan and decompose_node (including from_draft_tree meta under create_plan) — do not hand-patch semantic facet children; for facet gaps after other modes use mode=repair_plan.",
+  },
+  {
+    id: 'H10',
+    atom: 'WG_PLANNING_ARTIFACT',
+    summary: "meta.planning_artifact nodes are evidence-only (resolution=non_executable_artifact) — attach evidence on parent; plan_process_backlog and claim skip them for execution.",
+  },
+  {
+    id: 'H11',
+    atom: 'WG_BIND_VS_CLAIM',
+    summary: "node.agent_id binding ≠ active claim lease — already_claimed requires status=in_progress with non-expired lease meta; bound agent on ready/pending is not already_claimed; retry ensure_agent idempotent_replay or plan_claim with if_match_revision.",
+  },
+] as const;
+
+/** agents.work_next when_blocked — parity with shared/fixtures/capabilities/agents.json */
+export const WORK_GRAPH_WHEN_BLOCKED = {
+  provision_required: "ensure_agent create=false (H5) then create=true then plan_claim",
+  no_compatible_agent: "agents.ensure_agent create=false (H5) then create=true, or plan_propose mode=repair_plan",
+  planning_required: "agents.plan_propose mode=create_plan or decompose_node — strategic/decomposition node, not execution",
+  planning_blocked: "agents.plan_propose mode=decompose_node or plan_process_backlog — finish planner plane first",
+  dependency_blocked: "dependency_ready=false — wait deps; do not ensure_agent",
+  role_mismatch: "work_next handoff=true node_id=… — do not retry same agent",
+  specialization_mismatch: "work_next handoff=true — follow recovery.next_actions",
+  capability_mismatch: "agents.ensure_agent create=false (H5) then create=true, or plan_propose mode=repair_plan",
+  verification_failed: "agents.plan_recovery_scan → plan_propose mode=repair_plan",
+  fully_provisionable: "ensure_agent create=false (H5) then create=true (preferred over create_from_template)",
+  supersede_in_progress: "agents.plan_get then wait/retry — in-progress node cannot be superseded without options.force_supersede_in_progress (retryable)",
+  planner_duplicate_children: "agents.plan_get — semantic facet children already exist; re-propose is a no-op or use mode=replan_subtree",
+  plan_revision_conflict: "agents.plan_get reload if_match_revision; retry claim/apply (retryable)",
+  expired_claim: "agents.plan_reclaim_stale — lease expired; do not treat as dependency_blocked",
+  wip_full: "Agent WIP cap reached — agents.plan_get then complete/release in_progress claims; retry plan_claim",
+  terminal: "agents.work_next — skip terminal node; pick another leaf (completed/cancelled not claimable)",
+  waiting_input: "agents.work_next — ask_user recovery; do not plan_claim until operator input arrives",
+  waiting_approval: "agents.work_next — wait approval gate; agents.plan_get to inspect approval meta",
+  decomposition_blocked: "agents.plan_propose mode=decompose_node — parent has open decomposition children",
+  already_claimed: "agents.work_next — check in_progress lease (H11); handoff if wrong agent; plan_reclaim_stale if stale",
+  skill_mismatch: "agents.work_next handoff=true — skill_ids mismatch; follow recovery.next_actions",
+  missing_capability: "agents.ensure_agent create=false (H5) then create=true, or plan_propose mode=repair_plan",
+  internal_execution_error: "agents.plan_recovery_scan → plan_propose mode=repair_plan; retry after catalog refresh",
+  created_agent_not_eligible: "Provision rolled back — plan_propose mode=repair_plan or pick template with matching caps (H5)",
+  ensure_agent_stamp_mismatch: "Replay create=false preview; create=true must match preview_template_id + graph_revision",
+} as const
+
+/** agents.work_next when_blocked trilingual — parity with work_graph_instruction_atoms */
+export const WORK_GRAPH_WHEN_BLOCKED_LOCALES = {
+  "planning_required": {
+    "en-US": "Plan first — agents.plan_propose mode=create_plan or decompose_node (not execution)",
+    "ru-RU": "Сначала план — agents.plan_propose mode=create_plan или decompose_node (не execution)",
+    "pt-BR": "Planeje primeiro — agents.plan_propose mode=create_plan ou decompose_node (não execução)",
+  },
+  "provision_required": {
+    "en-US": "Provision — agents.ensure_agent create=false (H5) then create=true, then plan_claim",
+    "ru-RU": "Провижн — agents.ensure_agent create=false (H5) затем create=true, затем plan_claim",
+    "pt-BR": "Provisione — agents.ensure_agent create=false (H5) depois create=true, então plan_claim",
+  },
+  "no_compatible_agent": {
+    "en-US": "No fleet match — agents.ensure_agent create=false (H5) then create=true, or repair_plan",
+    "ru-RU": "Нет агента во флоте — agents.ensure_agent create=false (H5) затем create=true или repair_plan",
+    "pt-BR": "Sem agente na frota — agents.ensure_agent create=false (H5) depois create=true ou repair_plan",
+  },
+  "capability_mismatch": {
+    "en-US": "Missing required_capabilities — agents.ensure_agent create=false (H5) then create=true, or plan_propose mode=repair_plan. Not handoff.",
+    "ru-RU": "Нет required_capabilities — agents.ensure_agent create=false (H5) затем create=true, или plan_propose mode=repair_plan. Не handoff.",
+    "pt-BR": "required_capabilities ausentes — agents.ensure_agent create=false (H5) depois create=true, ou plan_propose mode=repair_plan. Não é handoff.",
+  },
+  "fully_provisionable": {
+    "en-US": "Template ready — agents.ensure_agent create=false (H5) then create=true (preferred over create_from_template)",
+    "ru-RU": "Шаблон готов — agents.ensure_agent create=false (H5) затем create=true (предпочтительнее create_from_template)",
+    "pt-BR": "Template pronto — agents.ensure_agent create=false (H5) depois create=true (preferido a create_from_template)",
+  },
+  "plan_revision_conflict": {
+    "en-US": "CAS conflict — agents.plan_get reload if_match_revision; never apply stale proposal",
+    "ru-RU": "CAS конфликт — agents.plan_get перечитать if_match_revision; не apply устаревший proposal",
+    "pt-BR": "Conflito CAS — agents.plan_get recarregue if_match_revision; nunca apply proposal obsoleto",
+  },
+  "expired_claim": {
+    "en-US": "Stale lease — agents.plan_reclaim_stale, then plan_claim with a fresh if_match_revision",
+    "ru-RU": "Истёк lease — agents.plan_reclaim_stale, затем plan_claim с новым if_match_revision",
+    "pt-BR": "Lease expirado — agents.plan_reclaim_stale, depois plan_claim com if_match_revision novo",
+  },
+  "supersede_in_progress": {
+    "en-US": "In-progress supersede blocked — agents.plan_get, wait/retry (or force_supersede_in_progress)",
+    "ru-RU": "Supersede in_progress заблокирован — agents.plan_get, wait/retry (или force_supersede_in_progress)",
+    "pt-BR": "Supersede in_progress bloqueado — agents.plan_get, aguarde/retry (ou force_supersede_in_progress)",
+  },
+  "planner_duplicate_children": {
+    "en-US": "Duplicate facet children — agents.plan_get; skip re-propose or use mode=replan_subtree",
+    "ru-RU": "Дубли facet children — agents.plan_get; не re-propose или mode=replan_subtree",
+    "pt-BR": "Filhos facet duplicados — agents.plan_get; pule re-propose ou use mode=replan_subtree",
+  },
+  "dependency_blocked": {
+    "en-US": "Wait on deps — agents.work_next after upstream finishes; agents.plan_get to inspect graph; do not ensure_agent",
+    "ru-RU": "Дождитесь deps — agents.work_next после upstream; agents.plan_get для просмотра графа; не ensure_agent",
+    "pt-BR": "Aguarde deps — agents.work_next após upstream; agents.plan_get para inspecionar o grafo; não ensure_agent",
+  },
+  "role_mismatch": {
+    "en-US": "Handoff — agents.work_next handoff=true node_id=…; follow recovery.next_actions; do not retry same agent",
+    "ru-RU": "Handoff — agents.work_next handoff=true node_id=…; следуйте recovery.next_actions; не повторяйте того же агента",
+    "pt-BR": "Handoff — agents.work_next handoff=true node_id=…; siga recovery.next_actions; não repita o mesmo agente",
+  },
+  "specialization_mismatch": {
+    "en-US": "Specialization mismatch — agents.work_next handoff=true; follow recovery.next_actions",
+    "ru-RU": "Несовпадение специализации — agents.work_next handoff=true; следуйте recovery.next_actions",
+    "pt-BR": "Especialização incompatível — agents.work_next handoff=true; siga recovery.next_actions",
+  },
+  "planning_blocked": {
+    "en-US": "Planner plane blocked — agents.plan_propose mode=decompose_node or plan_process_backlog first",
+    "ru-RU": "Планер заблокирован — сначала agents.plan_propose mode=decompose_node или plan_process_backlog",
+    "pt-BR": "Plano bloqueado — agents.plan_propose mode=decompose_node ou plan_process_backlog primeiro",
+  },
+  "verification_failed": {
+    "en-US": "Verification failed — agents.plan_recovery_scan → plan_propose mode=repair_plan",
+    "ru-RU": "Верификация не прошла — agents.plan_recovery_scan → plan_propose mode=repair_plan",
+    "pt-BR": "Verificação falhou — agents.plan_recovery_scan → plan_propose mode=repair_plan",
+  },
+  "wip_full": {
+    "en-US": "WIP cap — complete/release in_progress claims; agents.plan_get then retry plan_claim",
+    "ru-RU": "Лимит WIP — завершите/освободите in_progress; agents.plan_get затем plan_claim",
+    "pt-BR": "Cap WIP — conclua/libere claims in_progress; agents.plan_get depois plan_claim",
+  },
+  "terminal": {
+    "en-US": "Terminal node — agents.work_next skip; not claimable (completed/cancelled)",
+    "ru-RU": "Терминальный узел — agents.work_next пропустить; не claimable",
+    "pt-BR": "Nó terminal — agents.work_next pule; não claimable (concluído/cancelado)",
+  },
+  "waiting_input": {
+    "en-US": "Waiting input — agents.work_next ask_user; no plan_claim until operator responds",
+    "ru-RU": "Ожидание ввода — agents.work_next ask_user; без plan_claim до ответа оператора",
+    "pt-BR": "Aguardando entrada — agents.work_next ask_user; sem plan_claim até resposta",
+  },
+  "waiting_approval": {
+    "en-US": "Waiting approval — agents.work_next wait gate; agents.plan_get inspect approval meta",
+    "ru-RU": "Ожидание approval — agents.work_next wait; agents.plan_get для meta approval",
+    "pt-BR": "Aguardando aprovação — agents.work_next aguarde; agents.plan_get inspecione meta",
+  },
+  "decomposition_blocked": {
+    "en-US": "Decompose first — agents.plan_propose mode=decompose_node on parent",
+    "ru-RU": "Сначала decompose — agents.plan_propose mode=decompose_node на parent",
+    "pt-BR": "Decomponha primeiro — agents.plan_propose mode=decompose_node no parent",
+  },
+  "already_claimed": {
+    "en-US": "In progress lease — agents.work_next (H11); handoff or plan_reclaim_stale if stale",
+    "ru-RU": "Lease in_progress — agents.work_next (H11); handoff если чужой агент; plan_reclaim_stale только если lease протух",
+    "pt-BR": "Lease in_progress — agents.work_next (H11); handoff se o agente for outro; plan_reclaim_stale só se expirado",
+  },
+  "skill_mismatch": {
+    "en-US": "Skill mismatch — agents.work_next handoff=true; follow recovery.next_actions",
+    "ru-RU": "Skill mismatch — agents.work_next handoff=true; следуйте recovery.next_actions",
+    "pt-BR": "Skill mismatch — agents.work_next handoff=true; siga recovery.next_actions",
+  },
+  "missing_capability": {
+    "en-US": "Missing caps — agents.ensure_agent create=false (H5) then create=true, or plan_propose mode=repair_plan",
+    "ru-RU": "Нет caps — agents.ensure_agent create=false (H5) затем create=true, или plan_propose mode=repair_plan",
+    "pt-BR": "Caps ausentes — agents.ensure_agent create=false (H5) depois create=true, ou plan_propose mode=repair_plan",
+  },
+  "internal_execution_error": {
+    "en-US": "Resolver error — agents.plan_recovery_scan → repair_plan; refresh catalog then retry",
+    "ru-RU": "Ошибка resolver — agents.plan_recovery_scan → repair_plan; обновите каталог, затем retry",
+    "pt-BR": "Erro resolver — agents.plan_recovery_scan → repair_plan; atualize o catálogo e então retry",
+  },
+  "created_agent_not_eligible": {
+    "en-US": "Rollback — plan_propose mode=repair_plan or template with matching caps (H5)",
+    "ru-RU": "Rollback — plan_propose mode=repair_plan или шаблон с caps (H5)",
+    "pt-BR": "Rollback — plan_propose mode=repair_plan ou template com caps (H5)",
+  },
+  "ensure_agent_stamp_mismatch": {
+    "en-US": "Stamp mismatch — replay create=false; create=true must match preview + revision",
+    "ru-RU": "Stamp mismatch — повторите create=false; create=true = preview + revision",
+    "pt-BR": "Stamp mismatch — repita create=false; create=true = preview + revision",
+  },
+} as const
+
+/** Platform-plane Wave XIX atoms trilingual — parity with WAVE_XIX_ATOM_LOCALES */
+export const WAVE_XIX_ATOM_LOCALES = {
+  "WG_STORAGE_NOT_KNOWLEDGE": {
+    "en-US": "File upload / document persistence → storage.* (MCP operator or REST binary upload). Do not ingest to knowledge unless the goal requests RAG/Q&A/semantic search.",
+    "ru-RU": "Загрузка файлов → storage.* (MCP оператор или REST). Не индексируй в knowledge без явного запроса RAG/семантического поиска.",
+    "pt-BR": "Upload de arquivo → storage.* (MCP operador ou REST). Não ingerir em knowledge salvo pedido RAG/busca semântica.",
+  },
+  "WG_MCP_SDK_REST_PLANE": {
+    "en-US": "MCP: operator/agent configure + work graph. SDK: app runtime integration. REST: binary transfer or capability not in SDK. Never duplicate platform CRM/Auth/Storage.",
+    "ru-RU": "MCP: оператор/агент + work graph. SDK: runtime приложения. REST: бинарные загрузки или возможности вне SDK. Не дублируй CRM/Auth/Storage платформы.",
+    "pt-BR": "MCP: operador/config + work graph. SDK: runtime do app. REST: binário ou capacidade fora do SDK. Nunca duplique CRM/Auth/Storage da plataforma.",
+  },
+  "WG_GRAPH_FOR_DURABLE_WORK": {
+    "en-US": "Durable work (more than one read) enters the Work Graph: agents.plan_propose (create_plan or decompose_node), agents.plan_apply_proposal when validation.safe_to_auto_apply, then agents.work_next following next_action until state=idle, blocked, or recoverable. A single domain call (one CRM write, one file upload, discovery.search, auth.get_profile) stays a direct MCP action. Do not mark a node complete from prose — attach meta.verify_after_write_action evidence. Idle with an empty graph is valid.",
+    "ru-RU": "Долгая работа (дольше одного чтения) входит в Work Graph: agents.plan_propose (create_plan или decompose_node), agents.plan_apply_proposal при validation.safe_to_auto_apply, затем agents.work_next и next_action до state=idle, blocked или recoverable. Один доменный вызов (один контакт CRM, одна загрузка файла, discovery.search, auth.get_profile) остаётся прямым MCP. Не помечайте узел выполненным из текста — приложите доказательство meta.verify_after_write_action. Пустой граф — валидный idle.",
+    "pt-BR": "Trabalho durável (mais que uma leitura) entra no Work Graph: agents.plan_propose (create_plan ou decompose_node), agents.plan_apply_proposal quando validation.safe_to_auto_apply, depois agents.work_next seguindo next_action até state=idle, blocked ou recoverable. Uma chamada de domínio (um contato CRM, um upload, discovery.search, auth.get_profile) continua MCP direto. Não marque o nó completo pelo texto — anexe evidência meta.verify_after_write_action. Grafo vazio é idle válido.",
+  },
+  "WG_VERIFY_AFTER_WRITE": {
+    "en-US": "After each platform mutation, verify via canonical read on meta.verify_after_write_action (storage.list_files, crm.list_contacts, logic.dry_run, rag.search) — attach evidence, do not mark complete from agent prose alone.",
+    "ru-RU": "После мутации платформы — каноническое чтение meta.verify_after_write_action (storage.list_files, crm.list_contacts, logic.dry_run, rag.search); прикрепи evidence, не завершай по тексту агента.",
+    "pt-BR": "Após mutação, verifique via leitura canônica meta.verify_after_write_action (storage.list_files, crm.list_contacts, logic.dry_run, rag.search) — anexe evidência, não marque completo só pelo texto do agente.",
+  },
+} as const;
+
+/**
+ * HTTP bootstrap ladder — contract → manifest → organs → public catalog schemas.
+ * Parity with ``instruction_plane.http_bootstrap_ladder()`` / onboarding ``http_bootstrap_ladder``.
+ */
+export function httpBootstrapLadderSteps(apiBase = ''): McpHttpBootstrapLadderStep[] {
+  const aiPrompt = resolveMcpGuidanceUrl(apiBase, MCP_GUIDANCE_URLS.aiPrompt);
+  const manifest = resolveMcpGuidanceUrl(apiBase, MCP_GUIDANCE_URLS.manifest);
+  const organs = resolveMcpGuidanceUrl(apiBase, MCP_GUIDANCE_URLS.organs);
+  const actionsPublic = buildMcpCatalogActionsUrl(apiBase, { hot: false });
+  return [
+    {
+      step: 0,
+      label: 'Contract (slim)',
+      url: `${aiPrompt}?mode=contract`,
+      method: 'GET',
+    },
+    {
+      step: 1,
+      label: 'Server manifest',
+      url: manifest,
+      method: 'GET',
+    },
+    {
+      step: 2,
+      label: 'Organs map',
+      url: organs,
+      method: 'GET',
+    },
+    {
+      step: 3,
+      label: 'Public catalog schemas',
+      url: actionsPublic,
+      method: 'GET',
+    },
+  ];
+}
+
 /** Parity with onboarding bundle ``discovery_ladder`` (relative paths). */
 export function discoveryLadderSteps(): McpDiscoveryLadderStep[] {
-  return [
+          return [
     {
       step: 0,
       label: 'Session probe',
@@ -264,24 +590,30 @@ export function discoveryLadderSteps(): McpDiscoveryLadderStep[] {
     },
     {
       step: 1,
+      label: 'Work Graph default (bound project)',
+      url: 'agents.work_next',
+      method: 'MCP',
+    },
+    {
+      step: 2,
       label: 'Registry status',
       url: 'discovery.status',
       method: 'MCP',
     },
     {
-      step: 2,
-      label: 'Intent search',
+      step: 3,
+      label: 'Schema lookup only — prefer packet.next_action',
       url: 'discovery.search',
       method: 'MCP',
     },
     {
-      step: 3,
+      step: 4,
       label: 'Describe chosen action',
       url: 'discovery.describe',
       method: 'MCP',
     },
     {
-      step: 4,
+      step: 5,
       label: 'Preflight then execute',
       url: 'preflight.check',
       method: 'MCP',
@@ -348,15 +680,20 @@ export interface BuildMcpCatalogActionsUrlOptions {
   hot?: boolean;
 }
 
-/** Build GET /mcp/actions URL (hot schemas + optional etag delta). */
+/**
+ * Build GET /mcp/actions URL (default `schemas=public`; pass `hot: true` for hot schemas).
+ * Delta: `since_etag` + `delta=1` — server may return `delta_fallback: revision_unknown` (full body).
+ * Echo response header `X-AgentStack-Cache-Epoch` on subsequent catalog fetches after cache clear.
+ */
 export function buildMcpCatalogActionsUrl(
   apiBase: string,
   opts: BuildMcpCatalogActionsUrlOptions = {},
 ): string {
-  const { sinceEtag = null, delta = false, hot = true } = opts;
+  const { sinceEtag = null, delta = false, hot = false } = opts;
   const origin = resolveMcpGuidanceUrl(apiBase, MCP_GUIDANCE_URLS.actions);
   const url = new URL(origin);
   if (hot) url.searchParams.set('schemas', 'hot');
+  else url.searchParams.set('schemas', 'public');
   if (sinceEtag) url.searchParams.set('since_etag', sinceEtag);
   if (delta && sinceEtag) url.searchParams.set('delta', '1');
   return url.toString();
@@ -436,6 +773,53 @@ export type McpActionsSummary = {
   entrypoint?: string;
 };
 
+/** Read a public MCP resource via JSON-RPC resources/read (no auth). */
+export async function readPublicMcpResource(
+  apiBase: string,
+  uri: string,
+): Promise<Record<string, unknown>> {
+  const root = String(apiBase || '').replace(/\/$/, '');
+  const mcpUrl = root.endsWith('/mcp') ? root : `${root}/mcp`;
+  const res = await fetch(mcpUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 'resource-read',
+      method: 'resources/read',
+      params: { uri },
+    }),
+  });
+  const data = (await res.json().catch(() => ({}))) as {
+    result?: { contents?: Array<{ text?: string }> };
+    error?: unknown;
+  };
+  if (!res.ok || data.error) throw new Error(JSON.stringify(data));
+  const text = data.result?.contents?.[0]?.text;
+  if (!text) return {};
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    return { text };
+  }
+}
+
+/** Convenience readers for well-known public resources. */
+export async function readPublicMcpOnboardingBundle(
+  apiBase: string,
+): Promise<Record<string, unknown>> {
+  return readPublicMcpResource(apiBase, 'agentstack://instructions/session');
+}
+
+export async function readPublicMcpWorkGraphLadder(
+  apiBase: string,
+): Promise<Record<string, unknown>> {
+  return readPublicMcpResource(apiBase, 'agentstack://instructions/work-graph');
+}
+
 export async function fetchMcpActionsSummary(apiBase: string): Promise<McpActionsSummary> {
   const origin = resolveMcpGuidanceUrl(apiBase, MCP_GUIDANCE_URLS.actionsSummary);
   const res = await fetch(origin);
@@ -499,7 +883,7 @@ export interface McpListActionsOptions {
 /** GET /mcp/actions — enriched MCP catalog (includes capability_descriptor slim rows). */
 export async function mcpListActions(opts: McpListActionsOptions): Promise<unknown> {
   const url = buildMcpCatalogActionsUrl(opts.apiBase, {
-    hot: opts.hot ?? true,
+    hot: opts.hot ?? false,
     sinceEtag: opts.sinceEtag ?? null,
     delta: opts.delta ?? false,
   });
@@ -525,7 +909,7 @@ export async function refreshMcpCatalogWithDelta(
   const url = buildMcpCatalogActionsUrl(opts.apiBase, {
     sinceEtag: opts.sinceEtag,
     delta: true,
-    hot: true,
+    hot: false,
   });
   const res = await fetch(url, {
     headers: {
@@ -550,6 +934,11 @@ export interface RunMcpPreflightOptions {
   token: string;
   projectId: number;
   requiredCaps?: string[];
+  /** Optional MCP action for risk/effect probe (parity with preflight.check). */
+  action?: string;
+  actionParams?: Record<string, unknown>;
+  pathUpdates?: Array<Record<string, unknown>>;
+  publishAsked?: boolean;
 }
 
 /** Server-side preflight aggregator (GET /mcp/preflight). */
@@ -560,6 +949,18 @@ export async function fetchMcpPreflight(opts: RunMcpPreflightOptions): Promise<u
   const caps = opts.requiredCaps ?? [];
   if (caps[0]) {
     url.searchParams.set('permission', caps[0]);
+  }
+  if (opts.action) {
+    url.searchParams.set('action', opts.action);
+  }
+  if (opts.actionParams && Object.keys(opts.actionParams).length > 0) {
+    url.searchParams.set('action_params', JSON.stringify(opts.actionParams));
+  }
+  if (opts.pathUpdates && opts.pathUpdates.length > 0) {
+    url.searchParams.set('path_updates', JSON.stringify(opts.pathUpdates));
+  }
+  if (opts.publishAsked) {
+    url.searchParams.set('publish_asked', 'true');
   }
   const res = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${opts.token}`, Accept: 'application/json' },
@@ -616,6 +1017,14 @@ export interface FlowReceipt {
   partial_success?: boolean;
   succeeded_count?: number;
   failed_step_ids?: string[];
+  workflow_run_id?: string;
+  completed?: string[];
+  verified?: string[];
+  live_urls?: string[];
+  pending?: string[];
+  warnings?: string[];
+  quality_profiles?: string[];
+  quality_gates?: Array<{ id: string; status: string; gap?: string }>;
 }
 
 /** Build compact ops handoff receipt (distinct from AgentNet economy receipts). */
@@ -635,6 +1044,14 @@ export function buildFlowReceipt(partial: Partial<FlowReceipt> & { project_id: n
     partial_success: partial.partial_success,
     succeeded_count: partial.succeeded_count,
     failed_step_ids: partial.failed_step_ids,
+    workflow_run_id: partial.workflow_run_id,
+    completed: partial.completed ?? [],
+    verified: partial.verified ?? [],
+    live_urls: partial.live_urls ?? [],
+    pending: partial.pending ?? [],
+    warnings: partial.warnings ?? [],
+    quality_profiles: partial.quality_profiles,
+    quality_gates: partial.quality_gates,
   };
 }
 
@@ -708,6 +1125,8 @@ export interface DiscoveryStatusDomainSlice {
   id: string;
   actions_count: number;
   sample_actions?: string[];
+  /** e.g. rest_catalog_domain — REST-only rows, not MCP execute. */
+  note?: string;
 }
 
 export interface DiscoveryStatusPayload {
@@ -719,11 +1138,16 @@ export interface DiscoveryStatusPayload {
   registry_revision?: string;
   schema_version?: string;
   actions_total?: number;
+  /** MCP-executable catalog rows (excludes REST-only commerce hints). */
+  mcp_executable_total?: number;
+  /** REST-only commerce_rest catalog rows — not MCP execute steps. */
+  rest_catalog_total?: number;
   domains_total?: number;
   domains?: DiscoveryStatusDomainSlice[];
   recipes_total?: number;
   catalog_etag?: string;
   generated_at?: string;
+  instruction_locale?: string;
   instruction_slice?: {
     ladder_step?: number;
     when_to_use?: string;
@@ -771,9 +1195,14 @@ export async function fetchDiscoveryStatus(opts: {
   apiBase: string;
   token: string;
   projectId?: number;
+  locale?: string;
 }): Promise<DiscoveryStatusPayload> {
+  const params: Record<string, string> = {};
+  const locale = opts.locale?.trim();
+  if (locale) params.locale = locale;
+
   const res = await mcpExecute(
-    [{ id: 'status', action: 'discovery.status', params: {} }],
+    [{ id: 'status', action: 'discovery.status', params }],
     {
       token: opts.token,
       projectId: opts.projectId ?? 1,
@@ -789,6 +1218,49 @@ export async function fetchDiscoveryStatus(opts: {
       : (payload as DiscoveryStatusPayload | undefined);
   if (!data) {
     throw new Error('discovery.status returned no data');
+  }
+  return data;
+}
+
+/** Supported BCP-47 tags for MCP instruction-plane copy (parity with locale_tags.py). */
+export type Bcp47Locale = 'en-US' | 'ru-RU' | 'pt-BR';
+
+/** Typed params for discovery.search — pass locale for localized instruction slices. */
+export type DiscoverySearchParams = {
+  apiBase: string;
+  token: string;
+  projectId?: number;
+  /** Natural-language goal or capability query. */
+  q: string;
+  /** Client/profile locale — forwarded to discovery.search for localized slices. */
+  locale?: Bcp47Locale | string;
+  limit?: number;
+};
+
+/** MCP discovery.search — ranked actions with localized instruction slices. */
+export async function fetchDiscoverySearch(opts: DiscoverySearchParams): Promise<DiscoverySearchResult> {
+  const params: Record<string, unknown> = { q: opts.q };
+  const locale = opts.locale?.trim();
+  if (locale) params.locale = locale;
+  if (opts.limit != null) params.limit = opts.limit;
+
+  const res = await mcpExecute(
+    [{ id: 'search', action: 'discovery.search', params }],
+    {
+      token: opts.token,
+      projectId: opts.projectId ?? 1,
+      mcpUrl: resolveMcpGuidanceUrl(opts.apiBase, MCP_GUIDANCE_URLS.mcp),
+      stopOnError: true,
+    },
+  );
+  const first = res.results[0];
+  const payload = first?.result;
+  const data =
+    payload && typeof payload === 'object' && 'data' in (payload as object)
+      ? (payload as { data?: DiscoverySearchResult }).data
+      : (payload as DiscoverySearchResult | undefined);
+  if (!data) {
+    throw new Error('discovery.search returned no data');
   }
   return data;
 }

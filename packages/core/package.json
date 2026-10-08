@@ -1,6 +1,6 @@
 {
   "name": "@agentstack/sdk",
-  "version": "0.4.18",
+  "version": "0.4.22",
   "description": "AgentStack-SDK - Universal API client with modular architecture and Neural integration",
   "readme": "README.en.md",
   "type": "module",
@@ -30,6 +30,18 @@
       "import": "./dist/messaging/index.esm.js",
       "require": "./dist/messaging/index.js",
       "default": "./dist/messaging/index.esm.js"
+    },
+    "./messaging/user": {
+      "types": "./dist/messaging/user.d.ts",
+      "import": "./dist/messaging/user.js",
+      "require": "./dist/messaging/user.js",
+      "default": "./dist/messaging/user.js"
+    },
+    "./messaging/admin": {
+      "types": "./dist/messaging/admin.d.ts",
+      "import": "./dist/messaging/admin.js",
+      "require": "./dist/messaging/admin.js",
+      "default": "./dist/messaging/admin.js"
     },
     "./i18n": {
       "types": "./dist/i18n/index.d.ts",
@@ -90,6 +102,11 @@
       "types": "./dist/guidance/index.d.ts",
       "import": "./dist/guidance/index.js",
       "require": "./dist/guidance/index.js"
+    },
+    "./agents": {
+      "types": "./dist/agents/index.d.ts",
+      "import": "./dist/agents/index.js",
+      "require": "./dist/agents/index.js"
     },
     "./rag": {
       "types": "./dist/rag/index.d.ts",
@@ -278,6 +295,7 @@
     "pretest": "npm run sync:agentstack-version",
     "pretype-check": "npm run sync:agentstack-version",
     "build": "node ./scripts/rollup-build.mjs",
+    "check:rollup-isolated": "node ./scripts/check-rollup-build-isolated.mjs",
     "check:pwa-subpath-size": "node ./scripts/check-pwa-subpath-size.mjs",
     "dev": "rollup -c -w",
     "test": "jest",
@@ -297,7 +315,7 @@
     "check:commerce-shop-parity": "node ../../scripts/check-commerce-shop-parity.mjs",
     "check:commerce-topup-parity": "node ../../scripts/check-sdk-commerce-topup-parity.mjs",
     "check:docs-urls": "node ./scripts/check-docs-urls.mjs",
-    "check:package-exports": "node ./scripts/check-package-exports.mjs",
+    "check:package-exports": "npm run check:rollup-isolated && node ./scripts/check-guidance-dist.mjs && node ./scripts/check-package-exports.mjs",
     "check:docs-api-symbols": "node ./scripts/check-docs-api-symbols.mjs",
     "check:docs-sdk-method-calls": "node ./scripts/check-docs-sdk-method-calls.mjs",
     "check:openapi-sdk-sample": "node ./scripts/check-openapi-sdk-sample.mjs",
@@ -352,7 +370,6 @@
     "jest": "^29.7.0",
     "rimraf": "^6.0.0",
     "rollup": "^4.30.0",
-    "rollup-plugin-copy": "^3.5.0",
     "rollup-plugin-dts": "^6.1.1",
     "ts-jest": "^29.2.5",
     "typescript": "^5.7.3"

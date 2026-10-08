@@ -54,6 +54,11 @@ export const GoalVerifySpecSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('ragSearchReturned') }),
   z.object({ kind: z.literal('businessHeadExists'), minOrgans: z.number().optional() }),
   z.object({ kind: z.literal('manualConfirm'), checklistKeys: z.array(z.string()) }),
+  z.object({
+    kind: z.literal('mcpProbe'),
+    action: z.string().min(1),
+    minSources: z.number().int().min(0).optional(),
+  }),
 ]);
 
 export type GoalVerifySpec = z.infer<typeof GoalVerifySpecSchema>;

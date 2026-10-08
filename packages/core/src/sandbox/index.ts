@@ -10,7 +10,27 @@ export {
   applyPromoteGatesPolicy,
   resolveRequireGatesPassed,
 } from './promotePolicy';
-export type { GenerationSettingsLike, PromoteBodyLike } from './promotePolicy';
+export type { PromoteBodyLike } from './promotePolicy';
+export {
+  allowsAutoPromote,
+  approvalGateRequired,
+  approverIds,
+  generationReviewRequired,
+  quorumMet,
+  quorumNeeded,
+  resolveApprovalMode,
+} from './generationReview';
+export type { GenerationSettingsLike } from './generationReview';
+export { roleMayWriteProduction } from './directProd';
+
+export {
+  GENERATION_PREFERRED_ENV_BLOCKED,
+  isStaleEnvUuidError,
+  omitEnvUuid,
+  omitSandboxEnvKeys,
+  callWithEnvUuidRetry,
+} from './envUuidRetry';
+export type { SandboxEnvUuidRetryOptions } from './envUuidRetry';
 
 export type PromoteStrategy = 'immediate' | 'canary' | 'blue_green';
 
@@ -101,6 +121,12 @@ export type GenerationSettingsPatch = {
   auto_generation_categories?: string[];
   auto_generation_soak_minutes?: number;
   auto_generation_require_approval?: boolean;
+  /** off | at_least_one | min_count | min_percent | manual_only */
+  auto_generation_approval_mode?: string;
+  auto_generation_approval_min_count?: number;
+  auto_generation_approval_min_percent?: number;
+  /** Roles that write production. Empty list forces every actor through sandbox. */
+  direct_prod_roles?: string[];
   auto_promote_on_all_pass?: boolean;
   auto_promote_strategy?: PromoteStrategy;
   canary_auto_route?: boolean;

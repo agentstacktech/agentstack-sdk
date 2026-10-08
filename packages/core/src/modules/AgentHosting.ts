@@ -118,6 +118,27 @@ export interface BucketPatchBody {
   seo_banner_asset_id?: string | null;
 }
 
+export interface HostingContentPatchBody {
+  write_mode: string;
+  content?: string;
+  unified_diff?: string;
+  replacements?: Array<{ find: string; replace?: string; count?: number }>;
+  expected_sha256?: string;
+  dry_run?: boolean;
+  allow_shrink?: boolean;
+  strict_diff?: boolean;
+}
+
+export interface HostingContentPatchResult {
+  path?: string;
+  content_sha256?: string;
+  previous_sha256?: string;
+  apply_method?: string;
+  dry_run?: boolean;
+  preview_content?: string;
+  preview_truncated?: boolean;
+}
+
 export interface PromoteBuildBody {
   project_id: number;
   branch?: string;
@@ -313,10 +334,23 @@ export class AgentHosting {
       encoding: string;
       content?: string;
       content_base64?: string;
+      content_sha256?: string;
     }>(`/hosting/buckets/${bucketId}/files/${path}`, {
       params: { project_id: projectId },
       skipCache: true,
     });
+  }
+
+  contentPatchFile(
+    projectId: number,
+    bucketId: string,
+    path: string,
+    body: HostingContentPatchBody,
+  ) {
+    return this.client.post<HostingContentPatchResult>(
+      `/hosting/buckets/${bucketId}/files/${path}/content-patch`,
+      { project_id: projectId, ...body },
+    );
   }
 
   renameFile(

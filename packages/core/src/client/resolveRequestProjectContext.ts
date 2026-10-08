@@ -5,12 +5,15 @@
  *
  * Invariant: on hosted `/s/{pid}`, never rewrite X-Project-ID to JWT project_id.
  * Prefer vault Bearer for route pid, else guest (omit Bearer).
+ * Shell workspace: one identity JWT covers every accessible project.
+ * Keep Bearer and honor X-Project-ID; the server rebinds membership.
  */
 
 import {
   isEcosystemScopedApiPath,
   isIdentityBearerSessionPath,
   isIdentityScopedApiPath,
+  isPlatformOperatorApiPath,
 } from './routeScopeClassifier';
 import { ECOSYSTEM_PROJECT_ID } from '../config/ecosystemProject';
 
@@ -83,6 +86,22 @@ export function resolveRequestProjectContext(
     return { mode: 'guest', projectId: routePid };
   }
 
+  const platformRoute =
+    input.requestPath != null && isPlatformOperatorApiPath(input.requestPath);
+  if (platformRoute) {
+    const vaultPid = vault ? jwtProjectIdFromToken(vault) : null;
+    if (vault && (vaultPid === ECOSYSTEM_PROJECT_ID || jwtPid === ECOSYSTEM_PROJECT_ID)) {
+      // Workspace header may already be a tenant while the live JWT is still pid 1.
+      return { mode: 'shell', projectId: ECOSYSTEM_PROJECT_ID, bearer: vault };
+    }
+    // Same identity session. Admin/diagnostics stay on ecosystem pid;
+    // membership rebind applies that working project server-side.
+    if (vault) {
+      return { mode: 'shell', projectId: ECOSYSTEM_PROJECT_ID, bearer: vault };
+    }
+    return { mode: 'shell', projectId: ECOSYSTEM_PROJECT_ID };
+  }
+
   const shellPid = headerPid ?? jwtPid ?? ECOSYSTEM_PROJECT_ID;
   if (vault && jwtProjectIdFromToken(vault) === shellPid) {
     return { mode: 'shell', projectId: shellPid, bearer: vault };
@@ -105,10 +124,16 @@ export function resolveRequestProjectContext(
     const ecosystemRoute =
       input.requestPath != null && isEcosystemScopedApiPath(input.requestPath);
     if (ecosystemRoute && headerPid === ECOSYSTEM_PROJECT_ID) {
-      // Shell personal finance/profile — never guest-strip; bridge must remint vault[1].
+      // Personal finance/profile stays on ecosystem pid, same identity Bearer.
+      if (vault) {
+        return { mode: 'shell', projectId: headerPid, bearer: vault };
+      }
       return { mode: 'shell', projectId: headerPid };
     }
-    // Honor header project as guest rather than rewriting header to JWT
+    if (vault) {
+      // One session: working project is the header, identity stays on the JWT.
+      return { mode: 'shell', projectId: headerPid, bearer: vault };
+    }
     return { mode: 'guest', projectId: headerPid };
   }
   if (vault) {

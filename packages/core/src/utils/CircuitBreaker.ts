@@ -230,8 +230,7 @@ export class CircuitBreaker {
       return;
     }
     const wasOpen = this.state !== 'closed';
-    const isProd =
-      typeof import.meta !== 'undefined' && Boolean((import.meta as { env?: { PROD?: boolean } }).env?.PROD);
+    const isProd = typeof process !== 'undefined' && process.env?.NODE_ENV === 'production';
     if (wasOpen || !isProd) {
       const msg = `Circuit Breaker [${this.config.name}]: Manual reset!`;
       if (isProd) {

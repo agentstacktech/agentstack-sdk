@@ -3,6 +3,42 @@
  * Genetic tag: sdk.messaging.gen1
  */
 
+export type {
+  BotCandidateRow,
+  DeliveryReceiptRow,
+  CorrelationDeliveryStatus,
+  NotificationDeliveryStatus,
+  NotificationPrefsSnapshot,
+  NotificationPrefsWrite,
+  NotificationSourceHealth,
+  NotificationSourceRow,
+  NotifyCategoryId,
+  NotifyCategoryPref,
+  NotifyDigestDepth,
+  FlushNotifyDigestResult,
+  PlatformTelegramHint,
+  SourceKind,
+} from './notificationPrefs';
+
+export {
+  CHANNEL_ALIASES,
+  NOTIFY_CATEGORIES,
+  SOURCE_KINDS,
+  deleteNotificationSource,
+  flushNotifyDigest,
+  getDeliveryStatus,
+  getDeliveryStatusByCorrelationKey,
+  getNotifyDigestDepth,
+  getNotificationSourceHealth,
+  getNotificationPrefsSnapshot,
+  listFailedDeliveries,
+  putNotificationPrefs,
+  putNotificationSource,
+} from './notificationPrefs';
+
+export type { DeliverNotificationParams, DeliverNotificationResult } from './deliver';
+export { deliverNotification } from './deliver';
+
 import type { HTTPClient } from '../client/http-client';
 import type { APIResponse } from '../types';
 
@@ -142,6 +178,74 @@ export async function sendAdminEmail(
   } catch (err) {
     throw new Error(deliveryErrorMessage(err, 'Failed to send email'));
   }
+}
+
+export type MailThreadCard = {
+  id?: string;
+  subject?: string;
+  from?: string;
+  snippet?: string;
+  received_at?: string;
+  read?: boolean;
+  messages?: Array<{ text?: string; from?: string }>;
+};
+
+export async function getMailInbox(http: HTTPClient): Promise<{ success: boolean; threads: MailThreadCard[] }> {
+  return unwrap(http.get('/api/mail/inbox'));
+}
+
+export async function getMailThread(
+  http: HTTPClient,
+  threadId: string,
+): Promise<{ success: boolean; thread: MailThreadCard }> {
+  return unwrap(http.get(`/api/mail/inbox/${encodeURIComponent(threadId)}`));
+}
+
+export async function getMailboxSettings(http: HTTPClient): Promise<{
+  success: boolean;
+  primary_address?: string;
+  aliases?: string[];
+  settings?: { forward_to_canonical?: boolean; notify_in_app?: boolean; notify_push?: boolean };
+}> {
+  return unwrap(http.get('/api/mail/mailbox/settings'));
+}
+
+export async function claimMailbox(
+  http: HTTPClient,
+  local: string,
+): Promise<{ success: boolean; primary_address?: string }> {
+  return unwrap(http.post('/api/mail/mailbox/claim', { local }));
+}
+
+export async function putMailboxSettings(
+  http: HTTPClient,
+  settings: { forward_to_canonical?: boolean; notify_in_app?: boolean; notify_push?: boolean },
+): Promise<{ success: boolean }> {
+  return unwrap(http.put('/api/mail/mailbox/settings', settings));
+}
+
+export async function replyMailbox(
+  http: HTTPClient,
+  text: string,
+  idempotencyKey?: string,
+): Promise<{ success: boolean }> {
+  return unwrap(
+    http.post('/api/mail/reply', { text }, idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : undefined),
+  );
+}
+
+export async function sendMailboxLetter(
+  http: HTTPClient,
+  body: { to: string; subject?: string; text: string },
+  idempotencyKey?: string,
+): Promise<{ success: boolean }> {
+  return unwrap(
+    http.post('/api/mail/send', body, idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : undefined),
+  );
+}
+
+export async function markMailRead(http: HTTPClient, threadId: string): Promise<{ success: boolean }> {
+  return unwrap(http.patch(`/api/mail/inbox/${encodeURIComponent(threadId)}`, { read: true }));
 }
 
 export async function ensureAuthTemplates(

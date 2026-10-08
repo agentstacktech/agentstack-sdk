@@ -13,6 +13,8 @@ export type BusinessCommandSnapshot = {
   tariff?: Record<string, unknown>;
   integrations_index?: Record<string, unknown> | null;
   metrics?: Record<string, unknown>;
+  /** MCP closed-loop operator hints (instruction_plane.gen1). */
+  onboarding_pointers?: Record<string, string>;
   as_of?: string;
 };
 
@@ -56,7 +58,6 @@ export type BusinessOrgSettingsPatch = {
   industry?: string | null;
   inherit_membership?: boolean;
   federation_mode?: 'auto_active' | 'manual';
-  max_children?: number;
 };
 
 export type CreateBusinessCompositeBody = {

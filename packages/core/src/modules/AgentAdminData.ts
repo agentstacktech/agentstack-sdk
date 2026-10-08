@@ -62,6 +62,10 @@ export interface AdminDataDnaListParams {
   offset?: number;
   order_by?: string;
   order?: 'asc' | 'desc';
+  /** Card vs DNA contour. */
+  contour?: 'dna' | 'card';
+  /** Filter execution logs by service. */
+  service_name?: string;
 }
 
 export interface AdminDataDnaListResponse {
@@ -79,6 +83,8 @@ export interface AdminDataHealthResponse {
   sample_projects_returned?: number;
   ecosystem_project_id?: number;
   dna_list_counts?: { project?: number; user?: number };
+  projects_count_excl_showcase?: number;
+  showcase_projects_count?: number;
 }
 
 export interface AdminDataSnapshotResponse {

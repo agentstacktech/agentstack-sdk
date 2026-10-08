@@ -511,6 +511,7 @@ export class AgentsFleet {
       template_id?: string;
       name?: string;
       fork_on_collision?: boolean;
+      env_uuid?: string;
     },
   ): Promise<{ success: boolean; agent: AgentRowDTO }> {
     const res = await this.client.post(`${this.base(projectId)}/import-pack`, body);
@@ -519,7 +520,7 @@ export class AgentsFleet {
 
   async importFromAsset(
     projectId: number,
-    body: { asset: Record<string, unknown>; name?: string },
+    body: { asset: Record<string, unknown>; name?: string; env_uuid?: string },
   ): Promise<{ success: boolean; agent: AgentRowDTO; missing_resources?: string[] }> {
     const res = await this.client.post(`${this.base(projectId)}/import-from-asset`, body);
     return res.data as { success: boolean; agent: AgentRowDTO; missing_resources?: string[] };
@@ -654,7 +655,12 @@ export class AgentsFleet {
     projectId: number,
     optionsOrLimit:
       | number
-      | { conversationId?: string; limit?: number; beforeIndex?: number } = 40,
+      | {
+          conversationId?: string;
+          limit?: number;
+          beforeIndex?: number;
+          envUuid?: string;
+        } = 40,
   ): Promise<{
     success: boolean;
     turns?: Array<{ role: string; text: string; index?: number }>;
@@ -668,6 +674,10 @@ export class AgentsFleet {
     if (options.beforeIndex != null && options.beforeIndex >= 0) {
       params.before_index = options.beforeIndex;
     }
+    const envUuid = String(
+      ('envUuid' in options ? options.envUuid : '') ?? '',
+    ).trim();
+    if (envUuid) params.env_uuid = envUuid;
     const res = await this.client.get(`${this.orchestratorBase(projectId)}/thread`, {
       params,
     });
@@ -731,6 +741,7 @@ export class AgentsFleet {
       parent_prompt?: string;
       max_children?: number;
       use_llm?: boolean;
+      env_uuid?: string;
     },
   ): Promise<{
     success: boolean;
@@ -760,6 +771,7 @@ export class AgentsFleet {
       max_depth?: number;
       max_nodes?: number;
       use_llm?: boolean;
+      env_uuid?: string;
     },
   ): Promise<{
     success: boolean;
@@ -914,6 +926,8 @@ export class AgentsFleet {
       node_id?: string;
       env_uuid?: string;
       locale?: string;
+      /** ``compact`` (default) for loop tokens; ``full`` for operator UI panels. */
+      detail?: 'compact' | 'full';
     },
   ): Promise<import('../agents/planGraph').WorkNextPacket> {
     const { locale, ...params } = body ?? {};
@@ -972,6 +986,30 @@ export class AgentsFleet {
     body?: { limit?: number; env_uuid?: string },
   ): Promise<Record<string, unknown>> {
     return this.mcpAgentsAction(projectId, 'agents.plan_recovery_scan', body ?? {});
+  }
+
+  /** MCP-only — ``agents.team.create`` specialist fleet playbook ingest. */
+  async teamCreate(
+    projectId: number,
+    body: { message: string; env_uuid?: string },
+  ): Promise<Record<string, unknown>> {
+    return this.mcpAgentsAction(projectId, 'agents.team.create', body);
+  }
+
+  /** MCP-only — ``agents.reconcile_binding``. Fleet create stays on the production catalog. */
+  async reconcileBinding(
+    projectId: number,
+    body?: { repair?: boolean; env_uuid?: string },
+  ): Promise<Record<string, unknown>> {
+    return this.mcpAgentsAction(projectId, 'agents.reconcile_binding', body ?? {});
+  }
+
+  /** MCP-only — ``agents.plan_reconcile_diagnostics``. */
+  async planReconcileDiagnostics(
+    projectId: number,
+    body?: { env_uuid?: string },
+  ): Promise<Record<string, unknown>> {
+    return this.mcpAgentsAction(projectId, 'agents.plan_reconcile_diagnostics', body ?? {});
   }
 
   private async mcpAgentsAction(
@@ -1083,7 +1121,7 @@ export class AgentsFleet {
   async getAgentPlan(
     projectId: number,
     agentId: string,
-    options?: { include_execution_eligibility?: boolean },
+    options?: { include_execution_eligibility?: boolean; env_uuid?: string },
   ): Promise<{
     success: boolean;
     task_list?: Record<string, unknown>;
@@ -1095,6 +1133,8 @@ export class AgentsFleet {
     if (options?.include_execution_eligibility === true) {
       params.include_execution_eligibility = 'true';
     }
+    const envUuid = String(options?.env_uuid ?? '').trim();
+    if (envUuid) params.env_uuid = envUuid;
     const res = await this.client.get(
       `${this.orchestratorBase(projectId)}/plan/agent/${encodeURIComponent(agentId)}`,
       { params: Object.keys(params).length ? params : undefined },
@@ -1133,8 +1173,11 @@ export class AgentsFleet {
 
   async exportOrchestratorPack(
     projectId: number,
+    envUuid?: string,
   ): Promise<{ success: boolean; pack: Record<string, unknown> }> {
-    const res = await this.client.get(`${this.orchestratorBase(projectId)}/export-pack`);
+    const env = String(envUuid ?? '').trim();
+    const q = env ? `?env_uuid=${encodeURIComponent(env)}` : '';
+    const res = await this.client.get(`${this.orchestratorBase(projectId)}/export-pack${q}`);
     return res.data as { success: boolean; pack: Record<string, unknown> };
   }
 
@@ -1168,9 +1211,12 @@ export class AgentsFleet {
   async importOrchestratorPack(
     projectId: number,
     pack: Record<string, unknown>,
+    envUuid?: string,
   ): Promise<{ success: boolean; orchestrator?: Record<string, unknown> }> {
+    const env = String(envUuid ?? '').trim();
     const res = await this.client.post(`${this.orchestratorBase(projectId)}/import-pack`, {
       pack,
+      ...(env ? { env_uuid: env } : {}),
     });
     return res.data as { success: boolean; orchestrator?: Record<string, unknown> };
   }

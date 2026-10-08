@@ -27,6 +27,11 @@ import {
 } from '../utils/classifyAuthFailure';
 import { jwtProjectIdFromToken } from '../client/resolveRequestProjectContext';
 import { isTransientBrowserNetworkError } from '../client/networkErrors';
+import {
+  isAuthTransientRetryError,
+  isBackendReconnectingError,
+  UPSTREAM_UNAVAILABLE_CODE,
+} from '../client/apiWarming';
 import { loginWithDeviceCodeForm } from '../mcp/deviceCode';
 import type {
   UserSettings,
@@ -177,6 +182,25 @@ export interface OAuthConnectRequest {
   refresh_token?: string;
   expires_in?: number;
   project_id: number;
+}
+
+/**
+ * Mint JSON already sets refresh_token to the session JWT (user_token, has jti).
+ * session.api_key is a different credential; POST /auth/refresh rejects it (no jti)
+ * and a failed refresh used to wipe the stored session on the next boot.
+ */
+function refreshTokenFromMint(
+  data: { refresh_token?: unknown },
+  session: { api_key?: unknown; user_token?: unknown },
+  accessToken: string,
+): string {
+  const apiKey = typeof session.api_key === 'string' ? session.api_key.trim() : '';
+  const explicit = typeof data.refresh_token === 'string' ? data.refresh_token.trim() : '';
+  const userToken = typeof session.user_token === 'string' ? session.user_token.trim() : '';
+  if (explicit && explicit !== apiKey) return explicit;
+  if (userToken && userToken !== apiKey) return userToken;
+  if (accessToken && accessToken !== apiKey) return accessToken;
+  return explicit || userToken || accessToken;
 }
 
 export class AgentAuth extends SimpleEventEmitter {
@@ -379,17 +403,35 @@ export class AgentAuth extends SimpleEventEmitter {
             const code =
               (response?.data as any)?.code ||
               (response?.data as any)?.detail?.code;
+            const responseStatus = Number((response as any)?.status || 0);
             if (
+              isAuthTransientRetryError({
+                status: responseStatus,
+                apiCode: code,
+                message: String((response?.data as any)?.message || ''),
+              }) ||
               isTypedDna503Code(code) ||
-              code === 'api_warming_up' ||
               code === 'login_capacity' ||
-              code === 'project_key_unavailable' ||
-              code === 'auth_mint_timeout' ||
-              code === 'auth_mint_in_progress' ||
               code === 'auth_crypto_timeout' ||
-              code === 'auth_lookup_timeout' ||
-              ((response as any)?.status === 503 && !code)
+              code === 'auth_lookup_timeout'
             ) {
+              if (code === UPSTREAM_UNAVAILABLE_CODE) {
+                mintId =
+                  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+                    ? crypto.randomUUID()
+                    : `mint-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+                loginBody.mint_id = mintId;
+                try {
+                  if (typeof localStorage !== 'undefined') {
+                    localStorage.setItem(mintStorageKey, mintId);
+                  }
+                  if (typeof sessionStorage !== 'undefined') {
+                    sessionStorage.setItem(mintStorageKey, mintId);
+                  }
+                } catch {
+                  /* ignore */
+                }
+              }
               const retryAfterRaw =
                 (response as any)?.headers?.['retry-after'] ||
                 (response as any)?.headers?.['Retry-After'] ||
@@ -418,17 +460,31 @@ export class AgentAuth extends SimpleEventEmitter {
               err?.name === 'TimeoutError' ||
               /timeout/i.test(String(err?.message || ''));
             if (
+              isAuthTransientRetryError(err) ||
+              isBackendReconnectingError(err) ||
               isTypedDna503Code(detailCode) ||
-              detailCode === 'api_warming_up' ||
               detailCode === 'login_capacity' ||
-              detailCode === 'project_key_unavailable' ||
-              detailCode === 'auth_mint_timeout' ||
-              detailCode === 'auth_mint_in_progress' ||
               detailCode === 'auth_crypto_timeout' ||
               detailCode === 'auth_lookup_timeout' ||
-              (status === 503 && !detailCode) ||
               isTimeout
             ) {
+              if (detailCode === UPSTREAM_UNAVAILABLE_CODE) {
+                mintId =
+                  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+                    ? crypto.randomUUID()
+                    : `mint-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+                loginBody.mint_id = mintId;
+                try {
+                  if (typeof localStorage !== 'undefined') {
+                    localStorage.setItem(mintStorageKey, mintId);
+                  }
+                  if (typeof sessionStorage !== 'undefined') {
+                    sessionStorage.setItem(mintStorageKey, mintId);
+                  }
+                } catch {
+                  /* ignore */
+                }
+              }
               const retryAfterSec = Math.max(
                 1,
                 Number(err?.retryAfterSec) ||
@@ -543,7 +599,7 @@ export class AgentAuth extends SimpleEventEmitter {
 
           const authTokens: AuthTokens = {
             access_token: accessToken,
-            refresh_token: session.api_key || session.user_token,
+            refresh_token: refreshTokenFromMint(data, session, accessToken),
             token_type: 'Bearer',
             expires_in: 86400, // 24 hours
             user_id: session.user_id?.toString(),
@@ -958,6 +1014,9 @@ export class AgentAuth extends SimpleEventEmitter {
             ?.detail?.code;
         const status = (err as { response?: { status?: number }; status?: number })?.response
           ?.status ?? (err as { status?: number })?.status;
+        if (detailCode === 'session_resolve_busy' && attempt >= 2) {
+          throw this.transformError(err);
+        }
         if (
           detailCode === 'auth_mint_in_progress' ||
           detailCode === 'switch_in_progress' ||
@@ -1010,7 +1069,7 @@ export class AgentAuth extends SimpleEventEmitter {
       .replace(/\s+/g, '');
     const authTokens: AuthTokens = {
       access_token: accessToken,
-      refresh_token: String(session.api_key || session.user_token || accessToken),
+      refresh_token: refreshTokenFromMint(data, session, accessToken),
       token_type: 'Bearer',
       expires_in: 86400,
       user_id: String(session.user_id ?? data.user_id ?? ''),
@@ -1094,9 +1153,9 @@ export class AgentAuth extends SimpleEventEmitter {
   /** Convert anonymous account created via login-by-key to a full user. */
   async convertAnonymousUser(body: {
     user_api_key: string;
-    name: string;
+    name?: string;
     email: string;
-    password: string;
+    password?: string;
   }): Promise<Record<string, unknown>> {
     return this.errorHandler.executeWithErrorHandling(async () => {
       const response = await this.client.post('/auth/convert-anonymous', body, {
@@ -1775,8 +1834,8 @@ export class AgentAuth extends SimpleEventEmitter {
   }
 
   /**
-   * Создание API ключа (устаревший метод - используйте проектные ключи)
-   * @deprecated Используйте проектные API ключи вместо персональных
+   * @deprecated User PATs are `POST /user/api-keys` with `preset` (`user_full`) or
+   * `service_caps` from `CANONICAL_L1_CAPS`. This route is the old project-key path.
    */
   async createApiKey(data: {
     name: string;
@@ -1905,17 +1964,43 @@ export class AgentAuth extends SimpleEventEmitter {
     return response.data;
   }
 
+  /** Open a project and an anonymous owner. POST ``/projects/anonymous``. */
+  async createAnonymousProject(body: {
+    name: string;
+    description?: string;
+    preset_id?: string;
+  }): Promise<Record<string, unknown>> {
+    return this.errorHandler.executeWithErrorHandling(async () => {
+      const response = await this.client.post('/projects/anonymous', body, {
+        skipAuthStateCheck: true,
+      });
+      return (response.data ?? {}) as Record<string, unknown>;
+    }, { operation: 'create_anonymous_project' }) as Promise<Record<string, unknown>>;
+  }
+
   /** Passwordless sign-in: request email OTP (Mail Hub template ``email_otp``). */
-  async sendEmailOtpLogin(email: string): Promise<{
+  async sendEmailOtpLogin(
+    email: string,
+    options?: { purpose?: string; channel?: string; destination?: string; apiKey?: string },
+  ): Promise<{
     challenge_id: string;
     masked_email: string;
     expires_in: number;
     sent: boolean;
+    needs_human?: boolean;
+    ask_user?: string;
   }> {
+    const headers: Record<string, string> = {};
+    if (options?.apiKey) headers['X-API-Key'] = options.apiKey;
     const response = await this.client.post(
       '/auth/email-otp/send',
-      { email },
-      { skipAuthStateCheck: true },
+      {
+        email,
+        purpose: options?.purpose || 'login',
+        channel: options?.channel || 'email',
+        destination: options?.destination || '',
+      },
+      { skipAuthStateCheck: true, ...(Object.keys(headers).length ? { headers } : {}) } as any,
     );
     return response.data;
   }
@@ -1942,22 +2027,33 @@ export class AgentAuth extends SimpleEventEmitter {
         expires_in: typeof data.expires_in === 'number' ? data.expires_in : undefined,
       });
     }
+    // Same store as password login. The JWT stays valid across a process
+    // restart because the server stamped data.sessions[jti] before HTTP 200.
+    if (data?.success && data?.access_token && data?.session) {
+      await this.persistSessionFromLoginResponse(data);
+    }
     return data;
   }
 
+  /** @deprecated Use `@agentstack/sdk/messaging` (`getNotificationPrefsSnapshot`). */
   async getNotificationPrefs(): Promise<{ prefs: unknown; sources: unknown[] }> {
-    const response = await this.client.get('/users/me/notification-prefs');
-    return response.data;
+    const { getNotificationPrefsSnapshot } = await import('../messaging/notificationPrefs');
+    const snap = await getNotificationPrefsSnapshot(this.client);
+    return { prefs: snap.prefs, sources: snap.sources || [] };
   }
 
+  /** @deprecated Use `@agentstack/sdk/messaging` (`putNotificationPrefs`). */
   async putNotificationPrefs(prefs: Record<string, unknown>): Promise<{ prefs: unknown }> {
-    const response = await this.client.put('/users/me/notification-prefs', prefs);
-    return response.data;
+    const { putNotificationPrefs } = await import('../messaging/notificationPrefs');
+    const out = await putNotificationPrefs(this.client, prefs as { categories: Record<string, { channels: string[] }> });
+    return { prefs: out.prefs };
   }
 
+  /** @deprecated Use `@agentstack/sdk/messaging` (`putNotificationSource`). */
   async putNotificationSource(source: Record<string, unknown>): Promise<{ sources: unknown[] }> {
-    const response = await this.client.put('/users/me/notification-sources', { source });
-    return response.data;
+    const { putNotificationSource } = await import('../messaging/notificationPrefs');
+    const out = await putNotificationSource(this.client, source as { kind: string });
+    return { sources: out.sources || [] };
   }
 
   /**
@@ -2390,8 +2486,10 @@ export class AgentAuth extends SimpleEventEmitter {
   /**
    * Установка аватара текущего пользователя в profile_data
    */
-  async setAvatar(avatarDataUrl: string): Promise<void> {
-    await this.setProfileValue('avatar', avatarDataUrl);
+  async setAvatar(_avatarDataUrl: string): Promise<void> {
+    throw new Error(
+      'Avatar bytes are not stored in profile JSON. Call uploadAvatar(file) → POST /api/profile/avatar.',
+    );
   }
 
   // ============================================================================

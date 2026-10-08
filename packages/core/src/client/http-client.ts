@@ -65,8 +65,7 @@ import {
 } from './resolveRequestProjectContext';
 import {
   isAdminScopedApiPath,
-  isEcosystemScopedApiPath,
-  isIdentityScopedApiPath,
+  isNonSession401Path,
   isUserScopedSessionPath,
 } from './routeScopeClassifier';
 import {
@@ -552,8 +551,8 @@ export class HTTPClient extends SimpleEventEmitter {
     const pathOnly = url.split('?')[0] || '';
     assertIntegratorMayCallAdminApi(this.config, pathOnly);
 
-    // Identity PAT CRUD — never batch/cache; don't deadlock on auth-state during switch.
-    if (isIdentityScopedApiPath(url) || isIdentityScopedApiPath(pathOnly)) {
+    // Identity PAT and /users/me — never batch/cache; a 401 must not deadlock the shell.
+    if (isNonSession401Path(url) || isNonSession401Path(pathOnly)) {
       requestConfig.skipCache = true;
       requestConfig.skipBatching = true;
       if (this.authToken || this.apiKey) {
@@ -942,11 +941,12 @@ export class HTTPClient extends SimpleEventEmitter {
     const circuitKey = `${interceptedConfig.method}:${url}`;
     const run = (): Promise<APIResponse<T>> =>
       this._executeRequest<T>(url, headers, interceptedConfig);
-    // Identity PAT: never fail-closed behind CB. Edge 444 / SW abort was wrapping
-    // as Network error and locking Profile → API keys (G-A159).
+    // Identity PAT and /users/me: never fail-closed behind CB. Edge 444 / SW abort
+    // was wrapping as Network error and locking Profile → API keys (G-A159).
+    // A resource 401 must not open the shell refresh lock.
     if (
-      isIdentityScopedApiPath(url) ||
-      isIdentityScopedApiPath(interceptedConfig.url || '')
+      isNonSession401Path(url) ||
+      isNonSession401Path(interceptedConfig.url || '')
     ) {
       return run();
     }
@@ -970,6 +970,17 @@ export class HTTPClient extends SimpleEventEmitter {
     }
     
     const isValidToken = cleanToken && cleanToken.length > 0;
+
+    if (isValidToken && this.mintFloorIat > 0) {
+      const candIat = Number(HTTPClient.jwtClaim(cleanToken || '', 'iat')) || 0;
+      if (candIat > 0 && candIat < this.mintFloorIat) {
+        logger.debug('setAuthToken skipped: JWT iat below mint floor', {
+          candIat,
+          mintFloorIat: this.mintFloorIat,
+        });
+        return;
+      }
+    }
 
     // ✅ CRITICAL: Check if token changed - if so, clear cache to prevent loading wrong user's data
     const tokenChanged = this.authToken !== (isValidToken ? cleanToken : null);
@@ -1145,6 +1156,11 @@ export class HTTPClient extends SimpleEventEmitter {
       graceMs: HTTPClient.POST_LOGIN_GRACE_MS,
       mintFloorIat: this.mintFloorIat || undefined,
     });
+  }
+
+  /** Mint floor used to drop late switch responses with an older `iat`. */
+  public getMintFloorIat(): number {
+    return this.mintFloorIat;
   }
 
   /** Record mint JWT iat so refreshTokensFromStorage cannot resurrect older/dead JTIs. */
@@ -1371,6 +1387,17 @@ export class HTTPClient extends SimpleEventEmitter {
         const cached = this.getFromCache<T>(cacheKey);
         if (cached) {
           return cached;
+        }
+        const flagged = config as RequestConfig & { __etag304Retry?: boolean };
+        if (!flagged.__etag304Retry) {
+          const nextHeaders = { ...headers };
+          delete nextHeaders['If-None-Match'];
+          delete nextHeaders['if-none-match'];
+          return this._executeRequest<T>(url, nextHeaders, {
+            ...config,
+            skipCache: true,
+            __etag304Retry: true,
+          } as RequestConfig);
         }
         this.captureCacheEpochFromResponse(response);
         const api304: APIResponse<T> = {
@@ -2338,6 +2365,7 @@ export class HTTPClient extends SimpleEventEmitter {
         }
         const isAdminPermissionMiss =
           isAdminScopedApiPath(url) && hasBearer && !sessionMissEarly;
+        const nonSession401 = isNonSession401Path(url);
         const shouldMarkSessionExpired =
           hasBearer &&
           !config?.skipAuthStateCheck &&
@@ -2345,7 +2373,8 @@ export class HTTPClient extends SimpleEventEmitter {
           !isSettingsFieldGet &&
           !inMintGuard &&
           !config?.omittedBearerForMismatch &&
-          !isAdminPermissionMiss;
+          !isAdminPermissionMiss &&
+          !nonSession401;
 
         if (shouldMarkSessionExpired) {
           this.authStateStore.setState({
@@ -2438,6 +2467,18 @@ export class HTTPClient extends SimpleEventEmitter {
           break;
         }
 
+        if (nonSession401) {
+          logger.debug(
+            `Resource 401 on non-session path ${url} — not refreshing shell session`,
+          );
+          error = new UnauthorizedError(message || 'Unauthorized', {
+            status: 401,
+            code: 'resource_unauthorized',
+            traceId,
+          });
+          break;
+        }
+
         if (this.isInPostLoginGrace() && !isAuthEndpoint) {
           this.refreshTokensFromStorage();
           logger.debug(`Post-login grace: refreshed tokens from storage after 401 on ${url}`);
@@ -2474,15 +2515,17 @@ export class HTTPClient extends SimpleEventEmitter {
          if (retryCount >= 3) {
            logger.warn(`🚫 Max retry attempts (${retryCount}) reached for ${url}, giving up`);
            
-           // ✅ MEMORY LEAK FIX: Очищаем кэш при множественных 401 ошибках
-           // Это предотвращает накопление устаревших данных в кэше
-           this.clearCache();
-           if (this.proteinCache) {
-             try {
-               (this.proteinCache as any).clear?.();
-               logger.debug('Cleared cache after multiple 401 errors');
-             } catch (e) {
-               // Игнорируем ошибки
+           // Identity /users/me 401s must not drop the projects ETag cache
+           // (a later 304 would then arrive with an empty body).
+           if (!isNonSession401Path(url)) {
+             this.clearCache();
+             if (this.proteinCache) {
+               try {
+                 (this.proteinCache as any).clear?.();
+                 logger.debug('Cleared cache after multiple 401 errors');
+               } catch (e) {
+                 // Игнорируем ошибки
+               }
              }
            }
            
@@ -2559,6 +2602,14 @@ export class HTTPClient extends SimpleEventEmitter {
 
         // ✅ MEMORY LEAK FIX: Если refresh уже идет, добавляем запрос в очередь ожидания
         if (this.refreshLock !== null) {
+          if (isNonSession401Path(url)) {
+            error = new UnauthorizedError(message || 'Unauthorized', {
+              status: 401,
+              code: 'resource_unauthorized',
+              traceId,
+            });
+            break;
+          }
           logger.debug(`Token refresh in progress, adding request to queue: ${url}`);
           return new Promise((resolve, reject) => {
             this.addPendingRequest({
@@ -2791,6 +2842,10 @@ export class HTTPClient extends SimpleEventEmitter {
   }
 
   private shouldNotRetry(error: AgentStackError, config?: RequestConfig): boolean {
+    // Guest omit already fired project_session_required — do not replay the naked request.
+    if (config?.omittedBearerForMismatch) {
+      return true;
+    }
     // Nginx warm-up 503 — retry even on POST (login / mint) while edge recovers.
     if (isApiWarmingUpError(error)) {
       return false;
@@ -2803,6 +2858,14 @@ export class HTTPClient extends SimpleEventEmitter {
       config?.method &&
       config.method !== HTTPMethod.GET
     ) {
+      // Bare nginx 502/504 on the first POST (login) must retry; a later 503 list
+      // below never runs once this branch returns.
+      if (
+        (error.status === 502 || error.status === 504) &&
+        isBackendReconnectingError(error)
+      ) {
+        return false;
+      }
       return true;
     }
     if (
@@ -3427,9 +3490,12 @@ export class HTTPClient extends SimpleEventEmitter {
     // ✅ CRITICAL: Remove Authorization header from customHeaders - it should only be set from authToken
     // This prevents "Bearer " (with space but no token) from being set incorrectly
     const cleanCustomHeaders: Record<string, string> = {};
+    let presetBearer = '';
     for (const [key, value] of Object.entries(customHeaders)) {
-      // Skip Authorization header - it will be set from authToken below
+      // Skip Authorization header - it will be set from authToken below,
+      // unless this preset JWT already matches the outgoing X-Project-ID.
       if (key.toLowerCase() === 'authorization') {
+        presetBearer = String(value || '').replace(/^Bearer\s+/i, '').trim();
         continue;
       }
       if (value && typeof value === 'string') {
@@ -3530,7 +3596,14 @@ export class HTTPClient extends SimpleEventEmitter {
     // ✅ Fix: Add API key header - API key is REQUIRED for /auth/login to validate project
     // Only skip for /auth/refresh (uses token refresh, not API key)
     const isRefreshEndpoint = url ? url.includes('/auth/refresh') : false;
-    if (this.apiKey && typeof this.apiKey === 'string' && this.apiKey.trim().length > 0 && !isRefreshEndpoint) {
+    const callerApiKey = headers['X-API-Key'] || headers['x-api-key'];
+    if (
+      !callerApiKey &&
+      this.apiKey &&
+      typeof this.apiKey === 'string' &&
+      this.apiKey.trim().length > 0 &&
+      !isRefreshEndpoint
+    ) {
       // Remove any leading/trailing whitespace, newlines, and invalid characters
       let cleanApiKey = this.apiKey.trim()
         .replace(/^[,\s\n\r]+/g, '') // Remove leading commas, spaces, newlines
@@ -3552,7 +3625,7 @@ export class HTTPClient extends SimpleEventEmitter {
           originalApiKeyPreview: maskSecretForLog(this.apiKey)
         });
       }
-    } else {
+    } else if (!callerApiKey) {
       // Session/JWT-only browser clients often have no API key; public routes need neither — debug only.
       logger.debug('X-API-Key header not set', {
         url,
@@ -3624,9 +3697,24 @@ export class HTTPClient extends SimpleEventEmitter {
       }
     }
 
-    // V3.2 H1: shared resolveRequestProjectContext — omit Bearer on JWT↔header mismatch.
+    // V3.2 H1: shared resolveRequestProjectContext — one identity Bearer, header is the workspace.
+    const headerPidNow = String(headers['X-Project-ID'] || headers['x-project-id'] || '');
+    const presetPid = presetBearer ? jwtProjectIdFromToken(presetBearer) : null;
+    const presetMatchesHeader =
+      Boolean(presetBearer) &&
+      presetPid != null &&
+      headerPidNow !== '' &&
+      String(presetPid) === headerPidNow;
+    if (presetMatchesHeader) {
+      headers['Authorization'] = `Bearer ${presetBearer}`;
+    }
     let omittedBearerForMismatch = false;
-    if (this.authToken && this.authToken.trim().length > 0 && !isAuthEndpoint) {
+    if (
+      this.authToken &&
+      this.authToken.trim().length > 0 &&
+      !isAuthEndpoint &&
+      !presetMatchesHeader
+    ) {
       const headerPidRaw = headers['X-Project-ID'] || headers['x-project-id'] || '';
       const binding = resolveRequestProjectContext({
         headerProjectId: headerPidRaw ? Number(headerPidRaw) : null,
@@ -3634,76 +3722,20 @@ export class HTTPClient extends SimpleEventEmitter {
         vaultToken: this.authToken,
         requestPath: url || '',
       });
-      if (binding.mode === 'guest' || !binding.bearer) {
-        const tokenPid = String(jwtProjectIdFromToken(this.authToken) ?? '');
-        const headerPid = String(headerPidRaw);
-        if (
-          tokenPid &&
-          headerPid &&
-          tokenPid !== headerPid &&
-          !isUserScopedSessionPath(url || '')
-        ) {
-          if (isEcosystemScopedApiPath(url || '') && headerPid === String(ECOSYSTEM_PROJECT_ID)) {
-            if (tokenPid === String(ECOSYSTEM_PROJECT_ID)) {
-              // Finance/ecosystem contour — vault[eco] bearer matches header
-            } else {
-              omittedBearerForMismatch = true;
-              if (config) {
-                config.omittedBearerForMismatch = true;
-              }
-              delete headers['Authorization'];
-              delete headers['authorization'];
-              if (typeof window !== 'undefined') {
-                try {
-                  window.dispatchEvent(
-                    new CustomEvent('agentstack.auth.project_session_required', {
-                      detail: { project_id: ECOSYSTEM_PROJECT_ID },
-                    }),
-                  );
-                } catch {
-                  /* ignore */
-                }
-              }
-            }
-          } else {
-            const warnKey = `${tokenPid}->${headerPid}`;
-            if (!(HTTPClient as unknown as { _mismatchWarnKeys?: Set<string> })._mismatchWarnKeys) {
-              (HTTPClient as unknown as { _mismatchWarnKeys: Set<string> })._mismatchWarnKeys =
-                new Set();
-            }
-            const keys = (HTTPClient as unknown as { _mismatchWarnKeys: Set<string> })
-              ._mismatchWarnKeys;
-            if (!keys.has(warnKey)) {
-              keys.add(warnKey);
-              logger.warn(
-                'Bearer project_id mismatch with X-Project-ID — omitting Bearer to honor header',
-                { tokenPid, headerPid },
-              );
-            }
-            delete headers['Authorization'];
-            delete headers['authorization'];
-            omittedBearerForMismatch = true;
-            if (config) {
-              config.omittedBearerForMismatch = true;
-            }
-            const targetPid = Number(headerPid);
-            if (
-              typeof window !== 'undefined' &&
-              Number.isFinite(targetPid) &&
-              targetPid > 0
-            ) {
-              try {
-                window.dispatchEvent(
-                  new CustomEvent('agentstack.auth.project_session_required', {
-                    detail: { project_id: targetPid },
-                  }),
-                );
-              } catch {
-                /* ignore */
-              }
-            }
-          }
+      if (binding.projectId) {
+        headers['X-Project-ID'] = String(binding.projectId);
+      }
+      if (binding.bearer) {
+        headers['Authorization'] = `Bearer ${binding.bearer}`;
+      } else if (binding.mode === 'guest') {
+        delete headers['Authorization'];
+        delete headers['authorization'];
+        omittedBearerForMismatch = true;
+        if (config) {
+          config.omittedBearerForMismatch = true;
         }
+      } else {
+        headers['Authorization'] = `Bearer ${this.authToken}`;
       }
     }
 

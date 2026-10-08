@@ -32,11 +32,20 @@ export type ProductBundle = {
 export async function getProductBundle(
   client: HTTPClient,
   listingUuid: string,
+  sellerProjectId?: number,
 ): Promise<ProductBundle> {
-  const response = await client.get(`/commerce/shop/products/${listingUuid}`, undefined, {
-    skipAuthStateCheck: true,
-    skipBatching: true,
-  });
+  const seller =
+    sellerProjectId != null && Number.isFinite(sellerProjectId) && sellerProjectId > 0
+      ? Math.trunc(sellerProjectId)
+      : undefined;
+  const response = await client.get(
+    `/commerce/shop/products/${listingUuid}`,
+    seller != null ? { project: seller } : undefined,
+    {
+      skipAuthStateCheck: true,
+      skipBatching: true,
+    },
+  );
   const data = response.data ?? response;
   return {
     listing: data.listing,

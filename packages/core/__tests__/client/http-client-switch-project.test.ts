@@ -18,10 +18,10 @@ import { HTTPClient } from '../../src/client/http-client';
 import { AuthStateStore } from '../../src/utils/auth-state';
 import { cleanupMocks } from '../setup';
 
-function makeJwt(projectId: number, jti = 'switch-test-jti'): string {
+function makeJwt(projectId: number, jti = 'switch-test-jti', iat = 1_700_000_000): string {
   const header = Buffer.from(JSON.stringify({ alg: 'none' })).toString('base64url');
   const payload = Buffer.from(
-    JSON.stringify({ jti, project_id: projectId, iat: 1_700_000_000 }),
+    JSON.stringify({ jti, project_id: projectId, iat }),
   ).toString('base64url');
   return `${header}.${payload}.sig`;
 }
@@ -56,6 +56,31 @@ describe('HTTPClient switch-project bearer exempt', () => {
 
     expect(headers['Authorization']).toMatch(/^Bearer /);
     expect(headers['X-Project-ID']).toBe('1');
+  });
+
+  it('keeps interceptor Bearer when it already matches X-Project-ID', () => {
+    const stale = makeJwt(1600, 'stale-jti', 200);
+    const aligned = makeJwt(1, 'aligned-jti', 300);
+    client.setAuthToken(stale);
+    client.setProjectId(1);
+
+    const headers = client.buildFetchHeaders(
+      { Authorization: `Bearer ${aligned}`, 'X-Project-ID': '1' },
+      '/api/capabilities?effective=true',
+    );
+
+    expect(headers['Authorization']).toBe(`Bearer ${aligned}`);
+    expect(headers['X-Project-ID']).toBe('1');
+  });
+
+  it('ignores setAuthToken below the mint floor', () => {
+    const newer = makeJwt(1, 'new-jti', 500);
+    const older = makeJwt(1600, 'old-jti', 100);
+    client.setAuthToken(newer);
+    client.noteMintFloorFromToken(newer);
+    client.setAuthToken(older);
+    expect(client.getAuthToken()).toBe(newer);
+    expect(client.getMintFloorIat()).toBe(500);
   });
 
   it('project overview omits Bearer on jwt/header mismatch', () => {

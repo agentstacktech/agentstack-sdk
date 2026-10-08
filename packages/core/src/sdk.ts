@@ -526,6 +526,7 @@ export class AgentStackSDK extends SimpleEventEmitter {
         webPush: this.webPush,
         economy: this.economy,
         finance: this.finance,
+        hosting: this.hosting,
       },
       {}
     );
