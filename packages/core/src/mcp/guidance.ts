@@ -243,7 +243,7 @@ export interface McpSessionSetupLadderPhase {
 
 /** Mandatory session order (auth → project → context → work). Parity with ``session_setup_ladder_steps``. */
 export function sessionSetupLadderPhases(): McpSessionSetupLadderPhase[] {
-          return [
+            return [
     { phase: 1, id: 'authenticate', title: 'Authenticate' },
     { phase: 2, id: 'project', title: 'Select or create project', recipeId: 'mcp_session_setup' },
     { phase: 3, id: 'bind_context', title: 'Bind context.project_id' },
@@ -274,7 +274,7 @@ export interface McpClosedLoopLadderStep {
 
 /** Parity with onboarding bundle ``closed_loop_ladder``. */
 export function closedLoopLadderSteps(): McpClosedLoopLadderStep[] {
-                                                    return [
+                                                      return [
     {
       step: 0,
       stepId: 'session',
@@ -387,6 +387,8 @@ export const WORK_GRAPH_WHEN_BLOCKED = {
   internal_execution_error: "agents.plan_recovery_scan → plan_propose mode=repair_plan; retry after catalog refresh",
   created_agent_not_eligible: "Provision rolled back — plan_propose mode=repair_plan or pick template with matching caps (H5)",
   ensure_agent_stamp_mismatch: "Replay create=false preview; create=true must match preview_template_id + graph_revision",
+  plan_claim_required: "agents.plan_claim if_match_revision — in_progress lease before agents.plan_execute",
+  plan_completion_blocked: "Attach completion_predicates evidence; do not retry agents.plan_execute until allowed",
 } as const
 
 /** agents.work_next when_blocked trilingual — parity with work_graph_instruction_atoms */
@@ -581,7 +583,7 @@ export function httpBootstrapLadderSteps(apiBase = ''): McpHttpBootstrapLadderSt
 
 /** Parity with onboarding bundle ``discovery_ladder`` (relative paths). */
 export function discoveryLadderSteps(): McpDiscoveryLadderStep[] {
-          return [
+            return [
     {
       step: 0,
       label: 'Session probe',
