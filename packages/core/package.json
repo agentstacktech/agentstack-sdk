@@ -1,6 +1,6 @@
 {
   "name": "@agentstack/sdk",
-  "version": "0.4.22",
+  "version": "0.4.23",
   "description": "AgentStack-SDK - Universal API client with modular architecture and Neural integration",
   "readme": "README.en.md",
   "type": "module",
@@ -135,6 +135,12 @@
       "import": "./dist/commerce/checkout/index.esm.js",
       "require": "./dist/commerce/checkout/index.js",
       "default": "./dist/commerce/checkout/index.esm.js"
+    },
+    "./commerce/settlement": {
+      "types": "./dist/commerce/settlement/index.d.ts",
+      "import": "./dist/commerce/settlement/index.esm.js",
+      "require": "./dist/commerce/settlement/index.js",
+      "default": "./dist/commerce/settlement/index.esm.js"
     },
     "./commerce/cart": {
       "types": "./dist/commerce/cart/index.d.ts",
