@@ -44,6 +44,7 @@ export const adminDataDnaListResponseSchema = z.object({
   total: z.number(),
   limit: z.number(),
   offset: z.number(),
+  admission_stale: z.boolean().optional(),
 });
 
 export const adminDataHealthResponseSchema = z.object({

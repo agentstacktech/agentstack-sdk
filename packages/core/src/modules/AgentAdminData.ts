@@ -66,6 +66,8 @@ export interface AdminDataDnaListParams {
   contour?: 'dna' | 'card';
   /** Filter execution logs by service. */
   service_name?: string;
+  /** Comma-separated leaves to keep when a row is over the byte budget. At most 16. */
+  paths?: string;
 }
 
 export interface AdminDataDnaListResponse {
@@ -74,6 +76,8 @@ export interface AdminDataDnaListResponse {
   total: number;
   limit: number;
   offset: number;
+  /** True when admission shed served stale L1 card contour (`X-Admission-Stale: 1`). */
+  admission_stale?: boolean;
 }
 
 export interface AdminDataHealthResponse {
@@ -100,6 +104,30 @@ export interface AdminDataSnapshotResponse {
 
 const ADMIN_GET_OPTS = { skipCache: true, skipBatching: true } as const;
 
+function admissionStaleFromHeaders(
+  headers: Record<string, string> | undefined,
+): boolean {
+  if (!headers) return false;
+  const raw =
+    headers['x-admission-stale'] ??
+    headers['X-Admission-Stale'] ??
+    headers['X-ADMISSION-STALE'];
+  return raw === '1' || String(raw).toLowerCase() === 'true';
+}
+
+function withAdminDnaListAdmissionStale<T extends AdminDataDnaListResponse>(
+  data: T,
+  headers: Record<string, string> | undefined,
+): T {
+  if (data.admission_stale === true) {
+    return data;
+  }
+  if (!admissionStaleFromHeaders(headers)) {
+    return data;
+  }
+  return { ...data, admission_stale: true };
+}
+
 export class AgentAdminData {
   constructor(private readonly http: HTTPClient) {}
 
@@ -124,7 +152,7 @@ export class AgentAdminData {
       q,
       ADMIN_GET_OPTS,
     );
-    return res.data;
+    return withAdminDnaListAdmissionStale(res.data, res.headers);
   }
 
   async health(): Promise<AdminDataHealthResponse> {
