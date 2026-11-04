@@ -1,6 +1,6 @@
 {
   "name": "@agentstack/sdk",
-  "version": "0.4.23",
+  "version": "0.4.26",
   "description": "AgentStack-SDK - Universal API client with modular architecture and Neural integration",
   "readme": "README.en.md",
   "type": "module",
@@ -80,6 +80,12 @@
       "require": "./dist/workspace/index.js",
       "default": "./dist/workspace/index.esm.js"
     },
+    "./hosting": {
+      "types": "./dist/hosting/index.d.ts",
+      "import": "./dist/hosting/index.esm.js",
+      "require": "./dist/hosting/index.js",
+      "default": "./dist/hosting/index.esm.js"
+    },
     "./fabric": {
       "types": "./dist/fabric/index.d.ts",
       "import": "./dist/fabric/index.esm.js",
@@ -108,6 +114,12 @@
       "import": "./dist/agents/index.js",
       "require": "./dist/agents/index.js"
     },
+    "./stackscript": {
+      "types": "./dist/stackscript/index.d.ts",
+      "import": "./dist/stackscript/index.esm.js",
+      "require": "./dist/stackscript/index.js",
+      "default": "./dist/stackscript/index.esm.js"
+    },
     "./rag": {
       "types": "./dist/rag/index.d.ts",
       "import": "./dist/rag/index.js",
@@ -123,6 +135,12 @@
       "import": "./dist/commerce/assets/index.esm.js",
       "require": "./dist/commerce/assets/index.js",
       "default": "./dist/commerce/assets/index.esm.js"
+    },
+    "./commerce/iap": {
+      "types": "./dist/commerce/iap/index.d.ts",
+      "import": "./dist/commerce/iap/index.esm.js",
+      "require": "./dist/commerce/iap/index.js",
+      "default": "./dist/commerce/iap/index.esm.js"
     },
     "./commerce/marketplace": {
       "types": "./dist/commerce/marketplace/index.d.ts",
@@ -301,6 +319,7 @@
     "pretest": "npm run sync:agentstack-version",
     "pretype-check": "npm run sync:agentstack-version",
     "build": "node ./scripts/rollup-build.mjs",
+    "build:rollup": "node ./scripts/rollup-build.mjs",
     "check:rollup-isolated": "node ./scripts/check-rollup-build-isolated.mjs",
     "check:pwa-subpath-size": "node ./scripts/check-pwa-subpath-size.mjs",
     "dev": "rollup -c -w",
