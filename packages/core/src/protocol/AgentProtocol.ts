@@ -37,6 +37,7 @@ import type {
   DNAListResponse,
 } from '../modules/AgentDNA';
 import { SerialMutationQueue } from './command-queue';
+import { DiscoveryProtocol } from './discovery';
 import type { AgentFinanceFacade } from '../finance/AgentFinanceFacade';
 import type { AgentAPI } from '../modules/AgentAPI';
 import type {
@@ -45,6 +46,7 @@ import type {
 } from '../modules/AgentHosting';
 import type {
   PatchProjectDataBody,
+  PatchProjectDataResponse,
   ProjectDataPathValue,
   ProjectDataSnapshot,
   RequestConfig,
@@ -106,10 +108,15 @@ export type SnapshotSearchHit = {
 export class AgentProtocol {
   private readonly mutationQueue = new SerialMutationQueue();
 
+  /** discovery.describe_many and related read helpers. */
+  readonly discovery: DiscoveryProtocol;
+
   constructor(
     private readonly deps: AgentProtocolDeps,
     private readonly options: AgentProtocolOptions = {}
-  ) {}
+  ) {
+    this.discovery = new DiscoveryProtocol(deps.http);
+  }
 
   // ---------------------------------------------------------------------------
   // Command plane — /commands/*
@@ -966,16 +973,124 @@ export class AgentProtocol {
    */
   async patchProjectData(
     projectId: number,
-    path: string,
+    pathOrBody: string | PatchProjectDataBody,
     value?: unknown,
-    writeMode?: 'replace' | 'merge' | 'delete' | 'set' | 'put' | 'patch'
-  ): Promise<{ success: boolean; project_id: number; path: string }> {
-    const body: PatchProjectDataBody & { write_mode?: string } = {
-      path,
-      value: writeMode === 'delete' ? null : value,
-      ...(writeMode ? { write_mode: writeMode } : {}),
-    };
+    writeMode?: PatchProjectDataBody['write_mode'],
+    options?: Pick<
+      PatchProjectDataBody,
+      | 'allow_shrink'
+      | 'replacements'
+      | 'unified_diff'
+      | 'strict_diff'
+      | 'dry_run'
+      | 'expected_sha256'
+      | 'missing'
+      | 'ops'
+    >,
+  ): Promise<PatchProjectDataResponse> {
+    const body: PatchProjectDataBody =
+      typeof pathOrBody === 'string'
+        ? {
+            path: pathOrBody,
+            value: writeMode === 'delete' ? null : value,
+            ...(writeMode ? { write_mode: writeMode } : {}),
+            ...options,
+          }
+        : pathOrBody;
     return this.requireApi().patchProjectData(projectId, body);
+  }
+
+  /**
+   * Patch one object leaf with default ``merge`` for dict overlays (DNA-P0-04).
+   */
+  async patchProjectLeaf(
+    projectId: number,
+    path: string,
+    value: unknown,
+    options?: Omit<PatchProjectDataBody, 'path' | 'value' | 'write_mode'>,
+  ): Promise<PatchProjectDataResponse> {
+    return this.patchProjectData(projectId, {
+      path,
+      value,
+      write_mode: 'merge',
+      ...options,
+    });
+  }
+
+  /** Directed edit batch on one project.data leaf (wraps ``projects.patch_data`` ops). */
+  async editProjectDataPath(
+    projectId: number,
+    path: string,
+    ops: import('../types/entities/Project').DirectedEditOp[],
+    options?: Pick<
+      PatchProjectDataBody,
+      'dry_run' | 'expected_sha256' | 'missing' | 'allow_shrink'
+    >,
+  ): Promise<PatchProjectDataResponse> {
+    return this.patchProjectData(projectId, { path, ops, ...options });
+  }
+
+  /** Server-side preview (`dry_run: true`) for directed ops or leaf write_mode. */
+  async previewProjectDataEdits(
+    projectId: number,
+    body: PatchProjectDataBody,
+  ): Promise<PatchProjectDataResponse> {
+    return this.patchProjectData(projectId, { ...body, dry_run: true });
+  }
+
+  /** Multi-leaf SET (REST/MCP ``patches[]``); CAS applies to one path only. */
+  async patchProjectDataLeaves(
+    projectId: number,
+    patches: import('../types/entities/Project').PatchProjectDataLeaf[],
+    options?: Omit<PatchProjectDataBody, 'path' | 'patches' | 'value'>,
+  ): Promise<PatchProjectDataResponse> {
+    return this.patchProjectData(projectId, { ...options, patches });
+  }
+
+  async editProjectDataPathPreview(
+    projectId: number,
+    path: string,
+    ops: import('../types/entities/Project').DirectedEditOp[],
+    options?: Pick<
+      PatchProjectDataBody,
+      'expected_sha256' | 'missing' | 'allow_shrink'
+    >,
+  ): Promise<PatchProjectDataResponse> {
+    return this.editProjectDataPath(projectId, path, ops, { ...options, dry_run: true });
+  }
+
+  /**
+   * Optimistic concurrency: dry_run yields previous_sha256 (pre-mutation digest) for CAS commit.
+   */
+  async patchProjectDataWithRevision(
+    projectId: number,
+    body: PatchProjectDataBody,
+    options?: { skipPreflightPreview?: boolean },
+  ): Promise<PatchProjectDataResponse> {
+    let expected = body.expected_sha256;
+    const patchLeaves = body.patches?.length ?? 0;
+    const needsPreflight =
+      patchLeaves <= 1 &&
+      ((body.ops?.length ?? 0) > 0 ||
+        Boolean(body.write_mode) ||
+        Boolean(body.unified_diff) ||
+        (body.replacements?.length ?? 0) > 0 ||
+        (body.path != null && body.value !== undefined && !body.dry_run));
+    if (!expected && !options?.skipPreflightPreview && needsPreflight) {
+      const preview = await this.patchProjectData(projectId, { ...body, dry_run: true });
+      if (preview.next_actions?.length) {
+        const { commitBodyFromPreview } = await import('../atoms/projectDataPatch');
+        return this.patchProjectData(
+          projectId,
+          commitBodyFromPreview(preview, body),
+        );
+      }
+      const cas = preview.previous_sha256?.trim() || undefined;
+      if (cas) {
+        expected = cas;
+      }
+    }
+    return this.patchProjectData(projectId, { ...body, expected_sha256: expected });
   }
 
   private requireHosting(): AgentHosting {
@@ -1016,9 +1131,37 @@ export class AgentProtocol {
    */
   getProjectData(
     projectId: number,
-    path?: string,
-    options?: Partial<RequestConfig>
+    path?: string | {
+      path?: string;
+      paths?: string;
+      excludePaths?: string;
+      maxDepth?: number;
+      minDepth?: number;
+      detail?: string;
+      itemOffset?: number;
+      itemLimit?: number;
+      offset?: number;
+      maxChars?: number;
+      keyAfter?: string;
+      keyLimit?: number;
+    },
+    options?: Partial<RequestConfig> & {
+      paths?: string;
+      excludePaths?: string;
+      maxDepth?: number;
+      minDepth?: number;
+      detail?: string;
+      itemOffset?: number;
+      itemLimit?: number;
+      offset?: number;
+      maxChars?: number;
+      keyAfter?: string;
+      keyLimit?: number;
+    }
   ): Promise<ProjectDataSnapshot | ProjectDataPathValue> {
+    if (path != null && typeof path === "object") {
+      return this.requireApi().getProjectData(projectId, { ...path, ...options });
+    }
     if (path != null && String(path).length > 0) {
       return this.requireApi().getProjectData(projectId, { path: String(path), ...options });
     }

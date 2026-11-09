@@ -6,6 +6,11 @@ export {
   type SearchSnapshotsOptions,
   type SnapshotSearchHit,
 } from './AgentProtocol';
+export {
+  DiscoveryProtocol,
+  type DescribeManyResult,
+  type DiscoveryDescribeManyParams,
+} from './discovery';
 export { SerialMutationQueue } from './command-queue';
 export {
   parsePath,
