@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { mintHostedAppSession } from './hostedAppSession';
+import { ensureHostedPlayerMcpReady, mintHostedAppSession } from './hostedAppSession';
 
 describe('mintHostedAppSession', () => {
   it('POSTs session with Bearer and credentials include', async () => {
@@ -20,5 +20,18 @@ describe('mintHostedAppSession', () => {
 
   it('rejects invalid project id', async () => {
     await expect(mintHostedAppSession(0, 'tok')).rejects.toThrow('hosted_session_invalid_project');
+  });
+});
+
+describe('ensureHostedPlayerMcpReady', () => {
+  it('fails closed without bearer or bootstrap deps', async () => {
+    const http = {
+      getAuthToken: () => undefined,
+      setProjectId: vi.fn(),
+      updateConfig: vi.fn(),
+    };
+    await expect(ensureHostedPlayerMcpReady(2052, http)).rejects.toThrow(
+      'hosted_cookie_missing',
+    );
   });
 });

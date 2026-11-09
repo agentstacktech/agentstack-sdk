@@ -1,6 +1,10 @@
 import type { HTTPClient } from '../client/http-client';
 import { mcpBatchStep, unwrapFirstMcpBatchStepData } from '../mcp/batchStepData';
-import { mintHostedAppSession } from '../commerce/hosted/hostedAppSession';
+import {
+  hostedMcpCookieMinted,
+  markHostedMcpCookieMinted,
+  mintHostedAppSession,
+} from '../commerce/hosted/hostedAppSession';
 import { resolveHostedMcpUrl } from '../mcp/urls';
 import { pollWithBackoff } from './pollBackoff';
 import { matchRuntimePrefix } from './runtimePaths';
@@ -13,6 +17,15 @@ export type MatchPollState = {
   revision?: number;
   paths: Record<string, unknown>;
 };
+
+export function buildMatchTurnIdempotencyKey(
+  matchId: string,
+  revision: number,
+  principalId: string,
+  exportName: string,
+): string {
+  return `${matchId}:${revision}:${principalId}:${exportName}`;
+}
 
 export type MatchClientOptions = {
   /** Operator REST bulk read (default) vs player MCP my-data (hosted). */
@@ -39,7 +52,11 @@ export function createStackScriptMatchClient(
       const hostedOpts = options?.hostedMcp
         ? { skipCache: true, signal, skipAuthStateCheck: true, cookieSessionMcp: true }
         : { skipCache: true, signal, skipAuthStateCheck: true };
-      if (options?.hostedMcp && 'getAuthToken' in http) {
+      if (
+        options?.hostedMcp &&
+        !hostedMcpCookieMinted(projectId) &&
+        'getAuthToken' in http
+      ) {
         const bearer = (
           http as { getAuthToken?: () => string | null }
         ).getAuthToken?.();
@@ -47,6 +64,7 @@ export function createStackScriptMatchClient(
           await mintHostedAppSession(projectId, bearer, {
             apiBase: options?.hostedApiBase,
           });
+          markHostedMcpCookieMinted(projectId);
         }
       }
       const res = await http.post(

@@ -6,6 +6,7 @@ export {
   pathAllowedForWrite,
 } from './runtimePaths';
 export {
+  buildMatchTurnIdempotencyKey,
   createStackScriptMatchClient,
   createHostedStackScriptMatchClient,
   type MatchPollState,

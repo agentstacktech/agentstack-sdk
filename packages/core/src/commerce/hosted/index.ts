@@ -36,6 +36,12 @@ export {
 
 export { mapHostedMcpPlayerError, type HostedMcpPlayerError } from './hostedMcpPlayerError';
 
+export {
+  patchHostedProjectLeafCAS,
+  readHostedProjectLeaf,
+  type HostedSharedDataOptions,
+} from './hostedSharedData';
+
 export { warmHostedCsrfCookie } from './csrfWarmup';
 
 export {

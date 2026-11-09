@@ -16,6 +16,18 @@ export type MintHostedAppSessionOptions = {
   apiBase?: string;
 };
 
+const mintedHostedMcpPids = new Set<number>();
+
+/** Skip redundant POST /hosted-apps/.../session when already minted this tab. */
+export function hostedMcpCookieMinted(projectId: number): boolean {
+  return mintedHostedMcpPids.has(Number(projectId));
+}
+
+export function markHostedMcpCookieMinted(projectId: number): void {
+  const pid = Number(projectId);
+  if (Number.isFinite(pid) && pid > 0) mintedHostedMcpPids.add(pid);
+}
+
 /**
  * POST /api/hosted-apps/{projectId}/session — required for MCP cookie plane after Bearer login.
  */
@@ -57,6 +69,7 @@ export async function mintHostedAppSession(
   if (!res.ok) {
     throw new Error(`hosted_session_mint_failed:${res.status}`);
   }
+  markHostedMcpCookieMinted(pid);
 }
 
 /** True when the page is a hosted tenant surface (`/s/{pid}/`). */
@@ -90,9 +103,13 @@ export async function ensureHostedPlayerMcpReady(
     bearer = http.getAuthToken()?.trim() || readHostedSessionToken() || '';
   }
   if (bearer) {
-    await mintHostedAppSession(pid, bearer, options);
+    if (!hostedMcpCookieMinted(pid)) {
+      await mintHostedAppSession(pid, bearer, options);
+    }
     markHostedPostLoginGrace();
+    return;
   }
+  throw new Error('hosted_cookie_missing');
 }
 
 export async function bootstrapHostedPlayerSession(
