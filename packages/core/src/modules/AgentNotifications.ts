@@ -417,6 +417,22 @@ export class AgentNotifications {
     const response = await this.client.get(`/notifications/bulk-send/${batchId}/status`);
     return response.data;
   }
+
+  /** Unified channel deliver (same bus as MCP notifications.deliver). */
+  async deliver(params: {
+    project_id: number;
+    channels: string[];
+    title?: string;
+    message?: string;
+    user_id?: number;
+    correlation_key?: string;
+    category?: string;
+    source_agent_id?: string;
+    attachments?: Record<string, unknown>[];
+  }): Promise<Record<string, unknown>> {
+    const response = await this.client.post('/api/notifications/deliver', params);
+    return response.data as Record<string, unknown>;
+  }
 }
 
 

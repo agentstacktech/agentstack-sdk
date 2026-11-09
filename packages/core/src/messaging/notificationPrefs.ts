@@ -6,6 +6,8 @@
 import type { HTTPClient } from '../client/http-client';
 import type { APIResponse } from '../types';
 
+import { formatNotifyApiError } from './deliver';
+
 export const NOTIFY_CATEGORIES = [
   'security',
   'auth',
@@ -219,11 +221,95 @@ export async function putNotificationPrefs(
   return unwrap(http.put('/users/me/notification-prefs', prefs));
 }
 
+export async function patchNotificationPrefsCategory(
+  http: HTTPClient,
+  params: { category: string; channel: string; enabled: boolean },
+): Promise<{ success: boolean; category?: string; channel?: string; enabled?: boolean }> {
+  try {
+    return await unwrap(
+      http.patch('/users/me/notification-prefs', params, { skipCache: true }),
+    );
+  } catch (err) {
+    throw new Error(formatNotifyApiError(err, 'Could not update notification preference'));
+  }
+}
+
+export type ChannelRouteRow = Record<string, unknown>;
+
+export type ChannelRoutesListResponse = {
+  success: boolean;
+  ok?: boolean;
+  items?: ChannelRouteRow[];
+  effective_items?: ChannelRouteRow[];
+  template_active?: boolean;
+  email?: Record<string, unknown>;
+};
+
+export type ResolveNotificationRoutingParams = {
+  channels?: string[];
+  category?: string;
+  project_id?: number;
+};
+
+export type ResolveNotificationRoutingResult = {
+  success: boolean;
+  effective_channels: string[];
+  category: string;
+};
+
+export async function resolveNotificationRouting(
+  http: HTTPClient,
+  params: ResolveNotificationRoutingParams = {},
+): Promise<ResolveNotificationRoutingResult> {
+  try {
+    return await unwrap(
+      http.post('/users/me/notification-routing/resolve', params, { skipCache: true }),
+    );
+  } catch (err) {
+    throw new Error(formatNotifyApiError(err, 'Could not resolve notification routing'));
+  }
+}
+
+export async function getChannelRoutes(http: HTTPClient): Promise<ChannelRoutesListResponse> {
+  try {
+    return await unwrap(http.get('/users/me/channel-routes', {}, { skipCache: true }));
+  } catch (err) {
+    throw new Error(formatNotifyApiError(err, 'Could not load channel routes'));
+  }
+}
+
+export async function putChannelRoute(
+  http: HTTPClient,
+  route: ChannelRouteRow,
+): Promise<{ success: boolean; ok?: boolean; items?: ChannelRouteRow[] }> {
+  try {
+    return await unwrap(http.put('/users/me/channel-routes', route));
+  } catch (err) {
+    throw new Error(formatNotifyApiError(err, 'Could not save channel route'));
+  }
+}
+
+export async function removeChannelRoute(
+  http: HTTPClient,
+  routeId: string,
+): Promise<{ success: boolean; ok?: boolean; items?: ChannelRouteRow[] }> {
+  const id = String(routeId || '').trim();
+  try {
+    return await unwrap(http.delete(`/users/me/channel-routes/${encodeURIComponent(id)}`));
+  } catch (err) {
+    throw new Error(formatNotifyApiError(err, 'Could not remove channel route'));
+  }
+}
+
 export async function putNotificationSource(
   http: HTTPClient,
   source: Partial<NotificationSourceRow> & { kind: string },
 ): Promise<{ sources: NotificationSourceRow[] }> {
-  return unwrap(http.put('/users/me/notification-sources', { source }));
+  try {
+    return await unwrap(http.put('/users/me/notification-sources', { source }));
+  } catch (err) {
+    throw new Error(formatNotifyApiError(err, 'Could not save notification source'));
+  }
 }
 
 export async function deleteNotificationSource(
@@ -231,7 +317,13 @@ export async function deleteNotificationSource(
   sourceId: string,
 ): Promise<{ sources: NotificationSourceRow[] }> {
   const id = String(sourceId || '').trim();
-  return unwrap(http.delete(`/users/me/notification-sources/${encodeURIComponent(id)}`));
+  try {
+    return await unwrap(
+      http.delete(`/users/me/notification-sources/${encodeURIComponent(id)}`),
+    );
+  } catch (err) {
+    throw new Error(formatNotifyApiError(err, 'Could not remove notification source'));
+  }
 }
 
 export type NotificationSourceHealth = {
@@ -244,6 +336,24 @@ export type NotificationSourceHealth = {
   issues?: string[];
   error?: string;
 };
+
+export type NotificationSourcesHealthBatch = {
+  items: Record<string, NotificationSourceHealth>;
+};
+
+export async function listNotificationSourcesHealth(
+  http: HTTPClient,
+): Promise<NotificationSourcesHealthBatch> {
+  const raw = await unwrap(
+    http.get<{ success?: boolean; items?: Record<string, NotificationSourceHealth> }>(
+      '/users/me/notification-sources/health',
+      {},
+      { skipCache: true },
+    ),
+  );
+  const items = raw.items && typeof raw.items === 'object' ? raw.items : {};
+  return { items };
+}
 
 export async function getNotificationSourceHealth(
   http: HTTPClient,

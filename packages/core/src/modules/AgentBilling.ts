@@ -106,13 +106,25 @@ export class AgentBilling {
       const response = await this.httpClient.get(
         '/billing/overview',
         { user_id: userId },
-        { headers: { 'X-No-Batch': 'true' }, skipBatching: true }
+        {
+          headers: { 'X-No-Batch': 'true' },
+          skipBatching: true,
+          // Cold cache + large portfolios can exceed default 30s on VPS under login storm.
+          timeout: 45_000,
+        }
       )
       
-      this.eventEmitter.emit('billing:overview:success', { userId, data: response })
-      
-      // Backend возвращает данные напрямую в response, не в response.data
-      return response as unknown as BillingOverview
+      const payload: BillingOverview =
+        response &&
+        typeof response === 'object' &&
+        'data' in (response as object) &&
+        (response as { data?: unknown }).data != null
+          ? (response as { data: BillingOverview }).data
+          : (response as unknown as BillingOverview)
+
+      this.eventEmitter.emit('billing:overview:success', { userId, data: payload })
+
+      return payload
     } catch (error) {
       this.eventEmitter.emit('billing:overview:error', { userId, error })
       throw error

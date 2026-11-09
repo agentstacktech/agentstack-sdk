@@ -5,7 +5,13 @@
  */
 
 import { HTTPClient } from '../client/http-client';
-import type { KnowledgeConfig, KnowledgeConfigPatch } from './AgentKnowledge';
+import type {
+  KnowledgeConfig,
+  KnowledgeConfigEnvelope,
+  KnowledgeConfigPatch,
+  KnowledgeConfigQuery,
+} from './AgentKnowledge';
+import { knowledgeConfigQueryParams } from './AgentKnowledge';
 
 /** @deprecated Prefer KnowledgeConfig via sdk.knowledge */
 export type MentorConfig = KnowledgeConfig & {
@@ -25,23 +31,27 @@ function warnMentorSdkDeprecated(): void {
 export class AgentMentor {
   constructor(private client: HTTPClient) {}
 
-  config(projectId: number) {
+  config(projectId: number, query?: KnowledgeConfigQuery) {
     warnMentorSdkDeprecated();
-    return this.client.get<{
-      ok: boolean;
-      config: MentorConfig;
-      safety_playbooks?: Record<string, unknown>;
-      crisis_playbooks?: Record<string, unknown>;
-    }>(`/projects/${projectId}/mentor/config`);
+    const params = knowledgeConfigQueryParams(query);
+    return this.client.get<KnowledgeConfigEnvelope & { config?: MentorConfig }>(
+      `/projects/${projectId}/mentor/config`,
+      params,
+    );
   }
 
-  patchConfig(projectId: number, body: KnowledgeConfigPatch) {
-    return this.client.patch<{
-      ok: boolean;
-      config: MentorConfig;
-      safety_playbooks?: Record<string, unknown>;
-      crisis_playbooks?: Record<string, unknown>;
-    }>(`/projects/${projectId}/mentor/config`, body);
+  patchConfig(
+    projectId: number,
+    body: KnowledgeConfigPatch,
+    query?: KnowledgeConfigQuery,
+  ) {
+    warnMentorSdkDeprecated();
+    const params = knowledgeConfigQueryParams(query);
+    return this.client.patch<KnowledgeConfigEnvelope & { config?: MentorConfig }>(
+      `/projects/${projectId}/mentor/config`,
+      body,
+      Object.keys(params).length ? { params } : undefined,
+    );
   }
 
   playground(

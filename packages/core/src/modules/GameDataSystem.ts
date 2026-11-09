@@ -822,7 +822,7 @@ export class GameDataSystem extends SimpleEventEmitter {
       this.emit('script:cache:hit', { scriptId });
       
       // Выполнение скрипта
-      return this.executeScript(script, parameters);
+      return this.executeScript(script, parameters, projectId, userId);
     }
 
     try {
@@ -838,7 +838,7 @@ export class GameDataSystem extends SimpleEventEmitter {
         this.scriptCache.set(cacheKey, scriptData);
         
         this.emit('script:loaded', { scriptData });
-        return this.executeScript(scriptData, parameters);
+        return this.executeScript(scriptData, parameters, projectId, userId);
       }
     } catch (error) {
       this.emit('script:error', { scriptId, error });
@@ -848,27 +848,59 @@ export class GameDataSystem extends SimpleEventEmitter {
   }
 
   /**
-   * Выполнение скрипта
+   * Execute game logic scripts.
+   *
+   * **StackScript (supported):** set `metadata.runtime = 'stackscript'` and
+   * `metadata.stackscript_id` — calls `@agentstack/sdk` StackScript client (`script.run`).
+   *
+   * **Legacy placeholder:** any other `metadata.runtime` returns a non-executing stub.
+   * Prefer StackScript for server-side rules (THERMOMORPHS / pid 1997). See
+   * `docs/sdk/STACKSCRIPT_MCP_AGENT_GUIDE.md`.
    */
-  private executeScript(script: GameScript, parameters: Record<string, any>): any {
+  private async executeScript(
+    script: GameScript,
+    parameters: Record<string, any>,
+    projectId: number,
+    userId: number,
+  ): Promise<any> {
     try {
       this.emit('script:execution:start', { script, parameters });
 
-      // Здесь должна быть логика выполнения скрипта
-      // В реальной реализации это может быть интерпретатор JavaScript,
-      // Lua, или другой язык скриптов
-      
+      const runtime = String(script.metadata?.runtime || '').toLowerCase();
+      if (runtime === 'stackscript') {
+        const { createStackScriptClient } = await import('../stackscript/client');
+        const client = createStackScriptClient(
+          this.proteinClient.getHttpClient(),
+          projectId,
+        );
+        const script_id = String(script.metadata?.stackscript_id || script.id);
+        const exportName = String(
+          parameters.export || script.metadata?.export || 'main',
+        );
+        const runResult = await client.run({
+          script_id,
+          export: exportName,
+          input: (parameters.input as Record<string, unknown>) ?? parameters,
+          version: String(script.metadata?.stackscript_version || 'live'),
+          idempotency_key: parameters.idempotency_key as string | undefined,
+        });
+        this.emit('script:execution:success', { script, result: runResult });
+        return runResult;
+      }
+
       const result = {
         script_id: script.id,
         execution_time: Date.now(),
         result: 'Script executed successfully',
         parameters,
-        metadata: script.metadata
+        metadata: script.metadata,
+        deprecated_stub: true,
+        hint:
+          'Set metadata.runtime=stackscript and metadata.stackscript_id for real script.run',
       };
 
       this.emit('script:execution:success', { script, result });
       return result;
-
     } catch (error) {
       this.emit('script:execution:error', { script, error });
       throw error;

@@ -8,6 +8,17 @@ function ragOpts(rt: { requireProject: () => number }) {
   return { homeProjectId: rt.requireProject() };
 }
 
+function assignBoolFlag(
+  params: Record<string, unknown>,
+  args: string[],
+  flag: string,
+  key: string,
+): void {
+  const raw = parseFlagValue(args, flag);
+  if (raw === 'true') params[key] = true;
+  if (raw === 'false') params[key] = false;
+}
+
 export const ragCommands: CommandSpec[] = [
   {
     name: 'rag collections',
@@ -215,20 +226,11 @@ function genPromoteMcp(): CommandSpec['run'] {
 function genSettingsPatchMcp(): CommandSpec['run'] {
   return async (rt, args) => {
     const params: Record<string, unknown> = { project_id: rt.requireProject() };
-    if (parseFlagValue(args, 'auto-generation-mode') === 'true') {
-      params.auto_generation_mode = true;
-    }
-    if (parseFlagValue(args, 'auto-generation-mode') === 'false') {
-      params.auto_generation_mode = false;
-    }
+    assignBoolFlag(params, args, 'auto-generation-mode', 'auto_generation_mode');
     const strategy = parseFlagValue(args, 'auto-promote-strategy');
     if (strategy) params.auto_promote_strategy = strategy;
-    if (parseFlagValue(args, 'auto-checkpoint-before-promote') === 'true') {
-      params.auto_checkpoint_before_promote = true;
-    }
-    if (parseFlagValue(args, 'require-gates-on-promote') === 'true') {
-      params.require_gates_passed_on_promote = true;
-    }
+    assignBoolFlag(params, args, 'auto-checkpoint-before-promote', 'auto_checkpoint_before_promote');
+    assignBoolFlag(params, args, 'require-gates-on-promote', 'require_gates_passed_on_promote');
     rt.print(await mcpAction(rt, 'generation.settings.patch', params));
   };
 }

@@ -36,8 +36,11 @@ describe('mcp discover REST', () => {
 
   it('gets discovery context', async () => {
     const original = globalThis.fetch;
-    globalThis.fetch = (async (url: RequestInfo | URL) => {
-      expect(String(url)).toBe('https://agentstack.tech/mcp/discovery');
+    globalThis.fetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(url)).toContain('https://agentstack.tech/mcp/discovery');
+      expect(String(url)).toContain('verbose=1');
+      const headers = init?.headers as Record<string, string>;
+      expect(headers['Accept-Language']).toBe('pt-BR');
       return new Response(JSON.stringify({ caps: [] }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -48,6 +51,7 @@ describe('mcp discover REST', () => {
       const out = await mcpGetDiscovery({
         apiBase: 'https://agentstack.tech/api',
         token: 'tok',
+        locale: 'pt-BR',
       });
       expect(out).toEqual({ caps: [] });
     } finally {

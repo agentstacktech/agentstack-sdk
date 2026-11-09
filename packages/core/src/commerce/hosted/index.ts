@@ -8,18 +8,35 @@ export {
   readHostedWorkspaceProjectId,
   resolveSessionBearerToken,
   storeHostedSession,
+  markHostedPostLoginGrace,
+  isHostedPostLoginGraceActive,
   type SessionTokenPayload,
 } from './sessionVault';
 
 export {
+  resolveHostedFlagshipProjectId,
   resolveHostedProjectId,
   resolveHostedProjectIdFromLocation,
+  resolveHostedWorkspaceProjectIdFromLogin,
   type HostedBootManifest,
 } from './projectContext';
 
 export { buildHostedCommerceHeaders } from './requestHeaders';
 
 export { probeHostedSession, type ProbeHostedSessionOptions } from './sessionProbe';
+
+export {
+  bootstrapHostedPlayerSession,
+  ensureHostedPlayerMcpReady,
+  isHostedTenantPath,
+  mintHostedAppSession,
+  type HostedPlayerBootstrapDeps,
+  type MintHostedAppSessionOptions,
+} from './hostedAppSession';
+
+export { mapHostedMcpPlayerError, type HostedMcpPlayerError } from './hostedMcpPlayerError';
+
+export { warmHostedCsrfCookie } from './csrfWarmup';
 
 export {
   HOSTED_CHECKOUT_INTENT_KEY,

@@ -8,6 +8,7 @@ export type TransportKind =
   | 'timeout'
   | 'typed_503'
   | 'unauthorized'
+  | 'forbidden'
   | 'project_session_required'
   | 'unknown';
 
@@ -125,11 +126,22 @@ export function sessionBootstrapRetryDelayMs(round: number): number {
 /** True when bootstrap should retry without clearing local auth. */
 export function isTransientSessionBootstrapError(err: unknown): boolean {
   const { status, apiCode, sessionMissReason } = extractAuthErrorFields(err);
+  if (apiCode === 'authz_generation_stale') return true;
   if (status === 503 && apiCode === 'session_resolve_busy') return true;
   if (apiCode === 'session_not_found' && isTransientSessionMissReason(sessionMissReason)) {
     return true;
   }
   return isTransientSessionMissReason(apiCode);
+}
+
+/** 401s that reflect workspace/header race — not identity session death. */
+export function isProjectScopeContentionCode(code?: string | null): boolean {
+  const c = String(code || '').toLowerCase();
+  return (
+    c === 'stale_project_scope' ||
+    c === 'project_session_required' ||
+    c === 'stale_jti_discarded'
+  );
 }
 
 const SESSION_DEATH_FRAGMENTS = [
@@ -141,6 +153,7 @@ const SESSION_DEATH_FRAGMENTS = [
 /** Post-restart / overload — retry before vault purge (G-A24, G-A96). */
 const TRANSIENT_SESSION_MISS_REASONS = new Set([
   'absent',
+  'authz_generation_stale',
   'dna_timeout',
   'hist_busy',
   'server_busy',
@@ -276,14 +289,22 @@ export function classifyAuthFailure(
     msg.includes('invalid credentials') ||
     msg.includes('неверн')
   ) {
-    if ((apiCode || '').toLowerCase() === 'project_session_required') {
-      return { kind: 'project_session_required', code: apiCode || 'project_session_required' };
+    const scopeCode = apiCode || errCode;
+    if (isProjectScopeContentionCode(scopeCode)) {
+      return {
+        kind: 'project_session_required',
+        code: scopeCode || 'project_session_required',
+      };
     }
     return { kind: 'unauthorized', code: apiCode };
   }
 
   if (status === 503 && apiCode) {
     return { kind: 'typed_503', code: apiCode };
+  }
+
+  if (status === 403 || name === 'ForbiddenError') {
+    return { kind: 'forbidden', code: apiCode };
   }
 
   return { kind: 'unknown', code: apiCode };

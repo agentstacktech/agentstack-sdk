@@ -66,8 +66,6 @@ export const MCP_ACTION_ALIASES: Record<string, string> = {
   "channels.notify": "channels.deliver",
   "channels.send": "channels.deliver",
   "commerce.list_coupons": "commerce.coupon.list",
-  "commerce.listings.list": "discovery.list",
-  "commerce_rest.listings.list": "discovery.list",
   "context.set_project": "context.hint_use_params_project_id",
   "crm.contacts.create": "crm.upsert_contact",
   "crm.contacts.list": "crm.list_contacts",

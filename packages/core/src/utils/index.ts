@@ -94,6 +94,7 @@ export {
   isTransientSessionBootstrapError,
   sessionBootstrapRetryDelayMs,
   shouldPurgeClientSessionOnMiss,
+  isProjectScopeContentionCode,
   isTypedDna503Code,
   TYPED_DNA_503_CODES,
   BATCH_TRANSPORT_SHED_CODES,

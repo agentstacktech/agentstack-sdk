@@ -83,6 +83,44 @@ export function isNonSession401Path(urlOrPath: string): boolean {
   return isIdentityScopedApiPath(urlOrPath) || isUserMePath(urlOrPath);
 }
 
+/**
+ * Project id baked into a request path, `project_id` query, or params.
+ * Query survives `normalizeApiPath`, which strips the search string.
+ */
+export function requestProjectId(
+  urlOrPath: string,
+  params?: Record<string, unknown> | null,
+): number | null {
+  const raw = String(urlOrPath || '');
+  const path = normalizeApiPath(raw);
+  const pathMatch = path.match(/\/projects\/(\d+)(?:\/|$)/);
+  if (pathMatch) {
+    const n = Number(pathMatch[1]);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  const query = raw.includes('?') ? raw.slice(raw.indexOf('?')) : '';
+  const queryMatch = query.match(/[?&]project_id=(\d+)/);
+  if (queryMatch) {
+    const n = Number(queryMatch[1]);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  const fromParams = params?.project_id ?? params?.projectId;
+  const pn = Number(fromParams);
+  if (Number.isFinite(pn) && pn > 0) return pn;
+  return null;
+}
+
+/** Request targets a pid other than the live workspace header. */
+export function isForeignProjectRequest(
+  urlOrPath: string,
+  activeProjectId: number | null | undefined,
+  params?: Record<string, unknown> | null,
+): boolean {
+  const reqPid = requestProjectId(urlOrPath, params);
+  if (reqPid == null || activeProjectId == null || activeProjectId <= 0) return false;
+  return reqPid !== activeProjectId;
+}
+
 /** User-scoped session paths: keep live JWT when header pid ≠ JWT pid (G-A157). */
 export function isUserScopedSessionPath(urlOrPath: string): boolean {
   if (isIdentityScopedApiPath(urlOrPath)) return true;

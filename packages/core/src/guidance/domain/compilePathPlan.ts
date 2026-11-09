@@ -63,6 +63,7 @@ function nodeToPlan(
   if (node.kind === 'task') {
     return {
       ...base,
+      titleKey: node.titleKey,
       mscTaskId: node.mscTaskId,
       resourceActionId: node.resourceActionId,
       verifySpec: node.verify,
@@ -72,6 +73,7 @@ function nodeToPlan(
     return {
       ...base,
       kind: 'capability',
+      titleKey: node.titleKey,
       taskId: node.taskId,
       fabricCapabilityId: node.fabricCapabilityId,
       fabricCapabilityDomain: node.fabricCapabilityDomain,
@@ -87,6 +89,12 @@ function nodeToPlan(
   }
   if (node.kind === 'recipe') {
     return { ...base, recipeId: node.recipeId, narrativeId: node.narrativeId };
+  }
+  if (node.kind === 'outcome') {
+    return { ...base, messageKey: node.messageKey };
+  }
+  if (node.kind === 'question') {
+    return { ...base, titleKey: node.promptKey };
   }
   return base;
 }

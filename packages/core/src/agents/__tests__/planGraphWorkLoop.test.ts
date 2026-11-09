@@ -1,4 +1,8 @@
-import { parsePlanExecuteResult, primaryWorkGraphAction } from '../planGraph';
+import {
+  parsePlanExecuteResult,
+  primaryRecoveryNextAction,
+  primaryWorkGraphAction,
+} from '../planGraph';
 
 describe('parsePlanExecuteResult', () => {
   it('normalizes focus node and handoff ladder', () => {
@@ -38,5 +42,41 @@ describe('primaryWorkGraphAction', () => {
       next_actions: [{ action: 'agents.work_next', params: { project_id: 1 } }],
     });
     expect(action?.action).toBe('agents.plan_claim');
+  });
+
+  it('preserves choose_template resolution on next_actions[0]', () => {
+    const action = primaryWorkGraphAction({
+      next_actions: [
+        {
+          action: 'agents.create_from_template',
+          params: { project_id: 1 },
+          resolution: {
+            mode: 'choose_template',
+            candidates: [{ template_id: 'analyst@v1', score: 0.7 }],
+          },
+        },
+      ],
+    });
+    expect(action?.resolution?.mode).toBe('choose_template');
+    expect(action?.resolution?.candidates?.[0]?.template_id).toBe('analyst@v1');
+  });
+});
+
+describe('primaryRecoveryNextAction', () => {
+  it('prefers choose_template row over stripped canonical', () => {
+    const action = primaryRecoveryNextAction({
+      next_action: { action: 'agents.create_from_template', params: { project_id: 1 } },
+      next_actions: [
+        {
+          action: 'agents.create_from_template',
+          params: { project_id: 1 },
+          resolution: {
+            mode: 'choose_template',
+            candidates: [{ template_id: 'analyst@v1' }],
+          },
+        },
+      ],
+    });
+    expect(action?.resolution?.candidates?.[0]?.template_id).toBe('analyst@v1');
   });
 });

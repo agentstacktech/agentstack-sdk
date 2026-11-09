@@ -35,6 +35,10 @@ export const CANONICAL_L1_CAPS = [
   'rag.write',
   'scheduler',
   'social_read',
+  'stackscript_admin',
+  'stackscript_read',
+  'stackscript_run',
+  'stackscript_write',
   'storage.read',
   'storage.write',
 ] as const;

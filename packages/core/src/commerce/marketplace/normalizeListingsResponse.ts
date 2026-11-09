@@ -91,7 +91,8 @@ export function normalizeMarketplaceListingsResponse(response: {
   listings?: unknown[];
   total?: number;
 }): { listings: NormalizedStorefrontListing[]; total: number } {
-  const listings: NormalizedStorefrontListing[] = (response.listings || []).map((item: unknown) => {
+  const rows = Array.isArray(response.listings) ? response.listings : [];
+  const listings: NormalizedStorefrontListing[] = rows.map((item: unknown) => {
     const row = item as Record<string, unknown>;
     const listingData =
       (row.listing as Record<string, unknown> | undefined) ||

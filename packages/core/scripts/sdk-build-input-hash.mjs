@@ -51,7 +51,12 @@ export function computeSdkBuildInputHash(root = packageRoot) {
   const rollupCfg = path.join(root, 'rollup.config.js');
   const constantsPy = constantsPyPath(root);
 
-  for (const f of [pkgJson, lock, rollupCfg, constantsPy].filter(Boolean)) {
+  const orchestrationScripts = [
+    path.join(root, 'scripts', 'rollup-build.mjs'),
+    path.join(root, 'scripts', 'rollup-run-one.mjs'),
+    path.join(root, 'scripts', 'sdk-build-input-hash.mjs'),
+  ];
+  for (const f of [pkgJson, lock, rollupCfg, constantsPy, ...orchestrationScripts].filter(Boolean)) {
     if (fs.existsSync(f)) {
       hashFile(sha, f);
     }
@@ -92,6 +97,13 @@ function latestTrackedMtimeMs(root = packageRoot) {
   bump(path.join(root, 'rollup.config.js'));
   const constantsPy = constantsPyPath(root);
   if (constantsPy) bump(constantsPy);
+  for (const rel of [
+    'scripts/rollup-build.mjs',
+    'scripts/rollup-run-one.mjs',
+    'scripts/sdk-build-input-hash.mjs',
+  ]) {
+    bump(path.join(root, rel));
+  }
 
   const srcRoot = path.join(root, 'src');
   const files = [];
@@ -122,6 +134,16 @@ export function isSdkBuildStampFresh(root = packageRoot) {
   }
   const stampMtime = fs.statSync(stampPath).mtimeMs;
   if (latestTrackedMtimeMs(root) > stampMtime) {
+    const reconcile =
+      process.env.SDK_BUILD_RECONCILE_STAMP === '1' ||
+      process.env.DEPLOY_CONSTRAINED_HOST === '1';
+    if (reconcile) {
+      const computed = computeSdkBuildInputHash(root);
+      if (stored === computed) {
+        writeStoredBuildInputHash(computed, root);
+        return true;
+      }
+    }
     return false;
   }
   if (process.env.SDK_BUILD_VERIFY_HASH === '1') {

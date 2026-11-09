@@ -37,6 +37,8 @@ export {
   parseAssetsSearchParams,
   writeAssetsSearchParams,
   buildAssetsModuleSearchParams,
+  DEFAULT_ASSETS_CATALOG_PAGE,
+  DEFAULT_ASSETS_CATALOG_PAGE_SIZE,
 } from './assetsUrlState';
 
 export type {

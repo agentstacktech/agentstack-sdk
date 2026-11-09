@@ -42,6 +42,7 @@ import {
   isTypedDna503Code,
   isTransportShed503Code,
   shouldPurgeClientSessionOnMiss,
+  isProjectScopeContentionCode,
 } from '../utils/classifyAuthFailure';
 import {
   API_WARMING_UP_CODE,
@@ -65,10 +66,12 @@ import {
 } from './resolveRequestProjectContext';
 import {
   isAdminScopedApiPath,
+  isForeignProjectRequest,
   isNonSession401Path,
   isUserScopedSessionPath,
 } from './routeScopeClassifier';
 import {
+  isAuthMintCredentialPath,
   isExpectedAuthMintPollResponse,
   isSessionAuthEndpoint,
   isSwitchProjectEndpoint,
@@ -113,6 +116,7 @@ const HTTP_GET_OPTION_KEYS = new Set<string>([
   'skipCache',
   'skipAuthStateCheck',
   'skipAuthCriticalDefer',
+  'cookieSessionMcp',
   'signal',
   'timeout',
   'retry',
@@ -183,6 +187,8 @@ export class HTTPClient extends SimpleEventEmitter {
   private apiKey: string | null = null;
   /** Last seen auth:session epoch from ``X-AgentStack-Cache-Epoch`` (Scale CFD-02). */
   private cacheEpoch: string | null = null;
+  /** Workspace switch fence. In-flight requests keep the generation they started with. */
+  private activeSwitchGeneration = 0;
   private static readonly CACHE_EPOCH_HEADER = 'X-AgentStack-Cache-Epoch';
   private authStateStore: AuthStateStore;
   private isRefreshingToken: boolean = false; // Предотвращает бесконечные циклы refresh
@@ -538,6 +544,12 @@ export class HTTPClient extends SimpleEventEmitter {
     });
   }
 
+  /** API origin without the `/api` suffix (WebSocket ticket URLs). */
+  getApiOrigin(): string {
+    const base = (this.config.apiBase || this.config.baseUrl || '').trim().replace(/\/$/, '');
+    return base.replace(/\/api\/?$/, '');
+  }
+
   // ============================================================================
   // Core Request Method
   // ============================================================================
@@ -630,12 +642,21 @@ export class HTTPClient extends SimpleEventEmitter {
     }
 
     // Z7 / Pass 11 AuthCriticalSection: defer non-auth noise (pool relief; $0 server).
+    const oauthAuthorizePath = /\/oauth2\/providers\/[^/]+\/authorize(?:\?|$)/i.test(pathOnly);
+    const oauthCallbackPath = /\/auth\/oauth\/callback\//i.test(pathOnly);
+    const loginSurfaceOAuth =
+      oauthAuthorizePath ||
+      oauthCallbackPath ||
+      pathOnly.includes('/api/oauth2/providers') ||
+      isAuthMintCredentialPath(pathOnly);
     if (
       this.isInAuthCriticalSection() &&
       !requestConfig.skipAuthCriticalDefer &&
+      !loginSurfaceOAuth &&
       (pathOnly.includes('/telemetry/') ||
         pathOnly.includes('/api/telemetry/') ||
-        pathOnly.includes('/oauth') ||
+        pathOnly.includes('/oauth2/connected') ||
+        pathOnly.includes('/auth/oauth/providers/connected') ||
         pathOnly.includes('/seo') ||
         pathOnly.includes('/social/') ||
         pathOnly.includes('/api/projects'))
@@ -1076,8 +1097,32 @@ export class HTTPClient extends SimpleEventEmitter {
   public setProjectId(projectId: number | string | null | undefined): void {
     const pid = normalizeProjectId(projectId);
     if (pid) {
+      const prev = this.config.projectId;
       this.config.projectId = pid;
+      if (prev !== pid) {
+        this.clearCache();
+      }
     }
+  }
+
+  /** Frontend switch intent. Responses stamped with an older generation are not a dead session. */
+  public setActiveSwitchGeneration(generation: number): void {
+    if (!Number.isFinite(generation)) return;
+    if (generation > this.activeSwitchGeneration) {
+      this.activeSwitchGeneration = generation;
+    }
+  }
+
+  /** Integrator workspace hop without React switchIntent — bumps the in-flight HTTP fence. */
+  public bumpActiveSwitchGeneration(): number {
+    this.activeSwitchGeneration += 1;
+    return this.activeSwitchGeneration;
+  }
+
+  private isStaleSwitchGeneration(config?: RequestConfig): boolean {
+    const stamped = config?.switchGeneration;
+    if (stamped == null || !Number.isFinite(stamped)) return false;
+    return stamped < this.activeSwitchGeneration;
   }
 
   public getApiKey(): string | null {
@@ -1354,13 +1399,17 @@ export class HTTPClient extends SimpleEventEmitter {
     }
 
     try {
+      if (config.cookieSessionMcp) {
+        delete headers.Authorization;
+        delete headers.authorization;
+      }
       const fetchInit: RequestInit = {
         method: config.method,
         headers,
         body: config.body instanceof FormData ? config.body : (config.body ? JSON.stringify(config.body) : undefined),
         signal: controller.signal,
       };
-      if (shouldIncludeCredentials(config.method, headers)) {
+      if (config.cookieSessionMcp || shouldIncludeCredentials(config.method, headers)) {
         fetchInit.credentials = 'include';
       }
       if (config.fetchPriority != null) {
@@ -1592,8 +1641,27 @@ export class HTTPClient extends SimpleEventEmitter {
             });
           }
         }
-        // For non-public pages or non-401 errors, process normally (will throw)
-        await this.handleErrorResponse(response, responseData, config);
+        const rawDetailForEpoch =
+          (responseData as { error?: { detail?: unknown }; detail?: unknown })?.error?.detail ??
+          (responseData as { detail?: unknown })?.detail;
+        if (
+          response.status === 401 &&
+          config &&
+          !config._epochRetry &&
+          HTTPClient.isCacheEpochStaleDetail(rawDetailForEpoch) &&
+          !isSessionAuthEndpoint(config.url || url)
+        ) {
+          this.clearCacheEpoch();
+          const retryHeaders = { ...headers };
+          delete retryHeaders[HTTPClient.CACHE_EPOCH_HEADER];
+          delete retryHeaders[HTTPClient.CACHE_EPOCH_HEADER.toLowerCase()];
+          return this._executeRequest<T>(url, retryHeaders, {
+            ...config,
+            _epochRetry: true,
+            skipCache: true,
+          });
+        }
+        return await this.handleErrorResponse(response, responseData, config);
       }
 
       const apiResponse: APIResponse<T> = {
@@ -2249,6 +2317,14 @@ export class HTTPClient extends SimpleEventEmitter {
     const message = HTTPClient.normalizeApiErrorMessage(errorData, data);
     const sessionExpiredByCode = HTTPClient.isTokenExpiredDetail(rawDetail);
     const { code, details } = errorData;
+    const detailObj =
+      rawDetail && typeof rawDetail === 'object' && !Array.isArray(rawDetail)
+        ? (rawDetail as { code?: string })
+        : null;
+    const effectiveCode =
+      (typeof code === 'string' && code) ||
+      (typeof detailObj?.code === 'string' && detailObj.code) ||
+      undefined;
     const traceId = response.headers.get('X-Trace-Id') || undefined;
 
     // ✅ CRITICAL: Check if we're on a public page BEFORE processing any errors
@@ -2289,6 +2365,38 @@ export class HTTPClient extends SimpleEventEmitter {
       case 401: {
         const url = config?.url || 'unknown';
         const isAuthEndpoint = isSessionAuthEndpoint(url);
+        const activePid = Number(this.config.projectId);
+        const staleProjectScope =
+          !isAuthEndpoint &&
+          (this.isStaleSwitchGeneration(config) ||
+            isForeignProjectRequest(
+              url,
+              Number.isFinite(activePid) ? activePid : null,
+              config?.params as Record<string, unknown> | undefined,
+            ));
+        if (staleProjectScope) {
+          if (typeof window !== 'undefined') {
+            const headerPid = Number(
+              config?.headers?.['X-Project-ID'] ||
+                config?.headers?.['x-project-id'] ||
+                this.config.projectId ||
+                0,
+            );
+            if (Number.isFinite(headerPid) && headerPid > 0) {
+              window.dispatchEvent(
+                new CustomEvent('agentstack.auth.project_session_required', {
+                  detail: { project_id: headerPid },
+                }),
+              );
+            }
+          }
+          error = new UnauthorizedError(message || 'Stale project scope', {
+            status: 401,
+            code: 'stale_project_scope',
+            traceId,
+          });
+          break;
+        }
         const isSettingsFieldGet = url.includes('/auth/settings/get');
         const sessionMissEarly =
           HTTPClient.isSessionNotFoundDetail(rawDetail) ||
@@ -2363,11 +2471,26 @@ export class HTTPClient extends SimpleEventEmitter {
           });
           break;
         }
+        if (isProjectScopeContentionCode(effectiveCode)) {
+          const scopeCode =
+            effectiveCode === 'stale_jti_discarded' ||
+            effectiveCode === 'project_session_required'
+              ? effectiveCode
+              : 'stale_project_scope';
+          error = new UnauthorizedError(message || 'Project scope contention', {
+            status: 401,
+            code: scopeCode,
+            traceId,
+          });
+          break;
+        }
         const isAdminPermissionMiss =
           isAdminScopedApiPath(url) && hasBearer && !sessionMissEarly;
         const nonSession401 = isNonSession401Path(url);
         const shouldMarkSessionExpired =
           hasBearer &&
+          !HTTPClient.isCacheEpochStaleDetail(rawDetail) &&
+          !isProjectScopeContentionCode(effectiveCode) &&
           !config?.skipAuthStateCheck &&
           !isAuthEndpoint &&
           !isSettingsFieldGet &&
@@ -2692,10 +2815,17 @@ export class HTTPClient extends SimpleEventEmitter {
         break;
       }
       case 403:
-        if (code === 'demo_readonly') {
+        if (effectiveCode === 'demo_readonly') {
           error = new DemoReadOnlyError(message || 'Demo Read Only');
         } else {
-          error = new ForbiddenError(message || 'Forbidden');
+          error = new ForbiddenError(message || 'Forbidden', {
+            apiCode: effectiveCode,
+            response: {
+              status: response.status,
+              data,
+              statusText: response.statusText,
+            },
+          });
         }
         break;
       case 404:
@@ -2893,7 +3023,9 @@ export class HTTPClient extends SimpleEventEmitter {
 
   private getCacheKey(config: RequestConfig): string {
     const params = config.params ? `?${new URLSearchParams(config.params).toString()}` : '';
-    return `${config.method}:${config.url}${params}`;
+    const pid = this.config.projectId ?? '';
+    const gen = config.switchGeneration ?? this.activeSwitchGeneration;
+    return `${config.method}:${config.url}${params}:pid=${pid}:sw=${gen}`;
   }
 
   /**
@@ -3280,6 +3412,8 @@ export class HTTPClient extends SimpleEventEmitter {
       signal: config.signal,
       fetchPriority: config.fetchPriority,
       useAiTimeout: config.useAiTimeout,
+      switchGeneration: config.switchGeneration ?? this.activeSwitchGeneration,
+      _epochRetry: config._epochRetry === true,
     };
   }
 

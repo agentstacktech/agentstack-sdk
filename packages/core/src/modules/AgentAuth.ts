@@ -315,6 +315,7 @@ export class AgentAuth extends SimpleEventEmitter {
       this.client.evictCacheByUrl('/profile'),
       this.client.evictCacheByUrl('/auth/profile-data'),
       this.client.evictCacheByUrl('/auth/me'),
+      this.client.evictCacheByUrl('/auth/settings'),
       this.client.evictCacheByUrl('/auth/avatar'),
     ]).catch((e) => {
       logger.debug('evictProfileRelatedCaches: best-effort failed', e);
@@ -392,6 +393,7 @@ export class AgentAuth extends SimpleEventEmitter {
               () =>
                 this.client.post('/auth/login', loginBody, {
                   skipAuthStateCheck: true,
+                  skipAuthCriticalDefer: true,
                   timeout: Math.max(5_000, mintDeadline - Date.now()),
                   headers: {
                     'Idempotency-Key': mintId,
@@ -1258,10 +1260,14 @@ export class AgentAuth extends SimpleEventEmitter {
 
       return tokens;
     } catch (error) {
-      this.authStateStore?.setState({
-        state: 'session_expired',
-        reason: 'refresh_failed'
-      });
+      const inMintGuard =
+        this.client.isInAuthCriticalSection?.() || this.client.isInPostLoginGrace?.();
+      if (!inMintGuard) {
+        this.authStateStore?.setState({
+          state: 'session_expired',
+          reason: 'refresh_failed',
+        });
+      }
       this.emit('auth:refresh:failed', error);
       throw error;
     }
@@ -1471,7 +1477,13 @@ export class AgentAuth extends SimpleEventEmitter {
       const detailCode =
         typeof detail?.code === 'string' ? String(detail.code) : undefined;
       const authCode =
-        detailCode === 'session_not_found' ? 'session_not_found' : 'session_expired';
+        detailCode === 'session_not_found'
+          ? 'session_not_found'
+          : detailCode === 'project_session_required' ||
+              detailCode === 'stale_project_scope' ||
+              detailCode === 'stale_jti_discarded'
+            ? detailCode
+            : 'session_expired';
       const bootstrapErr = new UnauthorizedError('Session bootstrap failed', {
         status: 401,
         code: authCode,
@@ -1559,9 +1571,24 @@ export class AgentAuth extends SimpleEventEmitter {
       throw err;
     }
     if (response.status === 401) {
+      const rawDetail = (response.data as { detail?: unknown } | undefined)?.detail;
+      const detail =
+        rawDetail && typeof rawDetail === 'object' && !Array.isArray(rawDetail)
+          ? (rawDetail as Record<string, unknown>)
+          : null;
+      const detailCode =
+        typeof detail?.code === 'string' ? String(detail.code) : undefined;
+      const authCode =
+        detailCode === 'session_not_found'
+          ? 'session_not_found'
+          : detailCode === 'project_session_required' ||
+              detailCode === 'stale_project_scope' ||
+              detailCode === 'stale_jti_discarded'
+            ? detailCode
+            : 'session_expired';
       throw new UnauthorizedError('Failed to get current user', {
         status: 401,
-        code: 'session_expired',
+        code: authCode,
         traceId: response.traceId,
       });
     }
@@ -1698,6 +1725,18 @@ export class AgentAuth extends SimpleEventEmitter {
       );
       return response.data;
     }, { operation: 'requestPasswordReset' }) as Promise<{ success: boolean; message: string }>;
+  }
+
+  /** Resend signup confirmation email (enumeration-safe). */
+  async resendEmailConfirmation(email: string): Promise<{ success: boolean; message: string }> {
+    return this.errorHandler.executeWithErrorHandling(async () => {
+      const response = await this.client.post(
+        '/auth/confirm-email/resend',
+        { email },
+        { skipAuthStateCheck: true },
+      );
+      return response.data;
+    }, { operation: 'resendEmailConfirmation' }) as Promise<{ success: boolean; message: string }>;
   }
 
   async getPasswordResetStatus(token: string): Promise<{
@@ -1989,6 +2028,7 @@ export class AgentAuth extends SimpleEventEmitter {
     sent: boolean;
     needs_human?: boolean;
     ask_user?: string;
+    delivery_unavailable?: boolean;
   }> {
     const headers: Record<string, string> = {};
     if (options?.apiKey) headers['X-API-Key'] = options.apiKey;
@@ -2376,9 +2416,10 @@ export class AgentAuth extends SimpleEventEmitter {
     try {
       const response = await this.getSettingsValue('language');
       const language = response.value;
-      if (language && typeof language === 'string' && language.length === 2) {
-        return language;
-      }
+      const low = typeof language === 'string' ? language.trim().toLowerCase() : '';
+      if (low.startsWith('ru')) return 'ru';
+      if (low.startsWith('pt')) return 'pt';
+      if (low.startsWith('en')) return 'en';
       return 'en';
     } catch {
       return 'en';
@@ -2389,10 +2430,19 @@ export class AgentAuth extends SimpleEventEmitter {
    * Установка языка пользователя
    */
   async setLanguage(language: string): Promise<void> {
-    if (!language || typeof language !== 'string' || language.length !== 2) {
-      throw new Error('Language must be a 2-character code');
+    const text = String(language || '').trim();
+    const low = text.toLowerCase().replace('_', '-');
+    const ok =
+      low === 'en' ||
+      low === 'ru' ||
+      low === 'pt' ||
+      low.startsWith('en-') ||
+      low.startsWith('ru-') ||
+      low.startsWith('pt-');
+    if (!ok) {
+      throw new Error('Language must be en, ru, or pt');
     }
-    await this.setSettingsValue('language', language);
+    await this.setSettingsValue('language', text);
   }
 
   /**
@@ -2576,7 +2626,11 @@ export class AgentAuth extends SimpleEventEmitter {
    * Обработка OAuth callback (для демонстрации)
    */
   async handleOAuthCallback(provider: string, code: string, state: string): Promise<{ message: string; user: any; provider: string }> {
-    const response = await this.client.get(`/auth/oauth/callback/${provider}?code=${code}&state=${state}`);
+    const response = await this.client.get(
+      `/auth/oauth/callback/${provider}?code=${code}&state=${state}`,
+      undefined,
+      { skipAuthStateCheck: true, skipAuthCriticalDefer: true },
+    );
     this.evictProfileRelatedCaches();
     this.evictOAuthConnectedCaches();
     return response.data;
@@ -2624,6 +2678,7 @@ export class AgentAuth extends SimpleEventEmitter {
    */
   async setSettingsValue(path: string, value: any): Promise<void> {
     await this.client.post('/auth/settings/set', { path, value });
+    this.evictProfileRelatedCaches();
   }
 
   // ===== Widget Methods =====

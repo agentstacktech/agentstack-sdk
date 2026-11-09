@@ -33,6 +33,7 @@ export type SimulatePatActionOpts = {
   actionParams?: Record<string, unknown>;
   pathPrefixes?: string[];
   resource?: string;
+  locale?: string;
 };
 
 export type McpExecuteClient = {
@@ -100,14 +101,16 @@ async function executeSimulateStep(
   actionName: string,
   params: Record<string, unknown>,
   projectId: number,
+  locale?: string,
 ): Promise<PatActionSimulation> {
+  const tag = String(locale ?? '').trim();
   const result = await client.execute(
     [{ action: actionName, params }],
-    { projectId, stopOnError: true },
+    { projectId, stopOnError: true, ...(tag ? { locale: tag } : {}) },
   );
   const outcome = summarizeMcpBatchOutcome(result);
-  if (!outcome.ok) {
-    throw new Error(outcome.errorMessage || `${actionName} failed`);
+  if (outcome.state === 'error') {
+    throw new Error(outcome.message || `${actionName} failed`);
   }
   const step = result.results[0];
   const payload = step?.result ?? step;
@@ -131,13 +134,25 @@ export async function simulatePatAction(
   };
 
   try {
-    return await executeSimulateStep(client, 'preflight.simulate', params, opts.projectId);
+    return await executeSimulateStep(
+      client,
+      'preflight.simulate',
+      params,
+      opts.projectId,
+      opts.locale,
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     if (!message.toLowerCase().includes('unknown') && !message.includes('not found')) {
       throw err;
     }
-    return await executeSimulateStep(client, 'permissions.effective', params, opts.projectId);
+    return await executeSimulateStep(
+      client,
+      'permissions.effective',
+      params,
+      opts.projectId,
+      opts.locale,
+    );
   }
 }
 
@@ -151,6 +166,7 @@ export async function simulatePatActionWithToken(
         token: opts.token,
         mcpUrl: opts.mcpUrl,
         projectId: opts.projectId,
+        locale: opts.locale,
         ...overrides,
       }),
   };

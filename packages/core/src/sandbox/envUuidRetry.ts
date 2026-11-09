@@ -19,23 +19,19 @@ const SANDBOX_LIMIT_CODES = new Set(['sandbox_not_available', 'sandbox_limit_exc
 
 function extractErrorHaystack(error: unknown): string {
   if (!error || typeof error !== 'object') return '';
-  const err = error as {
-    error_code?: string;
-    code?: string;
-    message?: string;
-    apiCode?: string;
-    response?: { data?: Record<string, unknown> };
-  };
-
+  const loose = error as Record<string, unknown>;
   const parts: string[] = [];
-  if (typeof err.error_code === 'string') parts.push(err.error_code);
-  if (err instanceof ServerError) {
-    if (typeof err.apiCode === 'string') parts.push(err.apiCode);
-    if (typeof err.message === 'string') parts.push(err.message);
+  if (typeof loose.error_code === 'string') parts.push(loose.error_code);
+  if (error instanceof ServerError) {
+    if (typeof error.apiCode === 'string') parts.push(error.apiCode);
+    if (typeof error.message === 'string') parts.push(error.message);
   }
-  if (typeof err.code === 'string') parts.push(err.code);
-
-  const data = err.response?.data;
+  if (typeof loose.code === 'string') parts.push(loose.code);
+  const response = loose.response;
+  const data =
+    response && typeof response === 'object'
+      ? (response as { data?: Record<string, unknown> }).data
+      : undefined;
   if (data) {
     for (const key of ['error_code', 'error', 'message'] as const) {
       if (typeof data[key] === 'string') parts.push(data[key] as string);
@@ -49,7 +45,7 @@ function extractErrorHaystack(error: unknown): string {
       if (typeof row.message === 'string') parts.push(row.message);
     }
   }
-  if (typeof err.message === 'string') parts.push(err.message);
+  if (typeof loose.message === 'string') parts.push(loose.message);
   return parts.join(' ').toLowerCase();
 }
 

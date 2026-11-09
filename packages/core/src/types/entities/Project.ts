@@ -190,11 +190,111 @@ export interface ProjectDataPathValue {
   path: string;
 }
 
+/** String-leaf editor envelope (REST + MCP coalesce). */
+export type ProjectDataStringLeafEdit = {
+  replacements?: Array<{ find: string; replace: string; count?: number }>;
+  unified_diff?: string;
+  text_write_mode?: 'search_replace' | 'unified_diff' | 'append' | 'prepend';
+  strict_diff?: boolean;
+};
+
+/** Opcode vocabulary (SoT: shared/atoms/edit_intent.py DIRECTED_EDIT_OPS). */
+export type DirectedEditOpKind =
+  | 'set'
+  | 'replace'
+  | 'delete'
+  | 'merge'
+  | 'upsert'
+  | 'append'
+  | 'prepend'
+  | 'insert_at'
+  | 'insert_before'
+  | 'insert_after'
+  | 'move'
+  | 'search_replace'
+  | 'fuzzy_replace'
+  | 'unified_diff';
+
+/** Directed edit op batch (MCP projects.patch_data ``ops``). */
+export type DirectedEditOp = {
+  op: DirectedEditOpKind | string;
+  path?: string;
+  value?: unknown;
+  find?: string;
+  replace?: string;
+  where?: Record<string, unknown>;
+  index?: number;
+  /** Wire alias for insert_at (MCP ops). */
+  at?: number;
+  from_index?: number;
+  to_index?: number;
+  uid?: string;
+  before_uid?: string;
+  insert?: string;
+  content?: string;
+  replacements?: ProjectDataStringLeafEdit['replacements'];
+  unified_diff?: string;
+  strict_diff?: boolean;
+  count?: number;
+};
+
+/** PATCH /projects/{id}/data success envelope (ops or leaf write). */
+export interface PatchProjectDataLeaf {
+  path: string;
+  value?: unknown;
+}
+
+export interface PatchProjectDataResponse {
+  success: boolean;
+  project_id: number;
+  path?: string;
+  dry_run?: boolean;
+  /** Digest of leaf before apply — pass as expected_sha256 on commit. */
+  previous_sha256?: string;
+  leaf_sha256?: string;
+  /** Per-leaf outcomes for patches[] batch (REST/MCP parity). */
+  writes?: Array<Record<string, unknown>>;
+  /** Suggested commit after dry_run (single-leaf CAS v1). */
+  next_actions?: Array<{ action: string; params: Record<string, unknown> }>;
+  preview_only?: boolean;
+  state?: string;
+  write?: {
+    mode?: string;
+    applied?: number;
+    skipped?: number;
+    methods?: string[];
+  };
+}
+
 /**
  * PATCH /projects/{id}/data body — set value at dot path in project.data.
  */
 export interface PatchProjectDataBody {
-  path: string;
-  value: unknown;
+  /** Wins over patches[] when set. */
+  path?: string;
+  /** Up to 16 leaves when path is omitted (plain replace SET may be atomic). */
+  patches?: PatchProjectDataLeaf[];
+  value?: unknown | ProjectDataStringLeafEdit;
+  write_mode?:
+    | 'replace'
+    | 'write'
+    | 'set'
+    | 'put'
+    | 'merge'
+    | 'patch'
+    | 'delete'
+    | 'search_replace'
+    | 'fuzzy_replace'
+    | 'unified_diff'
+    | 'append'
+    | 'prepend';
+  ops?: DirectedEditOp[];
+  dry_run?: boolean;
+  expected_sha256?: string;
+  missing?: 'error' | 'skip';
+  allow_shrink?: boolean;
+  replacements?: ProjectDataStringLeafEdit['replacements'];
+  unified_diff?: string;
+  strict_diff?: boolean;
 }
 

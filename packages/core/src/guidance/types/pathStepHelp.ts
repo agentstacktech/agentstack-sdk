@@ -34,6 +34,7 @@ export const GoalVerifySpecSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('hostedVitrinePublished') }),
   z.object({ kind: z.literal('storefrontSeedApplied') }),
   z.object({ kind: z.literal('commerceSellerActivated') }),
+  z.object({ kind: z.literal('commerceIapCatalogConfigured') }),
   z.object({ kind: z.literal('integrationConnectionActive'), minCount: z.number().optional() }),
   z.object({ kind: z.literal('paymentWebhookOk') }),
   z.object({ kind: z.literal('botExists'), minCount: z.number().optional() }),
@@ -53,6 +54,7 @@ export const GoalVerifySpecSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('ragChunkIngested'), minCount: z.number().optional() }),
   z.object({ kind: z.literal('ragSearchReturned') }),
   z.object({ kind: z.literal('businessHeadExists'), minOrgans: z.number().optional() }),
+  z.object({ kind: z.literal('orchestratorDeskApplied') }),
   z.object({ kind: z.literal('manualConfirm'), checklistKeys: z.array(z.string()) }),
   z.object({
     kind: z.literal('mcpProbe'),

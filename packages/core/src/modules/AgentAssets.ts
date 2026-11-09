@@ -9,16 +9,22 @@ import type { AssetPresetsFixture } from '../commerce/assets/schemas';
 import { validateAssetPresetsResponse } from '../commerce/assets/schemas';
 
 export interface CreateAssetData {
-  name: string;
-  type: AssetType;
-  price_usdt: string;
-  components: any;
+  name?: string;
+  type?: AssetType;
+  price_usdt?: string;
+  components?: any;
+  preset_id?: string;
+  preset?: string;
+  preset_inputs?: Record<string, unknown>;
+  data?: Record<string, unknown>;
+  description?: string;
 }
 
 export interface UpdateAssetData {
   name?: string;
   price_usdt?: string;
   components?: any;
+  data?: Record<string, unknown>;
 }
 
 export interface ListAssetsParams {
@@ -27,7 +33,23 @@ export interface ListAssetsParams {
   rarity?: string;
   tradeable?: boolean;
   lifecycle?: string;
+  /** ECS index card status (index-light filter; distinct from lifecycle). */
+  status?: string;
   q?: string;
+  cross_project?: boolean;
+  include_catalog_scope?: boolean;
+  projection?: 'summary' | 'full';
+  limit?: number;
+  offset?: number;
+}
+
+export interface AssetsListScope {
+  project_id?: number;
+  source?: string;
+  visible_total?: number;
+  canonical_total?: number;
+  drift?: boolean;
+  drift_reason?: string;
 }
 
 export interface ImportAssetsPayload {
@@ -40,7 +62,7 @@ export interface BulkDeleteAssetsPayload {
 }
 
 export interface BulkUpdateAssetsPayload {
-  updates: Array<{ id: string; [key: string]: unknown }>;
+  updates: Array<{ asset_id: string; id?: string; [key: string]: unknown }>;
 }
 
 export interface TransferAssetData {
@@ -53,6 +75,17 @@ export type ListAssetPresetsResponse = AssetPresetsFixture & {
   success?: boolean;
   project_id?: number;
 };
+
+export interface AssetActivityEvent {
+  ts: string;
+  action: string;
+  detail?: string;
+}
+
+export interface ExportAssetsParams {
+  /** Comma-separated on wire; subset export without full catalog scan when indexed. */
+  asset_ids?: string[];
+}
 
 export class AgentAssets {
   constructor(private client: HTTPClient) {}
@@ -87,10 +120,26 @@ export class AgentAssets {
    */
   async listAssets(projectId: number, params?: ListAssetsParams): Promise<{
     assets: BaseAsset[];
-    count: number;
+    items?: BaseAsset[];
+    count?: number;
+    total?: number;
+    has_more?: boolean;
+    limit?: number;
+    offset?: number;
+    projection?: string;
+    scope?: AssetsListScope;
+    env_uuid?: string;
   }> {
     const response = await this.client.get(`/projects/${projectId}/assets`, params);
-    return response.data;
+    const data = response.data ?? {};
+    const rows = data.assets ?? data.items ?? [];
+    const count =
+      typeof data.count === 'number'
+        ? data.count
+        : data.has_more === true
+          ? undefined
+          : rows.length;
+    return { ...data, assets: rows, count };
   }
 
   /**
@@ -117,10 +166,37 @@ export class AgentAssets {
     return response.data;
   }
 
-  async exportAssets(projectId: number): Promise<{ assets: BaseAsset[] }> {
-    const response = await this.client.get(`/projects/${projectId}/assets/export`);
+  async exportAssets(
+    projectId: number,
+    params?: ExportAssetsParams,
+  ): Promise<{ assets: BaseAsset[] }> {
+    const query =
+      params?.asset_ids?.length
+        ? { asset_ids: params.asset_ids.join(',') }
+        : undefined;
+    const response = await this.client.get(`/projects/${projectId}/assets/export`, query);
     const data = response.data ?? response;
     return { assets: data.assets ?? data ?? [] };
+  }
+
+  async getAssetActivity(
+    projectId: number,
+    assetId: string,
+    opts?: { limit?: number },
+  ): Promise<{ events: AssetActivityEvent[] }> {
+    const response = await this.client.get(
+      `/projects/${projectId}/assets/${assetId}/activity`,
+      opts?.limit != null ? { limit: opts.limit } : undefined,
+    );
+    const data = response.data ?? response;
+    return { events: data.events ?? [] };
+  }
+
+  async reindexAssetsCatalog(
+    projectId: number,
+  ): Promise<{ success: boolean; reindexed?: number }> {
+    const response = await this.client.post(`/projects/${projectId}/assets/reindex`, {});
+    return response.data ?? response;
   }
 
   async importAssets(
@@ -134,7 +210,7 @@ export class AgentAssets {
   async bulkDeleteAssets(
     projectId: number,
     payload: BulkDeleteAssetsPayload,
-  ): Promise<{ deleted: number }> {
+  ): Promise<{ deleted: number; failed?: string[] }> {
     const response = await this.client.post(`/projects/${projectId}/assets/bulk-delete`, payload);
     return response.data ?? response;
   }
@@ -142,7 +218,7 @@ export class AgentAssets {
   async bulkUpdateAssets(
     projectId: number,
     payload: BulkUpdateAssetsPayload,
-  ): Promise<{ updated: number }> {
+  ): Promise<{ updated: number; failed?: unknown[] }> {
     const response = await this.client.post(`/projects/${projectId}/assets/bulk-update`, payload);
     return response.data ?? response;
   }

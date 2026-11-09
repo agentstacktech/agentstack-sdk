@@ -70,6 +70,18 @@ describe('runWorkGraphLoop', () => {
     expect(finalPacket.state).toBe('idle');
   });
 
+  it('stops when the same action node revision repeats', async () => {
+    const api = fleet();
+    api.workNext.mockResolvedValue({
+      state: 'actionable',
+      revision: 2,
+      next_action: { action: 'agents.ensure_agent', params: { node_id: 'n1' } },
+    });
+    api.ensureAgent = jest.fn().mockResolvedValue({});
+    await runWorkGraphLoop(api, 3, { maxIterations: 10 });
+    expect(api.ensureAgent).toHaveBeenCalledTimes(1);
+  });
+
   it('invokes onPacket before each loop step', async () => {
     const api = fleet();
     api.workNext
@@ -83,7 +95,7 @@ describe('runWorkGraphLoop', () => {
       maxIterations: 3,
       onPacket: (p) => seen.push(String(p.state ?? '')),
     });
-    expect(seen).toEqual(['executable']);
+    expect(seen).toEqual(['actionable']);
     expect(api.claimPlanNodes).toHaveBeenCalled();
   });
 });

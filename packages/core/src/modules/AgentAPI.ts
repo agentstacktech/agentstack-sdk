@@ -60,7 +60,10 @@ export class AgentAPI {
   }> {
     // ✅ FIX: Pass params directly, not wrapped in { params }
     // Only pass params if they exist and have values
-    const queryParams = params && Object.keys(params).length > 0 ? params : undefined;
+    const queryParams =
+      params && Object.keys(params).length > 0
+        ? params
+        : { limit: 200, accessible_only: true };
     const response = await this.client.get('/projects', queryParams, requestOptions);
     // Extract projects from the response structure (flat or nested `data`)
     const data = response.data as Record<string, unknown> | null | undefined;
@@ -222,13 +225,52 @@ export class AgentAPI {
    */
   async getProjectData(
     projectId: number,
-    options?: { path?: string } & Partial<RequestConfig>
+    options?: {
+      path?: string;
+      paths?: string;
+      excludePaths?: string;
+      maxDepth?: number;
+      minDepth?: number;
+      detail?: string;
+      itemOffset?: number;
+      itemLimit?: number;
+      offset?: number;
+      maxChars?: number;
+      keyAfter?: string;
+      keyLimit?: number;
+    } & Partial<RequestConfig>
   ): Promise<ProjectDataSnapshot | ProjectDataPathValue> {
-    const { path, ...req } = options || {};
-    const query = path != null && String(path).length > 0 ? { path: String(path) } : undefined;
+    const {
+      path,
+      paths,
+      excludePaths,
+      maxDepth,
+      minDepth,
+      detail,
+      itemOffset,
+      itemLimit,
+      offset,
+      maxChars,
+      keyAfter,
+      keyLimit,
+      ...req
+    } = options || {};
+    const query: Record<string, string | number> = {};
+    if (path != null && String(path).length > 0) query.path = String(path);
+    if (paths) query.paths = paths;
+    if (excludePaths) query.exclude_paths = excludePaths;
+    if (maxDepth != null) query.max_depth = maxDepth;
+    if (minDepth != null) query.min_depth = minDepth;
+    if (detail) query.detail = detail;
+    if (itemOffset != null) query.item_offset = itemOffset;
+    if (itemLimit != null) query.item_limit = itemLimit;
+    if (offset != null) query.offset = offset;
+    if (maxChars != null) query.max_chars = maxChars;
+    if (keyAfter) query.key_after = keyAfter;
+    if (keyLimit != null) query.key_limit = keyLimit;
     const response = await this.client.get(
       `/projects/${projectId}/data`,
-      query,
+      Object.keys(query).length ? query : undefined,
       req as Partial<RequestConfig>
     );
     const d = response.data;
@@ -243,13 +285,13 @@ export class AgentAPI {
     projectId: number,
     body: PatchProjectDataBody,
     options?: Partial<RequestConfig>
-  ): Promise<{ success: boolean; project_id: number; path: string }> {
+  ): Promise<import('../types/entities/Project').PatchProjectDataResponse> {
     const response = await this.client.patch(
       `/projects/${projectId}/data`,
       body,
       options
     );
-    return response.data as { success: boolean; project_id: number; path: string };
+    return response.data as import('../types/entities/Project').PatchProjectDataResponse;
   }
 
   async deleteProject(projectId: number): Promise<{
@@ -393,6 +435,18 @@ export class AgentAPI {
     user: ProjectUser;
   }> {
     const response = await this.client.post(`/projects/${projectId}/users`, userData);
+    return response.data;
+  }
+
+  async joinProject(projectId: number): Promise<{
+    success: boolean;
+    status: string;
+    role: string;
+    project_id: number;
+    user_id: number;
+    work_graph_path?: string;
+  }> {
+    const response = await this.client.post(`/projects/${projectId}/join`, {});
     return response.data;
   }
 

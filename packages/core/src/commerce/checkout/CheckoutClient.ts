@@ -1,6 +1,7 @@
 import type { HTTPClient } from '../../client/http-client';
 import { mapCommerceHttpError } from '../errors/mapCommerceHttpError';
 import { shouldPollCheckout } from './checkoutStateMachine';
+import { isWalletCreditOk } from '../settlement/walletCredit';
 
 export type CreateCheckoutSessionRequest = {
   listing_uuid: string;
@@ -104,22 +105,27 @@ export class CheckoutClient {
 
   async pollUntilTerminal(
     sessionId: string,
-    opts?: { intervalMs?: number; timeoutMs?: number },
+    opts?: { intervalMs?: number; timeoutMs?: number; returnLastOnTimeout?: boolean },
   ) {
     const interval = opts?.intervalMs ?? 1500;
     const timeout = opts?.timeoutMs ?? 60_000;
     const start = Date.now();
+    let lastResult: Awaited<ReturnType<typeof this.getSession>> | undefined;
     while (Date.now() - start < timeout) {
       const result = await this.getSession(sessionId);
+      lastResult = result;
       const session = result.session ?? result;
       const status = String(session?.status ?? '');
-      if (
-        status === 'completed' ||
-        status === 'failed' ||
-        status === 'expired' ||
-        status === 'cancelled'
-      ) {
+      const credit = String(session?.wallet_credit ?? '');
+      if (status === 'failed' || status === 'expired' || status === 'cancelled' || status === 'refunded') {
         return result;
+      }
+      if (status === 'completed' && isWalletCreditOk(credit)) {
+        return result;
+      }
+      if (status === 'completed') {
+        await new Promise((r) => setTimeout(r, interval));
+        continue;
       }
       const uiState =
         status === 'awaiting_payment'
@@ -131,6 +137,9 @@ export class CheckoutClient {
         return result;
       }
       await new Promise((r) => setTimeout(r, interval));
+    }
+    if (opts?.returnLastOnTimeout && lastResult) {
+      return lastResult;
     }
     throw new Error('checkout_poll_timeout');
   }

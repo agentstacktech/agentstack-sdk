@@ -5,6 +5,22 @@
 
 export const HOSTED_SESSION_TOKEN_KEY = 'vertical:token';
 export const HOSTED_SESSION_WORKSPACE_KEY = 'vertical:workspace_pid';
+export const HOSTED_POST_LOGIN_GRACE_AT_KEY = 'vertical:post_login_grace_at';
+const POST_LOGIN_GRACE_MS = 30_000;
+
+export function isHostedPostLoginGraceActive(): boolean {
+  if (typeof sessionStorage === 'undefined') return false;
+  const raw = sessionStorage.getItem(HOSTED_POST_LOGIN_GRACE_AT_KEY);
+  const at = Number(raw);
+  if (!Number.isFinite(at) || at <= 0) return false;
+  return Date.now() - at < POST_LOGIN_GRACE_MS;
+}
+
+/** Call immediately after REST login mint — enables `X-Auth-Mint-Grace` on probe/mint. */
+export function markHostedPostLoginGrace(): void {
+  if (typeof sessionStorage === 'undefined') return;
+  sessionStorage.setItem(HOSTED_POST_LOGIN_GRACE_AT_KEY, String(Date.now()));
+}
 
 export type SessionTokenPayload = {
   access_token?: string | null;
@@ -61,6 +77,7 @@ export function storeHostedSession(token: string, workspaceProjectId: number): v
   sessionStorage.removeItem('refresh_token');
   sessionStorage.setItem(HOSTED_SESSION_TOKEN_KEY, bearer);
   sessionStorage.setItem(HOSTED_SESSION_WORKSPACE_KEY, String(workspaceProjectId));
+  markHostedPostLoginGrace();
 }
 
 export function clearHostedSession(): void {

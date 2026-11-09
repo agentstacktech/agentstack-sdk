@@ -36,13 +36,50 @@ describe('AgentPayments', () => {
       };
 
       mockHttpClient.post.mockResolvedValueOnce({
-        data: testPayment,
+        data: { payment: { payment_id: 'pay-1', ...testPayment, id: undefined } },
       });
 
       const result = await payments.createPayment(paymentData);
 
-      expect(mockHttpClient.post).toHaveBeenCalledWith('/payments', paymentData);
-      expect(result).toEqual(testPayment);
+      expect(mockHttpClient.post).toHaveBeenCalledWith(
+        '/payments',
+        expect.objectContaining({
+          amount: 1000,
+          currency: 'USD',
+          description: 'Test payment',
+          idempotency_key: expect.any(String),
+        }),
+        expect.objectContaining({
+          headers: expect.objectContaining({ 'Idempotency-Key': expect.any(String) }),
+        }),
+      );
+      expect(result.id).toBe('pay-1');
+    });
+
+    it('should map PSP resume fields from create response', async () => {
+      mockHttpClient.post.mockResolvedValueOnce({
+        data: {
+          payment: {
+            payment_id: 'pay-ru',
+            amount: 100,
+            currency: 'RUB',
+            status: 'pending',
+            payment_url: 'https://bank.example/pay',
+            psp_selected: 'tochka',
+            psp_fallback_reason: 'stripe_not_configured',
+          },
+        },
+      });
+
+      const result = await payments.createPayment({
+        amount: 100,
+        currency: 'RUB',
+        description: 'RU',
+      });
+
+      expect(result.payment_url).toBe('https://bank.example/pay');
+      expect(result.psp_selected).toBe('tochka');
+      expect(result.psp_fallback_reason).toBe('stripe_not_configured');
     });
 
     it('should get payment', async () => {

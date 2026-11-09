@@ -22,18 +22,18 @@ export function ProductGridEmbed({
     ...params,
   };
   const listingsQ = useStorefront(queryParams);
-  const listings =
-    (
-      listingsQ.data as
-        | {
-            listings?: Array<{
-              uuid: string;
-              asset_card?: { name?: string; thumbnail_url?: string };
-              listing?: { asset?: { price_usdt?: string } };
-            }>;
-          }
-        | undefined
-    )?.listings ?? [];
+  const rawListings = (
+    listingsQ.data as
+      | {
+          listings?: Array<{
+            uuid: string;
+            asset_card?: { name?: string; thumbnail_url?: string };
+            listing?: { asset?: { price_usdt?: string } };
+          }>;
+        }
+      | undefined
+  )?.listings;
+  const listings = Array.isArray(rawListings) ? rawListings : [];
 
   useEffect(() => {
     if (!listingsQ.isLoading && !listingsQ.isError) {

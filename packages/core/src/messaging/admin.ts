@@ -46,6 +46,7 @@ export {
   getMessagingOpsStatus,
   getMessagingSetupInfo,
   listSuppressions,
+  removeSuppression,
   putMessagingConfig,
   sendAdminEmail,
   sendTestEmail,

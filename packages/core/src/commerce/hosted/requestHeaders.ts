@@ -2,7 +2,8 @@
  * REST headers for hosted commerce fetch (session vault + CSRF + project scope).
  * Gene: sdk.commerce.hosted.gen1
  */
-import { readHostedSessionToken } from './sessionVault';
+import { resolveHostedProjectId } from './projectContext';
+import { isHostedPostLoginGraceActive, readHostedSessionToken } from './sessionVault';
 
 function readCsrfCookie(): string {
   if (typeof document === 'undefined') return '';
@@ -26,7 +27,9 @@ export function buildHostedCommerceHeaders(
   const headers: Record<string, string> = { Accept: 'application/json', ...(extra ?? {}) };
   const token = readHostedSessionToken();
   if (token) headers.Authorization = `Bearer ${token}`;
-  if (projectId) headers['X-Project-ID'] = String(projectId);
+  const scopedPid = resolveHostedProjectId(projectId);
+  if (scopedPid) headers['X-Project-ID'] = String(scopedPid);
+  if (isHostedPostLoginGraceActive()) headers['X-Auth-Mint-Grace'] = '1';
   const csrf = readCsrfCookie();
   if (csrf) headers['X-CSRF-Token'] = csrf;
   return headers;

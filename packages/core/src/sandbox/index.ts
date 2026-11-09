@@ -4,6 +4,7 @@
  */
 
 import type { HTTPClient } from '../client/http-client';
+import type { GenerationSupplyGateStatus } from './generationGateProbe';
 import { applyPromoteGatesPolicy, type GenerationSettingsLike } from './promotePolicy';
 
 export {
@@ -22,6 +23,17 @@ export {
 } from './generationReview';
 export type { GenerationSettingsLike } from './generationReview';
 export { roleMayWriteProduction } from './directProd';
+export {
+  getGenerationGateSnapshot,
+  probeGenerationSupplyGate,
+  sandboxApplyReadyFromGate,
+} from './generationGateProbe';
+export type {
+  GenerationGateProbeClient,
+  GenerationSupplyGateStatus,
+  GenerationSupplyScope,
+  SandboxMutationGate,
+} from './generationGateProbe';
 
 export {
   GENERATION_PREFERRED_ENV_BLOCKED,
@@ -150,9 +162,14 @@ export type PreviewEnvScope = {
 export class GenerationsClient {
   constructor(private readonly http: HTTPClient) {}
 
-  async getStatus(projectId: number) {
-    const res = await this.http.get(`/generations/${projectId}/status`);
-    return res.data;
+  async getStatus(
+    projectId: number,
+    envUuid?: string | null,
+  ): Promise<GenerationSupplyGateStatus> {
+    const eu = String(envUuid ?? '').trim();
+    const q = eu ? `?env_uuid=${encodeURIComponent(eu)}` : '';
+    const res = await this.http.get(`/generations/${projectId}/status${q}`);
+    return res.data as GenerationSupplyGateStatus;
   }
 
   async list(projectId: number) {
@@ -403,8 +420,8 @@ export class SandboxClient {
     return res.data;
   }
 
-  async getStatus(projectId: number) {
-    return this.generations.getStatus(projectId);
+  async getStatus(projectId: number, envUuid?: string | null) {
+    return this.generations.getStatus(projectId, envUuid);
   }
 
   async advanceCanary(projectId: number, envUuid: string) {

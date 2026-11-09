@@ -21,6 +21,10 @@ function errorDetailString(error: unknown): string {
   return '';
 }
 
+export function isPlanArchiveNoEffect(error: unknown): boolean {
+  return errorDetailString(error).toLowerCase() === 'plan_archive_no_effect';
+}
+
 export function isPlanRevisionConflict(error: unknown): boolean {
   const err = error as { response?: { status?: number } };
   if (err.response?.status === 409) {
@@ -32,6 +36,14 @@ export function isPlanRevisionConflict(error: unknown): boolean {
   }
   const hay = errorDetailString(error).toLowerCase();
   return hay.includes('plan_revision_conflict');
+}
+
+export function isPlanCompletionGates(error: unknown): boolean {
+  return errorDetailString(error).toLowerCase() === 'plan_completion_gates';
+}
+
+export function isPlanGraphChildrenExceeded(error: unknown): boolean {
+  return errorDetailString(error).toLowerCase() === 'plan_graph_children_exceeded';
 }
 
 export function isPlanWipFull(error: unknown): boolean {
@@ -80,8 +92,19 @@ const PLAN_MUTATION_MESSAGES: Record<string, string> = {
     'Fleet lacks required capabilities — ensure_agent (H5) saga or repair_plan.',
   no_compatible_agent:
     'No fleet match — ensure_agent (H5) or repair_plan.',
+  operator_closure:
+    'Platform ops leaf — close with agents.plan_patch (gates_passed + gate_evidence); not ensure_agent.',
   node_not_eligible: 'Task is not eligible to claim yet — check dependencies and status.',
   plan_claim_owner_conflict: 'Task is already owned by another agent.',
+  plan_completion_gates:
+    'Completion gates not satisfied — finish child work, set gates_passed, or waive before status=completed.',
+  plan_graph_children_exceeded:
+    'Parent has more than 32 direct children — archive completed nodes or plan_propose decompose_node.',
+  plan_ops_unknown: 'Unknown plan_patch op — use discovery.describe ops_compact canonical names.',
+  work_graph_action_busy:
+    'Another work-graph action is still running — wait a moment and retry.',
+  work_graph_action_not_dispatchable:
+    'This recovery action cannot run from the work-graph dispatch spine.',
 };
 
 function recoveryBlockText(error: unknown, locale?: string): string {
@@ -93,16 +116,18 @@ function recoveryBlockText(error: unknown, locale?: string): string {
   const data = err.response?.data ?? err.step?.data ?? err.step?.result ?? {};
   const detail = data.detail;
   const claim = (data.claim_result ?? {}) as Record<string, unknown>;
-  const block =
-    (data.recovery_block as { en?: string; ru?: string; pt?: string } | undefined) ||
-    (detail && typeof detail === 'object'
-      ? (detail as { recovery_block?: { en?: string; ru?: string; pt?: string } }).recovery_block
-      : undefined) ||
-    (claim.recovery_block as { en?: string; ru?: string; pt?: string } | undefined);
-  if (!block) return '';
-  const lang = (locale || 'en').slice(0, 2);
-  const key = lang === 'ru' || lang === 'pt' ? lang : 'en';
-  return String(block[key] || block.en || '').trim();
+  const hint =
+    (typeof data.recovery_hint === 'string' && data.recovery_hint) ||
+    (detail && typeof detail === 'object' && typeof (detail as { recovery_hint?: string }).recovery_hint === 'string'
+      ? (detail as { recovery_hint?: string }).recovery_hint
+      : '') ||
+    (typeof claim.recovery_hint === 'string' ? claim.recovery_hint : '');
+  if (hint && String(hint).trim()) return String(hint).trim();
+  const block = data.recovery_block ?? (detail && typeof detail === 'object'
+    ? (detail as { recovery_block?: unknown }).recovery_block
+    : undefined) ?? claim.recovery_block;
+  if (typeof block === 'string' && block.trim()) return block.trim();
+  return '';
 }
 
 /** Human-readable planner mutation error for Copilot toasts. */

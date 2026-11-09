@@ -32,6 +32,21 @@ describe('commerce/assets url state', () => {
     expect(parsed.assetId).toBe('a1');
   });
 
+  it('parses and writes catalog pagination params', () => {
+    const parsed = parseAssetsSearchParams(new URLSearchParams('page=3&pageSize=24'));
+    expect(parsed.page).toBe(3);
+    expect(parsed.pageSize).toBe(24);
+    const defaults = parseAssetsSearchParams(new URLSearchParams());
+    expect(defaults.page).toBe(1);
+    expect(defaults.pageSize).toBe(48);
+    const cleared = writeAssetsSearchParams(
+      new URLSearchParams('page=2&pageSize=24'),
+      { page: 1, pageSize: 48 },
+    );
+    expect(cleared.get('page')).toBeNull();
+    expect(cleared.get('pageSize')).toBeNull();
+  });
+
   it('parses and writes pack param', () => {
     const parsed = parseAssetsSearchParams(new URLSearchParams('mode=studio&pack=starter_three'));
     expect(parsed.pack).toBe('starter_three');

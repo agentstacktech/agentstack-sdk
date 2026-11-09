@@ -68,6 +68,7 @@ import { createMobileSurface, type MobileSurface } from './mobile';
 import { ProteinResponseProcessor } from './modules/ProteinResponseProcessor';
 import { PageCompositionSystem } from './modules/PageCompositionSystem';
 import { GameDataSystem } from './modules/GameDataSystem';
+import { createStackScriptClient } from './stackscript';
 import { SDKConfig, AgentStackError } from './types';
 import { AuthStateStore } from './utils/auth-state';
 import { SimpleEventEmitter } from './utils/event-emitter';
@@ -754,6 +755,14 @@ export class AgentStackSDK extends SimpleEventEmitter {
     this.emit('config:updated', this.config);
   }
 
+  /** Project-scoped MCP script.* client (core.stackscript.engine.gen1). */
+  stackscript(
+    projectId: number,
+    options?: import('./stackscript/client').StackScriptClientOptions,
+  ) {
+    return createStackScriptClient(this.httpClient, projectId, options);
+  }
+
   getConfig(): SDKConfig {
     return { ...this.config };
   }
@@ -815,7 +824,14 @@ export class AgentStackSDK extends SimpleEventEmitter {
     if (!pid) {
       throw new AgentStackError('updateProjectId: invalid project id');
     }
+    const prev = this.config.projectId;
     this.config.projectId = pid;
+    if (typeof this.httpClient.setProjectId === 'function') {
+      this.httpClient.setProjectId(pid);
+    }
+    if (prev !== pid && typeof this.httpClient.bumpActiveSwitchGeneration === 'function') {
+      this.httpClient.bumpActiveSwitchGeneration();
+    }
     this.httpClient.updateConfig({ projectId: pid });
     this.emit('project:changed', { projectId: pid });
   }

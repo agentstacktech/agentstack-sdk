@@ -80,6 +80,11 @@ export class AgentProtein extends SimpleEventEmitter {
     this.httpClient = httpClient;
   }
 
+  /** HTTP surface for sibling SDK clients (e.g. StackScript script.run). */
+  getHttpClient(): HTTPClient {
+    return this.httpClient;
+  }
+
   // ============================================================================
   // CORE PROTEIN METHODS
   // ============================================================================
@@ -382,6 +387,10 @@ export class AgentProtein extends SimpleEventEmitter {
 
   /**
    * Выполнение игрового скрипта
+   *
+   * StackScript (server VM): prefer `createStackScriptClient(http, projectId).run`
+   * or GameDataSystem with metadata.runtime=stackscript. This protein command
+   * remains for legacy game-data payloads loaded via execute_script.
    */
   async executeGameScript(
     projectId: number,

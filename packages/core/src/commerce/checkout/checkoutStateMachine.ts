@@ -21,7 +21,8 @@ export function nextCheckoutUiState(
 ): CheckoutUiState {
   if (event === 'reset') return 'idle';
   if (event === 'fail') return 'failed';
-  if (event === 'complete' || event === 'external_pay_complete') return 'completed';
+  if (event === 'complete') return 'completed';
+  if (event === 'external_pay_complete') return 'confirming';
   if (event === 'confirm') return 'confirming';
   if (event === 'await_payment') return 'awaiting_payment';
   if (event === 'create') {

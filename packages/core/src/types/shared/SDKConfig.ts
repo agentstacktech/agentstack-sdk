@@ -217,6 +217,12 @@ export interface RequestConfig {
   /** Skip batching for this request */
   skipBatching?: boolean;
 
+  /**
+   * POST /s/{pid}/mcp cookie plane — send credentials, omit Bearer (hosted_app session).
+   * Gene: core.auth.anonymous_provisioning.gen1 (G6b).
+   */
+  cookieSessionMcp?: boolean;
+
   /** Abort in-flight request (e.g. React Query cancellation on unmount / key change) */
   signal?: AbortSignal;
 
@@ -231,6 +237,15 @@ export interface RequestConfig {
 
   /** Token epoch captured by session bridge for stale-request guard. */
   _tokenEpoch?: number;
+
+  /**
+   * Switch-intent generation copied when the request started.
+   * A response stamped below the client's active generation is not a dead session.
+   */
+  switchGeneration?: number;
+
+  /** One-shot retry after cache_epoch_stale with the echoed epoch cleared. */
+  _epochRetry?: boolean;
 
   /**
    * Browser fetch priority hint (Chromium). Forwarded to `globalThis.fetch` when set.

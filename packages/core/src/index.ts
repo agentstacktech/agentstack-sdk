@@ -17,6 +17,13 @@ export {
   loginWithDeviceCodeForm,
   deviceCodeActivateUrl,
   DEFAULT_DEVICE_SCOPES,
+  goalVerificationFromEnvelope,
+  normalizeGoalVerificationWire,
+  mergeExecuteEnvelopeIntoPacket,
+  normalizeWorkflowStatus,
+  extractBatchMeta,
+  summarizeMcpBatchOutcome,
+  isMcpPartialSuccess,
 } from './mcp';
 export type {
   McpStep,
@@ -25,6 +32,7 @@ export type {
   McpStepResult,
   DeviceCodeLoginOptions,
   McpDiscoverOptions,
+  GoalVerificationWire,
 } from './mcp';
 
 export {
@@ -59,6 +67,17 @@ export {
   jwtProjectIdFromToken,
   hostedRouteProjectIdFromPath,
 } from './client/resolveRequestProjectContext';
+export { submitHostedForm } from './hosted/submitHostedForm';
+export type {
+  SubmitHostedFormInput,
+  SubmitHostedFormResult,
+} from './hosted/submitHostedForm';
+export {
+  PUBLIC_FORM_MESSAGE_MAX,
+  PublicFormValidationError,
+  validatePublicFormFields,
+} from './hosted/publicFormIntake';
+export type { PublicFormValidationCode } from './hosted/publicFormIntake';
 export type {
   ProjectBindingMode,
   ResolveRequestProjectContextInput,
@@ -76,6 +95,8 @@ export {
   isMcpOAuthAuthorizePath,
   isUserScopedSessionPath,
   classifyRouteScope,
+  requestProjectId,
+  isForeignProjectRequest,
 } from './client/routeScopeClassifier';
 
 export {
@@ -127,6 +148,27 @@ export { AgentAuth, MfaRequiredError } from './modules/AgentAuth';
 export type { LoginCredentials, AuthTokens, UserProfile, SessionBootstrapPayload, SessionBootstrapSettingsSummary } from './modules/AgentAuth';
 export { AgentAPI } from './modules/AgentAPI';
 export type { AddUserToProjectData } from './modules/AgentAPI';
+export type {
+  DirectedEditOp,
+  DirectedEditOpKind,
+  PatchProjectDataBody,
+  PatchProjectDataLeaf,
+  PatchProjectDataResponse,
+  ProjectDataStringLeafEdit,
+} from './types/entities/Project';
+export { DIRECTED_EDIT_OPS, MAX_EDIT_OPS, applyEdits, leafDigest } from './atoms/editIntent';
+export type { ApplyEditsOptions, ApplyEditsResult } from './atoms/editIntent';
+export {
+  commitBodyFromKnowledgePreview,
+  commitDigestFromKnowledgePreview,
+  formatKnowledgeContentPreviewSummary,
+} from './atoms/knowledgePatch';
+export {
+  commitBodyFromPreview,
+  commitDigestFromPreview,
+  effectiveWriteModeLabel,
+  formatProjectDataPreviewSummary,
+} from './atoms/projectDataPatch';
 export { AgentNeural } from './modules/AgentNeural';
 export type { NeuralStatus, NeuralEvent } from './modules/AgentNeural';
 export { AgentDocs } from './modules/AgentDocs';
@@ -361,6 +403,14 @@ export type {
 export { AgentWebhooks } from './modules/AgentWebhooks';
 export { AgentIntegrations, buildIntegrationHookCurl } from './modules/AgentIntegrations';
 export { AgentBots } from './modules/AgentBots';
+export type {
+  BotGroupAccessGetResponse,
+  GroupAccessRoutingGates,
+  GroupAccessRoutingGatesBlocker,
+  GroupAccessRoutingGatesFlags,
+  GroupAccessRoutingGatesNextAction,
+  GroupAccessRoutingGatesSeverity,
+} from './bots';
 export { AgentMentor } from './modules/AgentMentor';
 export type { MentorConfig } from './modules/AgentMentor';
 export { AgentKnowledge } from './modules/AgentKnowledge';
@@ -375,6 +425,8 @@ export type {
   KnowledgeFaqPhenotype,
   KnowledgeGeneLexiconEntry,
   KnowledgeContentItem,
+  KnowledgeContentPatchBody,
+  KnowledgeContentPatchResponse,
   KnowledgeChunkSpan,
   KnowledgeKbChunk,
   KnowledgeAccessGrantBody,
@@ -450,12 +502,19 @@ export {
   createGenerationsClient,
   applyPromoteGatesPolicy,
   resolveRequireGatesPassed,
+  approverIds,
   generationReviewRequired,
+  quorumMet,
+  quorumNeeded,
+  resolveApprovalMode,
+  roleMayWriteProduction,
   GENERATION_PREFERRED_ENV_BLOCKED,
   isStaleEnvUuidError,
   omitEnvUuid,
   omitSandboxEnvKeys,
   callWithEnvUuidRetry,
+  probeGenerationSupplyGate,
+  sandboxApplyReadyFromGate,
 } from './sandbox';
 export type {
   PromoteStrategy,
@@ -464,6 +523,9 @@ export type {
   GenerationSettingsLike,
   PromoteBodyLike,
   SandboxEnvUuidRetryOptions,
+  GenerationGateProbeClient,
+  GenerationSupplyGateStatus,
+  SandboxMutationGate,
 } from './sandbox';
 export {
   integrationQueries,
@@ -741,7 +803,13 @@ export type {
   EcosystemChannelType
 } from './modules/AgentEcosystem';
 export { AgentAssets } from './modules/AgentAssets';
-export type { ListAssetPresetsResponse } from './modules/AgentAssets';
+export type {
+  AssetsListScope,
+  CreateAssetData,
+  ListAssetsParams,
+  ListAssetPresetsResponse,
+  UpdateAssetData,
+} from './modules/AgentAssets';
 export { AgentGlobalAssets } from './modules/AgentGlobalAssets';
 export {
   buildAssetsWizardHref,
@@ -828,6 +896,8 @@ export {
   socialChatRelayRoomId,
   userMuxRoomId,
 } from './relay/relay-constants';
+export { getRelayWsUrl } from './relay/getRelayWsUrl';
+export type { RelayWsTicketResponse, GetRelayWsUrlOptions } from './relay/getRelayWsUrl';
 export type {
   RelayEventType,
   RelayFrameType,
@@ -1292,6 +1362,28 @@ export {
   getFabricQueueSnapshot,
   replayFabricDlqItem,
 } from './fabric';
+
+export {
+  createStackScriptClient,
+  createStackScriptMatchClient,
+  pollBackoffMs,
+  pollWithBackoff,
+  RUNTIME_SEGMENTS,
+  normalizeRuntimeWritePath,
+  matchRuntimePrefix,
+  pathAllowedForWrite,
+  StackscriptMcpError,
+  isStackscriptMcpError,
+  parseStackscriptMcpFailure,
+  parseStackscriptMcpEnvelope,
+  getStackscriptWriteSet,
+} from './stackscript';
+export type {
+  ScriptPutParams,
+  ScriptListItem,
+  MatchPollState,
+} from './stackscript';
+
 export type {
   CapabilityDescriptor,
   CapabilityDescriptorFixture,

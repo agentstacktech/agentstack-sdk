@@ -235,3 +235,135 @@ export function setPath(
   }
   return result;
 }
+
+export function matchesWhere(item: unknown, where: Record<string, unknown>): boolean {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return false;
+  const rec = item as Record<string, unknown>;
+  for (const [key, val] of Object.entries(where)) {
+    if (rec[key] !== val) return false;
+  }
+  return true;
+}
+
+export function selectListIndexes(
+  items: unknown,
+  where: Record<string, unknown>,
+  opts?: { count?: number },
+): { indexes: number[]; error?: string } {
+  if (!Array.isArray(items)) return { indexes: [], error: 'write_mode_unsupported' };
+  if (!where || typeof where !== 'object' || !Object.keys(where).length) {
+    return { indexes: [], error: 'anchor_not_found' };
+  }
+  const matches = items.map((it, i) => (matchesWhere(it, where) ? i : -1)).filter((i) => i >= 0);
+  if (!matches.length) return { indexes: [], error: 'anchor_not_found' };
+  if (opts?.count == null && matches.length > 1) {
+    return { indexes: [], error: 'ambiguous_anchor' };
+  }
+  if (opts?.count != null) return { indexes: matches.slice(0, Number(opts.count)) };
+  return { indexes: [matches[0]] };
+}
+
+export function insertRelativeToWhere(
+  root: Record<string, unknown>,
+  listPath: string,
+  where: Record<string, unknown>,
+  value: unknown,
+  opts: { before: boolean; copyRoot?: boolean },
+): Record<string, unknown> {
+  const copyRoot = opts.copyRoot !== false;
+  const result: Record<string, unknown> = copyRoot ? structuredCloneSafe(root) : root;
+  const lst = getPath(result, listPath);
+  const { indexes, error } = selectListIndexes(lst, where);
+  if (error) throw new Error(error);
+  const idx = indexes[0]!;
+  const insertIdx = opts.before ? idx : idx + 1;
+  return insertAtPath(result, listPath, insertIdx, value, { copyRoot: false });
+}
+
+export function moveListItem(
+  root: Record<string, unknown>,
+  listPath: string,
+  opts?: {
+    fromIndex?: number;
+    toIndex?: number;
+    uid?: string;
+    beforeUid?: string;
+    listKey?: string;
+    copyRoot?: boolean;
+  },
+): Record<string, unknown> {
+  const copyRoot = opts?.copyRoot !== false;
+  const listKey = opts?.listKey ?? 'uid';
+  const result: Record<string, unknown> = copyRoot ? structuredCloneSafe(root) : root;
+  const lst = getPath(result, listPath);
+  if (!Array.isArray(lst)) throw new Error('write_mode_unsupported');
+  const newList = [...lst];
+  let fromIndex = opts?.fromIndex;
+  if (fromIndex == null && opts?.uid) {
+    fromIndex = newList.findIndex((it) => entityKey(it) === String(opts.uid));
+    if (fromIndex < 0) fromIndex = undefined;
+  }
+  if (fromIndex == null) throw new Error('anchor_not_found');
+  const fi = Number(fromIndex);
+  if (fi < 0 || fi >= newList.length) throw new Error('index_out_of_range');
+  const item = newList.splice(fi, 1)[0];
+  if (opts?.toIndex != null) {
+    let ti = Number(opts.toIndex);
+    if (ti < 0) ti = 0;
+    if (ti > newList.length) ti = newList.length;
+    newList.splice(ti, 0, item);
+  } else if (opts?.beforeUid) {
+    const ti = newList.findIndex((it) => entityKey(it) === String(opts.beforeUid));
+    if (ti < 0) throw new Error('anchor_not_found');
+    newList.splice(ti, 0, item);
+  } else {
+    newList.push(item);
+  }
+  return setPath(result, listPath, newList, { copyRoot: false });
+}
+
+/** Insert into list at path (mirror of ``insert_at_path``). */
+export function insertAtPath(
+  root: Record<string, unknown>,
+  path: string,
+  index: number,
+  value: unknown,
+  opts?: { copyRoot?: boolean },
+): Record<string, unknown> {
+  const copyRoot = opts?.copyRoot !== false;
+  const result: Record<string, unknown> = copyRoot
+    ? structuredCloneSafe(root)
+    : root;
+  const lst = getPath(result, path);
+  if (!Array.isArray(lst)) {
+    throw new Error('write_mode_unsupported');
+  }
+  const idx = Number(index);
+  if (idx < 0 || idx > lst.length) {
+    throw new Error('index_out_of_range');
+  }
+  const nextList = [...lst];
+  nextList.splice(idx, 0, value);
+  return setPath(result, path, nextList, { copyRoot: false });
+}
+
+/** Delete a dotted path segment (mirror of ``delete_path`` for simple dot paths). */
+export function deletePath(
+  root: Record<string, unknown>,
+  path: string,
+): Record<string, unknown> {
+  const result = structuredCloneSafe(root);
+  const parts = (path || '').split('.').filter(Boolean);
+  if (!parts.length) return result;
+  let cur: Record<string, unknown> = result;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const key = parts[i]!;
+    const next = cur[key];
+    if (!next || typeof next !== 'object' || Array.isArray(next)) {
+      return result;
+    }
+    cur = next as Record<string, unknown>;
+  }
+  delete cur[parts[parts.length - 1]!];
+  return result;
+}

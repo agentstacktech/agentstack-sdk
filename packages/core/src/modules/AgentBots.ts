@@ -4,6 +4,7 @@
 
 import { HTTPClient } from '../client/http-client';
 import type { BotOutboundAttachment } from '../bots/BotAttachmentTypes';
+import type { BotGroupAccessGetResponse } from '../bots/groupAccessTypes';
 import type { RequestConfig } from '../types';
 
 type BotsEnvOpts = { envUuid?: string | null };
@@ -75,11 +76,16 @@ export class AgentBots {
     return this.client.post<{ bot: unknown }>(`/projects/${projectId}/bots`, body);
   }
 
-  update(projectId: number, botId: string, spec: Record<string, unknown>) {
+  update(
+    projectId: number,
+    botId: string,
+    spec: Record<string, unknown>,
+    options?: BotsEnvOpts,
+  ) {
     return this.client.put<{
       bot: unknown;
       telegram_menu?: { ok?: boolean; skipped?: string; error?: string; n?: number };
-    }>(`/projects/${projectId}/bots/${botId}`, spec);
+    }>(`/projects/${projectId}/bots/${botId}`, spec, botsSandboxGetOptions(options));
   }
 
   attachChannel(
@@ -111,10 +117,12 @@ export class AgentBots {
       unified_diff?: string;
       allow_shrink?: boolean;
     },
+    options?: BotsEnvOpts,
   ) {
     return this.client.post<{ bot: unknown }>(
       `/projects/${projectId}/bots/${botId}/set_brain`,
       body,
+      botsSandboxGetOptions(options),
     );
   }
 
@@ -122,10 +130,12 @@ export class AgentBots {
     projectId: number,
     botId: string,
     body?: { hook_base?: string; activate_webhook?: boolean },
+    options?: BotsEnvOpts,
   ) {
     return this.client.post<{ bot: unknown; activation?: unknown; activation_error?: string }>(
       `/projects/${projectId}/bots/${botId}/go_live`,
       body ?? {},
+      botsSandboxGetOptions(options),
     );
   }
 
@@ -373,17 +383,29 @@ export class AgentBots {
     );
   }
 
-  pause(projectId: number, botId: string, body?: { deactivate_webhook?: boolean }) {
+  pause(
+    projectId: number,
+    botId: string,
+    body?: { deactivate_webhook?: boolean },
+    options?: BotsEnvOpts,
+  ) {
     return this.client.post<{ bot: unknown; deactivation?: unknown }>(
       `/projects/${projectId}/bots/${botId}/pause`,
       body ?? {},
+      botsSandboxGetOptions(options),
     );
   }
 
-  archive(projectId: number, botId: string, body?: { deactivate_webhook?: boolean }) {
+  archive(
+    projectId: number,
+    botId: string,
+    body?: { deactivate_webhook?: boolean },
+    options?: BotsEnvOpts,
+  ) {
     return this.client.post<{ bot: unknown; deactivation?: unknown }>(
       `/projects/${projectId}/bots/${botId}/archive`,
       body ?? {},
+      botsSandboxGetOptions(options),
     );
   }
 
@@ -400,10 +422,12 @@ export class AgentBots {
       sync_fanout?: boolean;
       async_fanout?: boolean;
     },
+    options?: BotsEnvOpts,
   ) {
     return this.client.post<Record<string, unknown>>(
       `/projects/${projectId}/bots/${botId}/broadcast`,
       body,
+      botsSandboxGetOptions(options),
     );
   }
 
@@ -480,7 +504,12 @@ export class AgentBots {
     );
   }
 
-  /** Group ACL — mirrors REST `/group-access*` (`core.bots.group_access.gen1`). */
+  /**
+   * Group ACL indexed home chats — REST `GET …/group-access/chats` (`core.bots.group_access.gen1`).
+   * `chat_keys: []` is success (no **indexed home chats** yet), not a load failure —
+   * account-level membership may still exist; enter `external_chat_id` manually or
+   * MCP `bots.acl.grant` (home channel) → promote.
+   */
   groupAccessChats(projectId: number, botId: string, options?: BotsEnvOpts) {
     return this.client.get<{ chat_keys?: string[] }>(
       `/projects/${projectId}/bots/${encodeURIComponent(botId)}/group-access/chats`,
@@ -492,19 +521,23 @@ export class AgentBots {
   groupAccessGet(
     projectId: number,
     botId: string,
-    params: { external_chat_id: string; provider: string },
+    params: {
+      external_chat_id: string;
+      provider: string;
+      thread_id?: string;
+      conversation_id?: string;
+    },
     options?: BotsEnvOpts,
   ) {
     const qs = new URLSearchParams({
       external_chat_id: params.external_chat_id,
       provider: params.provider,
     });
-    return this.client.get<{
-      chat_key?: string;
-      config?: Record<string, unknown> | null;
-      session_mode?: string;
-      mode_source?: string;
-    }>(
+    const thread = params.thread_id?.trim();
+    if (thread) qs.set('thread_id', thread);
+    const conversationId = params.conversation_id?.trim();
+    if (conversationId) qs.set('conversation_id', conversationId);
+    return this.client.get<BotGroupAccessGetResponse>(
       `/projects/${projectId}/bots/${encodeURIComponent(botId)}/group-access?${qs}`,
       undefined,
       botsSandboxGetOptions(options),
@@ -538,7 +571,15 @@ export class AgentBots {
     if (params?.limit != null) qs.set('limit', String(params.limit));
     if (params?.chat_key) qs.set('chat_key', params.chat_key);
     const q = qs.toString();
-    return this.client.get<{ items?: Array<Record<string, unknown>> }>(
+    return this.client.get<{
+      items?: Array<Record<string, unknown>>;
+      /** DNA last_change when ECS audit trail is empty (PLAN-1654). */
+      dna_last_change?: {
+        chat_key?: string;
+        last_change?: Record<string, unknown>;
+        source?: string;
+      };
+    }>(
       `/projects/${projectId}/bots/${encodeURIComponent(botId)}/group-access/audit${q ? `?${q}` : ''}`,
       undefined,
       botsSandboxGetOptions(options),

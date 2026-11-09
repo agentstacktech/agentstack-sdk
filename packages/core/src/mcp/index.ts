@@ -5,14 +5,26 @@
 
 export {
   resolveMcpUrl,
+  resolveHostedMcpUrl,
   resolveMcpAuthToken,
   resolvePublicOrigin,
 } from './urls';
 export {
   mcpExecute,
+  withSemanticAnchor,
+  runInverseWorkflowLoop,
   isMcpPartialSuccess,
   summarizeMcpBatchOutcome,
   readInverseEnvelope,
+  mergeExecuteEnvelopeIntoPacket,
+  normalizeWorkflowStatus,
+  extractBatchMeta,
+  goalVerificationFromEnvelope,
+  normalizeGoalVerificationWire,
+  batchEnvelopeHasWorkGraphBlock,
+  isWorkGraphBlockResultKind,
+  WORK_GRAPH_BLOCK_RESULT_KINDS,
+  type GoalVerificationWire,
   type McpStep,
   type McpExecuteOptions,
   type McpExecuteResult,
@@ -112,7 +124,10 @@ export {
   buildFlowReceipt,
   buildCertificationReceipt,
   runMcpCertificationRecipe,
+  runMcpPlaybookRecipe,
+  runMcpTenantBusinessAssistantRecipe,
   MCP_CERTIFICATION_RECIPE_ID,
+  MCP_TENANT_BUSINESS_ASSISTANT_RECIPE_ID,
   type DiscoveryStatusDomainSlice,
   type FlowReceipt,
   type McpAiPromptMode,
@@ -160,6 +175,8 @@ import {
   mcpListOrgans,
   refreshMcpCatalogWithDelta,
   runMcpCertificationRecipe,
+  runMcpPlaybookRecipe,
+  runMcpTenantBusinessAssistantRecipe,
   runMcpPreflight,
   type DiscoveryStatusPayload,
   type FetchMcpAiPromptOptions,
@@ -168,6 +185,7 @@ import {
   type McpListOrgansOptions,
   type RefreshMcpCatalogWithDeltaOptions,
   type RunMcpPreflightOptions,
+  type DiscoverySearchResult,
 } from './guidance';
 
 /** Facade attached as `sdk.mcp`. */
@@ -230,9 +248,11 @@ export class AgentMcp {
       observed: overrides?.observed,
       workflowRunId: overrides?.workflowRunId,
       density: overrides?.density,
+      locale: overrides?.locale,
       stopOnError: overrides?.stopOnError,
       timeoutMs: overrides?.timeoutMs,
       maxAttempts: overrides?.maxAttempts,
+      async: overrides?.async,
     });
   }
 
@@ -266,7 +286,7 @@ export class AgentMcp {
 
   /** Capability context — GET /mcp/discovery. */
   async getDiscovery(
-    overrides?: Partial<{ token: string; projectId: number }>,
+    overrides?: Partial<{ token: string; projectId: number; locale: string }>,
   ): Promise<unknown> {
     const token = overrides?.token ?? this.getToken() ?? resolveMcpAuthToken();
     if (!token) throw new Error('mcp.getDiscovery: missing token');
@@ -275,6 +295,7 @@ export class AgentMcp {
       apiBase: this.getApiBase(),
       token,
       ...(projectId != null ? { projectId: Number(projectId) } : {}),
+      locale: overrides?.locale,
     });
   }
 
@@ -291,6 +312,7 @@ export class AgentMcp {
       hot: overrides?.hot,
       sinceEtag: overrides?.sinceEtag,
       delta: overrides?.delta,
+      locale: overrides?.locale,
     });
   }
 
@@ -338,6 +360,7 @@ export class AgentMcp {
       token: string;
       projectId: number;
       idempotencyKey: string;
+      locale: string;
     }>,
   ): Promise<Awaited<ReturnType<typeof runMcpCertificationRecipe>>> {
     const token = overrides?.token ?? this.getToken() ?? resolveMcpAuthToken();
@@ -351,6 +374,69 @@ export class AgentMcp {
       token,
       projectId: Number(projectId),
       idempotencyKey: overrides?.idempotencyKey,
+      locale: overrides?.locale,
+    });
+  }
+
+  async runMcpPlaybookRecipe(
+    overrides?: Partial<{
+      apiBase: string;
+      token: string;
+      projectId: number;
+      recipeId: string;
+      idempotencyKey: string;
+      recipeParams: Record<string, unknown>;
+      locale: string;
+      async: boolean;
+      preflight: boolean;
+      timeoutMs: number;
+    }>,
+  ): Promise<Awaited<ReturnType<typeof runMcpPlaybookRecipe>>> {
+    const token = overrides?.token ?? this.getToken() ?? resolveMcpAuthToken();
+    if (!token) throw new Error('mcp.runMcpPlaybookRecipe: missing token');
+    const projectId = overrides?.projectId ?? this.getProjectId();
+    const recipeId = overrides?.recipeId?.trim();
+    if (projectId == null || !Number.isFinite(Number(projectId))) {
+      throw new Error('mcp.runMcpPlaybookRecipe: missing projectId');
+    }
+    if (!recipeId) throw new Error('mcp.runMcpPlaybookRecipe: missing recipeId');
+    return runMcpPlaybookRecipe({
+      apiBase: overrides?.apiBase ?? this.getApiBase(),
+      token,
+      projectId: Number(projectId),
+      recipeId,
+      idempotencyKey: overrides?.idempotencyKey,
+      recipeParams: overrides?.recipeParams,
+      locale: overrides?.locale,
+      async: overrides?.async,
+      preflight: overrides?.preflight,
+      timeoutMs: overrides?.timeoutMs,
+    });
+  }
+
+  async runMcpTenantBusinessAssistantRecipe(
+    overrides?: Partial<{
+      apiBase: string;
+      token: string;
+      projectId: number;
+      idempotencyKey: string;
+      recipeParams: Record<string, unknown>;
+      locale: string;
+    }>,
+  ): Promise<Awaited<ReturnType<typeof runMcpTenantBusinessAssistantRecipe>>> {
+    const token = overrides?.token ?? this.getToken() ?? resolveMcpAuthToken();
+    if (!token) throw new Error('mcp.runMcpTenantBusinessAssistantRecipe: missing token');
+    const projectId = overrides?.projectId ?? this.getProjectId();
+    if (projectId == null || !Number.isFinite(Number(projectId))) {
+      throw new Error('mcp.runMcpTenantBusinessAssistantRecipe: missing projectId');
+    }
+    return runMcpTenantBusinessAssistantRecipe({
+      apiBase: overrides?.apiBase ?? this.getApiBase(),
+      token,
+      projectId: Number(projectId),
+      idempotencyKey: overrides?.idempotencyKey,
+      recipeParams: overrides?.recipeParams,
+      locale: overrides?.locale,
     });
   }
 
@@ -403,6 +489,7 @@ export class AgentMcp {
       token,
       projectId: Number(projectId),
       requiredCaps: overrides?.requiredCaps,
+      locale: overrides?.locale,
     });
   }
 }

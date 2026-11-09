@@ -31,7 +31,8 @@ export type AuthErrorCode =
   | 'cache_epoch_stale'
   | 'stale_jti_discarded'
   | 'project_session_required'
-  | 'resource_unauthorized';
+  | 'resource_unauthorized'
+  | 'stale_project_scope';
 
 export class UnauthorizedError extends Error {
   public readonly status: number;
@@ -59,9 +60,25 @@ export class UnauthorizedError extends Error {
 }
 
 export class ForbiddenError extends Error {
-  constructor(message: string) {
+  public readonly status = 403;
+  public readonly apiCode?: string;
+  public readonly response?: {
+    status: number;
+    data?: unknown;
+    statusText?: string;
+  };
+
+  constructor(
+    message: string,
+    options?: {
+      apiCode?: string;
+      response?: { status: number; data?: unknown; statusText?: string };
+    },
+  ) {
     super(message);
     this.name = 'ForbiddenError';
+    this.apiCode = options?.apiCode;
+    this.response = options?.response;
   }
 }
 

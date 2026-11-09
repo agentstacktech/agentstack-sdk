@@ -8,6 +8,8 @@ export type StorageRefV1 = {
   is_temp: boolean;
   folder_key?: string | null;
   file_id: string;
+  label?: string | null;
+  expected_sha256?: string | null;
 };
 
 export type ChatAttachmentKind = 'photo' | 'file' | 'audio' | 'video' | 'video_note';

@@ -15,6 +15,8 @@ export type GoalRouteResult = {
   router_revision?: string;
   block_multi_agent?: boolean;
   complexity_score?: number;
+  /** From discovery.search / by_intent when compile_semantic_contract ran upstream. */
+  semantic_contract?: Record<string, unknown>;
 };
 
 export type ResolveGoalRouteOptions = McpDiscoverOptions & {
@@ -29,9 +31,13 @@ export async function resolveGoalRoute(
   const q = intentText.trim();
   if (!q) return null;
   const res = await mcpDiscoverByIntent(q, opts);
-  const data = (res as { data?: { routed_goal?: GoalRouteResult } }).data;
-  const routed = data?.routed_goal;
+  const data = res.data;
+  const routed = data?.routed_goal as GoalRouteResult | undefined;
   if (!routed || typeof routed !== 'object') return null;
+  const sem = data.semantic_contract;
+  if (sem && typeof sem === 'object' && !routed.semantic_contract) {
+    return { ...routed, semantic_contract: sem };
+  }
   return routed;
 }
 

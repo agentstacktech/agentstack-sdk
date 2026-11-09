@@ -454,7 +454,36 @@ export const PROCESSOR_FALLBACK_SCHEMAS: Record<string, Record<string, SchemaPro
       default: 5000000,
       description: 'Total number of users'
     }
-  }
+  },
+  script_processor: {
+    script_id: {
+      type: 'string',
+      description: 'StackScript id (ecosystem.scripts index key)',
+    },
+    export: {
+      type: 'string',
+      description: 'Export name from script.put receipt',
+    },
+    version: {
+      type: 'string',
+      default: 'live',
+      enum: ['live', 'latest', 'staging'],
+      description: 'Published alias or draft version',
+    },
+    input: {
+      type: 'object',
+      description: 'Export input object (optional __dna_prefetch for dna.read)',
+    },
+    result_field: {
+      type: 'string',
+      description: 'Optional field on command_data to store script result',
+    },
+    on_error: {
+      type: 'string',
+      default: 'abort',
+      enum: ['abort', 'continue', 'compensate'],
+    },
+  },
 }
 
 /**

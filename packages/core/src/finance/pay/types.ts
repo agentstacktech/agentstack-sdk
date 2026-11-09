@@ -15,7 +15,8 @@ export type PayIntentKind =
   | 'commerce_checkout'
   | 'project_fund'
   | 'project_contribute'
-  | 'invoice_pay';
+  | 'invoice_pay'
+  | 'stackscript_fuel_pack';
 
 export interface PaymentSourceRef {
   kind: PaymentSourceKind;

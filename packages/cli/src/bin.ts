@@ -11,6 +11,7 @@ import { findCommand, helpText } from './commands/registry.js';
 function parseGlobals(argv: string[]): { flags: GlobalFlags; rest: string[] } {
   const flags: GlobalFlags = {};
   const rest: string[] = [];
+  let seenCommand = false;
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === '--json') flags.json = true;
@@ -18,8 +19,10 @@ function parseGlobals(argv: string[]): { flags: GlobalFlags; rest: string[] } {
     else if (a === '--trace') flags.trace = true;
     else if (a === '--project' && argv[i + 1]) {
       flags.project = Number(argv[++i]);
+      if (seenCommand) rest.push('--project', String(flags.project));
     } else if (a.startsWith('--project=')) {
       flags.project = Number(a.slice('--project='.length));
+      if (seenCommand) rest.push(a);
     } else if (a === '--profile' && argv[i + 1]) {
       flags.profile = argv[++i];
     } else if (a.startsWith('--profile=')) {
@@ -29,6 +32,7 @@ function parseGlobals(argv: string[]): { flags: GlobalFlags; rest: string[] } {
     } else if (a.startsWith('--api-base=')) {
       flags.apiBase = a.slice('--api-base='.length);
     } else {
+      if (!a.startsWith('-')) seenCommand = true;
       rest.push(a);
     }
   }

@@ -12,6 +12,7 @@ Universal hosted commerce runtime for **any** tenant `/s/{pid}/` surface (showca
 | `listings.ts` | `loadHostedListings` + `mapHostedListingRow` (uses `offerRow` SoT) |
 | `checkoutIntent.ts` | `createHostedCheckoutIntent` → `/api/commerce/intents` (`navigate?: boolean`) |
 | `sessionProbe.ts` | `probeHostedSession` → `GET /api/auth/me` with vault headers |
+| `hostedAppSession.ts` | `mintHostedAppSession` → `POST /api/hosted-apps/{pid}/session` after REST login |
 
 **Import:** `@agentstack/sdk/commerce/hosted`
 

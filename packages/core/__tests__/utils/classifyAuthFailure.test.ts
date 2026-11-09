@@ -57,6 +57,16 @@ describe('classifyAuthFailure', () => {
     });
   });
 
+  it('classifies forbidden login gates', () => {
+    expect(
+      classifyAuthFailure({
+        status: 403,
+        name: 'ForbiddenError',
+        apiCode: 'email_unconfirmed',
+      }),
+    ).toEqual({ kind: 'forbidden', code: 'email_unconfirmed' });
+  });
+
   it('isTypedDna503Code guards admission codes', () => {
     expect(isTypedDna503Code('dna_overloaded')).toBe(true);
     expect(isTypedDna503Code('batch_sub_timeout')).toBe(false);
@@ -94,6 +104,11 @@ describe('classifyAuthFailure', () => {
       code: 'session_not_found',
       sessionMissReason: 'absent',
     });
+    expect(isTransientSessionBootstrapError(err)).toBe(true);
+  });
+
+  it('isTransientSessionBootstrapError covers authz_generation_stale', () => {
+    const err = new UnauthorizedError('stale', { code: 'authz_generation_stale' });
     expect(isTransientSessionBootstrapError(err)).toBe(true);
   });
 

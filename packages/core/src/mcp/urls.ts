@@ -10,6 +10,16 @@ export function resolveMcpUrl(apiBase: string): string {
   return `${origin}/mcp`;
 }
 
+/** Hosted game plane — cookie session at /s/{projectId}/mcp (G6b). */
+export function resolveHostedMcpUrl(
+  projectId: number,
+  apiBase?: string,
+): string {
+  const trimmed = String(apiBase || 'https://agentstack.tech/api').replace(/\/$/, '');
+  const origin = trimmed.endsWith('/api') ? trimmed.slice(0, -4) : trimmed;
+  return `${origin}/s/${projectId}/mcp`;
+}
+
 /** Bearer / API key for MCP from standard env vars. */
 export function resolveMcpAuthToken(
   env: NodeJS.ProcessEnv | Record<string, string | undefined> = typeof process !== 'undefined'

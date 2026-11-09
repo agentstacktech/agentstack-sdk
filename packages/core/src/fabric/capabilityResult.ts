@@ -577,7 +577,8 @@ export function parseMcpRecoveryError(
     auth_required:
       'Authenticate first, then run agentstack_session_setup to bind context.project_id.',
     validation_error: 'Fix params using GET /mcp/actions input schema.',
-    action_not_found: 'Use discovery.list or discovery.search for exact action names.',
+    action_not_found:
+      'Use discovery.list to copy exact action ids, then discovery.describe(params.action). Avoid discovery.search inside goal-anchored batches (batch_semantic_anchor_conflict).',
     permission_denied: 'Widen RBAC or use rbac.check_permission before retry.',
     not_ready: 'Resource not yet visible — poll list/status with retry_after_ms.',
     mcp_sync_heavy_limit:

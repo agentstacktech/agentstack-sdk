@@ -118,6 +118,15 @@ export class AgentBuffs {
   /**
    * Получить список активных баффов
    */
+  /** Docs alias for `getActiveBuffs`. */
+  async listActiveBuffs(params: {
+    entityId: number
+    entityKind: 'user' | 'project'
+    category?: string
+  }): Promise<ActiveBuffsResponse> {
+    return this.getActiveBuffs(params)
+  }
+
   async getActiveBuffs(params: {
     entityId: number
     entityKind: 'user' | 'project'
@@ -351,9 +360,34 @@ export class AgentBuffs {
   async calculateEffectiveLimits(params: {
     entityId: number
     entityKind: 'user' | 'project'
+    projectId?: number
+  }): Promise<EffectiveLimitsResponse> {
+    const query: Record<string, number> = {}
+    if (params.projectId != null) {
+      query.project_id = params.projectId
+    }
+    const response = await this.httpClient.get<EffectiveLimitsResponse>(
+      `/buffs/${params.entityKind}/${params.entityId}/effective-limits`,
+      Object.keys(query).length ? query : undefined
+    )
+    return response.data
+  }
+
+  /** Alias for docs / commerce skills (`getEffectiveLimits`). */
+  async getEffectiveLimits(params: {
+    entityId: number
+    entityKind: 'user' | 'project'
+    projectId?: number
+  }): Promise<EffectiveLimitsResponse> {
+    return this.calculateEffectiveLimits(params)
+  }
+
+  /** Project-plane merged limits (business tier buffs on the project entity). */
+  async getProjectEffectiveLimits(params: {
+    projectId: number
   }): Promise<EffectiveLimitsResponse> {
     const response = await this.httpClient.get<EffectiveLimitsResponse>(
-      `/buffs/${params.entityKind}/${params.entityId}/effective-limits`
+      `/buffs/project/${params.projectId}/effective-limits`
     )
     return response.data
   }

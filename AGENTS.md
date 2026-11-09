@@ -4,6 +4,8 @@
 **RU:** [AGENTS_ru.md](AGENTS_ru.md) · **Doc hub:** [docs/DOC_HUB.md](docs/DOC_HUB.md) · **Glossary:** [docs/GLOSSARY.md](docs/GLOSSARY.md)  
 **North star:** fast, low-error construction of apps and sites on AgentStack via typed SDK + self-description.
 
+**Generation list (PLAN-1654):** MCP `generation.list` returns `list_contract: historical_all` — enumerate sandboxes without requiring `env_uuid` in batch context; check `environments[]` and `sandbox_gate`, not only `active_env_uuid`.
+
 ---
 
 ## 60-second bootstrap

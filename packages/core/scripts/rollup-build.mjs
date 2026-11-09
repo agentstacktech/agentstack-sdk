@@ -84,6 +84,18 @@ function trySkipFullBuildViaInputHash() {
   return true;
 }
 
+function runTypecheckPreflight() {
+  if (process.env.ROLLUP_SKIP_TYPECHECK === '1') return true;
+  const tscBin = require.resolve('typescript/bin/tsc');
+  const tsconfig = path.join(packageRoot, 'tsconfig.json');
+  const res = spawnSync(process.execPath, [tscBin, '--noEmit', '-p', tsconfig], {
+    cwd: packageRoot,
+    stdio: 'inherit',
+    env: childEnv,
+  });
+  return res.status === 0;
+}
+
 async function configCount() {
   const configUrl = pathToFileURL(path.join(packageRoot, 'rollup.config.js')).href;
   const { default: configs } = await import(configUrl);
@@ -117,6 +129,10 @@ if (legacyMonolith) {
 
 if (trySkipFullBuildViaInputHash()) {
   process.exit(0);
+}
+
+if (!runTypecheckPreflight()) {
+  process.exit(1);
 }
 
 const total = await configCount();

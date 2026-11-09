@@ -238,14 +238,24 @@ export class AgentHosting {
     }>(`/hosting/buckets/${bucketId}/preview-publish`, { project_id: projectId });
   }
 
+  /**
+   * Overlay upload by default on the server (`replace_site=false`).
+   * MCP `hosting.deploy_files` needs `confirm_site_replace=true` when replacing the live tree.
+   */
   putFilesBatch(
     projectId: number,
     bucketId: string,
     files: { path: string; content?: string; content_base64?: string }[],
+    options?: { replace_site?: boolean; confirm_site_replace?: boolean },
   ) {
     return this.client.post<{ paths: string[]; bytes: number; files_written: number }>(
       `/hosting/buckets/${bucketId}/files/batch`,
-      { project_id: projectId, files },
+      {
+        project_id: projectId,
+        files,
+        replace_site: options?.replace_site ?? false,
+        confirm_site_replace: options?.confirm_site_replace ?? false,
+      },
     );
   }
 
@@ -571,5 +581,33 @@ export class AgentHosting {
       duration: result.elapsedMs,
       timestamp: Date.now(),
     };
+  }
+
+  buildSite(
+    projectId: number,
+    body: {
+      bucket_id?: string;
+      bucket_name?: string;
+      profile?: string;
+      async?: boolean;
+      publish?: boolean;
+      target?: 'dev' | 'prod';
+      force?: boolean;
+    },
+  ) {
+    return this.client.post<{ ok: boolean; job_id?: string; status?: string; result?: Record<string, unknown> }>(
+      '/mcp/execute',
+      {
+        action: 'hosting.site.build',
+        params: { project_id: projectId, ...body },
+      },
+    );
+  }
+
+  getBuildStatus(jobId: string) {
+    return this.client.post<{ ok: boolean; job?: Record<string, unknown> }>('/mcp/execute', {
+      action: 'hosting.site.build_status',
+      params: { job_id: jobId },
+    });
   }
 }

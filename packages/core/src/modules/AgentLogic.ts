@@ -93,6 +93,12 @@ export interface UpdateLogicRequest {
   priority?: number;
   /** PathAtom patches (`space{uid}.*`) — server `logic_path_atom_updates`. */
   path_updates?: Record<string, unknown>;
+  write_mode?: string;
+  allow_shrink?: boolean;
+  replacements?: Array<{ find: string; replace: string }>;
+  unified_diff?: string;
+  strict_diff?: boolean;
+  text_field?: 'description' | 'name';
 }
 
 export interface ExecuteLogicRequest {

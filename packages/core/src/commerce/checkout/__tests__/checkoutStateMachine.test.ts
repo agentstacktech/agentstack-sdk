@@ -24,9 +24,9 @@ describe('checkoutStateMachine', () => {
     expect(state).toBe('completed');
   });
 
-  it('external_pay_complete from awaiting_payment', () => {
+  it('external_pay_complete from awaiting_payment waits for wallet credit', () => {
     expect(nextCheckoutUiState('awaiting_payment', 'external_pay_complete')).toBe(
-      'completed',
+      'confirming',
     );
   });
 

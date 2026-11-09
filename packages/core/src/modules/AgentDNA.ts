@@ -109,8 +109,16 @@ export class AgentDNA {
    * @example
    * const user = await sdk.dna.get('data_projects_user', 'uuid-here');
    */
-  async get<T = any>(table: string, uuid: string): Promise<DNAEntity<T>> {
-    const url = `/dna/${table}/${uuid}`;
+  async get<T = any>(
+    table: string,
+    uuid: string,
+    params?: { detail?: string; decrypt_protected?: boolean }
+  ): Promise<DNAEntity<T>> {
+    const query = new URLSearchParams();
+    if (params?.detail) query.set("detail", params.detail);
+    if (params?.decrypt_protected) query.set("decrypt_protected", "true");
+    const qs = query.toString();
+    const url = `/dna/${table}/${uuid}${qs ? `?${qs}` : ""}`;
     
     try {
       diagnosticLogger.log('AgentDNA', 'get', 'info', { table, uuid, url });
@@ -255,13 +263,18 @@ export class AgentDNA {
     projectId: number,
     path: string,
     value?: unknown,
-    options?: { writeMode?: 'replace' | 'merge' | 'delete' | 'set' | 'put' | 'patch' }
-  ): Promise<{
-    success: boolean;
-    project_id: number;
-    path: string;
-    write?: { mode: string };
-  }> {
+    options?: {
+      writeMode?: import('../types/entities/Project').PatchProjectDataBody['write_mode'];
+      allow_shrink?: boolean;
+      replacements?: Array<{ find: string; replace: string; count?: number }>;
+      unified_diff?: string;
+      strict_diff?: boolean;
+      ops?: import('../types/entities/Project').DirectedEditOp[];
+      dry_run?: boolean;
+      expected_sha256?: string;
+      missing?: 'error' | 'skip';
+    }
+  ): Promise<import('../types/entities/Project').PatchProjectDataResponse> {
     if (typeof projectId === 'string') {
       throw new Error(
         'AgentDNA.patch no longer calls PATCH /dna/{table}/{uuid} (that route does not exist). ' +
@@ -270,18 +283,21 @@ export class AgentDNA {
       );
     }
     const writeMode =
-      options?.writeMode || (value === undefined ? 'delete' : 'replace');
+      options?.writeMode || (value === undefined && !options?.ops?.length ? 'delete' : 'replace');
     const response = await this.client.patch(`/projects/${projectId}/data`, {
       path,
       value: writeMode === 'delete' ? null : value,
       write_mode: writeMode,
+      ...(options?.ops?.length ? { ops: options.ops } : {}),
+      ...(options?.dry_run ? { dry_run: true } : {}),
+      ...(options?.expected_sha256 ? { expected_sha256: options.expected_sha256 } : {}),
+      ...(options?.missing ? { missing: options.missing } : {}),
+      ...(options?.allow_shrink ? { allow_shrink: true } : {}),
+      ...(options?.replacements?.length ? { replacements: options.replacements } : {}),
+      ...(options?.unified_diff ? { unified_diff: options.unified_diff } : {}),
+      ...(options?.strict_diff !== undefined ? { strict_diff: options.strict_diff } : {}),
     });
-    return response.data as {
-      success: boolean;
-      project_id: number;
-      path: string;
-      write?: { mode: string };
-    };
+    return response.data as import('../types/entities/Project').PatchProjectDataResponse;
   }
 
   /**

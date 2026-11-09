@@ -58,6 +58,15 @@ class AgentHTTPClient:
         if self.session and not self.session.closed:
             await self.session.close()
     
+    @staticmethod
+    def _resolve_body(
+        data: Optional[Dict[str, Any]] = None,
+        json: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        if data is not None:
+            return data
+        return json
+
     async def _make_request(
         self,
         method: str,
@@ -147,28 +156,34 @@ class AgentHTTPClient:
         self, 
         url: str, 
         data: Optional[Dict[str, Any]] = None,
+        json: Optional[Dict[str, Any]] = None,
         params: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """POST запрос"""
-        return await self._make_request('POST', url, data=data, params=params)
+        body = self._resolve_body(data, json)
+        return await self._make_request('POST', url, data=body, params=params)
     
     async def put(
         self, 
         url: str, 
         data: Optional[Dict[str, Any]] = None,
+        json: Optional[Dict[str, Any]] = None,
         params: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """PUT запрос"""
-        return await self._make_request('PUT', url, data=data, params=params)
+        body = self._resolve_body(data, json)
+        return await self._make_request('PUT', url, data=body, params=params)
     
     async def delete(
         self, 
         url: str, 
         data: Optional[Dict[str, Any]] = None,
+        json: Optional[Dict[str, Any]] = None,
         params: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """DELETE запрос"""
-        return await self._make_request('DELETE', url, data=data, params=params)
+        body = self._resolve_body(data, json)
+        return await self._make_request('DELETE', url, data=body, params=params)
     
     async def get_metrics(self) -> Dict[str, Any]:
         """Получение метрик"""

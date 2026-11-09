@@ -53,7 +53,11 @@ export const PlaybookIdSchema = z.enum([
   'list-project-for-sale',
   'llm-energy-setup',
   'explore-live-proofs',
+  'showcase-vps-publish',
+  'hosting-workspace-edit',
   'explore-mcp-catalog',
+  'setup-reachability',
+  'setup-business-assistant',
 ]);
 
 export type PlaybookId = z.infer<typeof PlaybookIdSchema>;
@@ -254,6 +258,9 @@ export type PathStepPlan = {
   kind: PathStepKind;
   phase: 'discover' | 'execute' | 'verify' | 'outcome';
   title: string;
+  /** i18n key for outcome message or step title (locale resolved in UI) */
+  messageKey?: string;
+  titleKey?: string;
   subtitle?: string;
   status: StepStatus;
   help: import('./pathStepHelp').PathStepHelpBlock[];

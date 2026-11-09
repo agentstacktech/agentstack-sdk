@@ -11,6 +11,7 @@ export type {
   NotificationPrefsSnapshot,
   NotificationPrefsWrite,
   NotificationSourceHealth,
+  NotificationSourcesHealthBatch,
   NotificationSourceRow,
   NotifyCategoryId,
   NotifyCategoryPref,
@@ -18,6 +19,8 @@ export type {
   FlushNotifyDigestResult,
   PlatformTelegramHint,
   SourceKind,
+  ChannelRouteRow,
+  ChannelRoutesListResponse,
 } from './notificationPrefs';
 
 export {
@@ -30,14 +33,24 @@ export {
   getDeliveryStatusByCorrelationKey,
   getNotifyDigestDepth,
   getNotificationSourceHealth,
+  listNotificationSourcesHealth,
   getNotificationPrefsSnapshot,
   listFailedDeliveries,
   putNotificationPrefs,
+  patchNotificationPrefsCategory,
+  getChannelRoutes,
+  resolveNotificationRouting,
+  putChannelRoute,
+  removeChannelRoute,
   putNotificationSource,
 } from './notificationPrefs';
 
 export type { DeliverNotificationParams, DeliverNotificationResult } from './deliver';
-export { deliverNotification } from './deliver';
+export {
+  deliverNotification,
+  extractNotifyApiDetail,
+  formatNotifyApiError,
+} from './deliver';
 
 import type { HTTPClient } from '../client/http-client';
 import type { APIResponse } from '../types';
@@ -85,7 +98,16 @@ export async function putMessagingConfig(
 
 export async function testConnection(
   http: HTTPClient,
-): Promise<{ success: boolean; ok?: boolean; domain_count?: number; verified_count?: number }> {
+): Promise<{
+  success: boolean;
+  ok?: boolean;
+  domain_count?: number;
+  verified_count?: number;
+  warnings?: string[];
+  from_address?: string;
+  provider?: string;
+  error?: string;
+}> {
   return unwrap(http.post('/api/admin/messaging/test-connection', {}));
 }
 
@@ -118,17 +140,27 @@ export async function getDeliveryLogs(
   http: HTTPClient,
   limit = 50,
 ): Promise<{ success: boolean; items: unknown[] }> {
+  const lim = Math.min(100, Math.max(1, Math.floor(limit || 50)));
   return unwrap(
-    http.get(`/api/admin/messaging/deliveries?limit=${limit}`, {}, { skipCache: true }),
+    http.get(`/api/admin/messaging/deliveries?limit=${lim}`, {}, { skipCache: true }),
   );
+}
+
+export async function removeSuppression(
+  http: HTTPClient,
+  email: string,
+): Promise<{ success: boolean }> {
+  const addr = encodeURIComponent(String(email || '').trim());
+  return unwrap(http.delete(`/api/admin/messaging/suppressions/${addr}`, { skipCache: true }));
 }
 
 export async function listSuppressions(
   http: HTTPClient,
   limit = 50,
 ): Promise<{ success: boolean; items: string[]; total?: number }> {
+  const lim = Math.min(200, Math.max(1, Math.floor(limit || 50)));
   return unwrap(
-    http.get(`/api/admin/messaging/suppressions?limit=${limit}`, {}, { skipCache: true }),
+    http.get(`/api/admin/messaging/suppressions?limit=${lim}`, {}, { skipCache: true }),
   );
 }
 
@@ -180,6 +212,15 @@ export async function sendAdminEmail(
   }
 }
 
+export type MailThreadMessage = {
+  message_id?: string;
+  direction?: string;
+  from?: string;
+  text?: string;
+  rfc_id?: string;
+  at?: string;
+};
+
 export type MailThreadCard = {
   id?: string;
   subject?: string;
@@ -187,51 +228,109 @@ export type MailThreadCard = {
   snippet?: string;
   received_at?: string;
   read?: boolean;
-  messages?: Array<{ text?: string; from?: string }>;
+  source?: string;
+  connection_id?: string;
+  messages?: MailThreadMessage[];
 };
 
-export async function getMailInbox(http: HTTPClient): Promise<{ success: boolean; threads: MailThreadCard[] }> {
-  return unwrap(http.get('/api/mail/inbox'));
+export type MailboxSettingsPatch = {
+  forward_to_canonical?: boolean;
+  notify_in_app?: boolean;
+  notify_push?: boolean;
+  notify_bots?: boolean;
+};
+
+const mailReadOpts = { skipCache: true as const };
+
+export async function getMailInbox(
+  http: HTTPClient,
+  options?: { limit?: number },
+): Promise<{ success: boolean; threads: MailThreadCard[] }> {
+  const limit = options?.limit;
+  const path =
+    limit != null && limit > 0
+      ? `/api/mail/inbox?limit=${Math.min(20, Math.max(1, Math.floor(limit)))}`
+      : '/api/mail/inbox';
+  return unwrap(http.get(path, {}, mailReadOpts));
 }
 
 export async function getMailThread(
   http: HTTPClient,
   threadId: string,
 ): Promise<{ success: boolean; thread: MailThreadCard }> {
-  return unwrap(http.get(`/api/mail/inbox/${encodeURIComponent(threadId)}`));
+  return unwrap(http.get(`/api/mail/inbox/${encodeURIComponent(threadId)}`, {}, mailReadOpts));
 }
 
 export async function getMailboxSettings(http: HTTPClient): Promise<{
   success: boolean;
   primary_address?: string;
   aliases?: string[];
-  settings?: { forward_to_canonical?: boolean; notify_in_app?: boolean; notify_push?: boolean };
+  settings?: MailboxSettingsPatch & Record<string, unknown>;
 }> {
-  return unwrap(http.get('/api/mail/mailbox/settings'));
+  return unwrap(http.get('/api/mail/mailbox/settings', {}, mailReadOpts));
 }
 
 export async function claimMailbox(
   http: HTTPClient,
   local: string,
 ): Promise<{ success: boolean; primary_address?: string }> {
-  return unwrap(http.post('/api/mail/mailbox/claim', { local }));
+  try {
+    return await unwrap(http.post('/api/mail/mailbox/claim', { local }));
+  } catch (err) {
+    throw new Error(deliveryErrorMessage(err, 'Could not claim that address'));
+  }
+}
+
+export async function getProjectMailbox(
+  http: HTTPClient,
+  projectId: number,
+): Promise<{ success: boolean; address?: string; recipient_user_ids?: number[] }> {
+  return unwrap(
+    http.get(`/api/projects/${projectId}/mail/mailbox`, {}, mailReadOpts),
+  );
+}
+
+export async function claimProjectMailbox(
+  http: HTTPClient,
+  projectId: number,
+  body: { local: string; recipient_user_ids?: number[]; allow_reserved?: boolean },
+): Promise<{ success: boolean; address?: string; recipient_user_ids?: number[] }> {
+  try {
+    return await unwrap(http.post(`/api/projects/${projectId}/mail/mailbox`, body));
+  } catch (err) {
+    throw new Error(deliveryErrorMessage(err, 'Could not claim project address'));
+  }
 }
 
 export async function putMailboxSettings(
   http: HTTPClient,
-  settings: { forward_to_canonical?: boolean; notify_in_app?: boolean; notify_push?: boolean },
-): Promise<{ success: boolean }> {
-  return unwrap(http.put('/api/mail/mailbox/settings', settings));
+  settings: MailboxSettingsPatch,
+): Promise<{ success: boolean; settings?: MailboxSettingsPatch & Record<string, unknown> }> {
+  try {
+    return await unwrap(http.put('/api/mail/mailbox/settings', settings));
+  } catch (err) {
+    throw new Error(deliveryErrorMessage(err, 'Could not save mailbox settings'));
+  }
 }
 
 export async function replyMailbox(
   http: HTTPClient,
   text: string,
   idempotencyKey?: string,
+  threadId?: string,
 ): Promise<{ success: boolean }> {
-  return unwrap(
-    http.post('/api/mail/reply', { text }, idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : undefined),
-  );
+  try {
+    const tid = String(threadId || '').trim();
+    return await unwrap(
+      http.post(
+        '/api/mail/reply',
+        { text, ...(tid ? { thread_id: tid } : {}) },
+        idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : undefined,
+      ),
+    );
+  } catch (err) {
+    throw new Error(deliveryErrorMessage(err, 'Could not send reply'));
+  }
 }
 
 export async function sendMailboxLetter(
@@ -239,13 +338,33 @@ export async function sendMailboxLetter(
   body: { to: string; subject?: string; text: string },
   idempotencyKey?: string,
 ): Promise<{ success: boolean }> {
-  return unwrap(
-    http.post('/api/mail/send', body, idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : undefined),
-  );
+  try {
+    return await unwrap(
+      http.post(
+        '/api/mail/send',
+        body,
+        idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : undefined,
+      ),
+    );
+  } catch (err) {
+    throw new Error(deliveryErrorMessage(err, 'Could not send mail'));
+  }
 }
 
 export async function markMailRead(http: HTTPClient, threadId: string): Promise<{ success: boolean }> {
-  return unwrap(http.patch(`/api/mail/inbox/${encodeURIComponent(threadId)}`, { read: true }));
+  try {
+    return await unwrap(http.patch(`/api/mail/inbox/${encodeURIComponent(threadId)}`, { read: true }));
+  } catch (err) {
+    throw new Error(deliveryErrorMessage(err, 'Could not mark thread read'));
+  }
+}
+
+export async function patchMailThread(
+  http: HTTPClient,
+  threadId: string,
+  patch: { read: boolean },
+): Promise<{ success: boolean }> {
+  return unwrap(http.patch(`/api/mail/inbox/${encodeURIComponent(threadId)}`, patch));
 }
 
 export async function ensureAuthTemplates(

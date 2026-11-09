@@ -31,6 +31,11 @@ export interface PaymentData {
   country?: string;
   use_project_keys?: boolean;
   idempotency_key?: string;
+  checkout_session_id?: string;
+  seller_user_id?: number;
+  buyer_user_id?: number;
+  buyer_project_id?: number;
+  funding_lane?: 'personal' | 'treasury';
 }
 
 export interface Payment {
@@ -52,6 +57,45 @@ export interface Payment {
   /** Redirect checkout URL (e.g. Tochka) when Elements are not used */
   payment_url?: string;
   external_id?: string;
+  /** ok after the ledger credits L0 (project 1) or L2 treasury. */
+  wallet_credit?: string;
+  /** personal or treasury. A provider return alone is not this field. */
+  settlement_lane?: string;
+  /** Resolved PSP after capability matrix (stripe | tochka | sbp). */
+  psp_selected?: string;
+  /** When card was requested but redirect PSP was used. */
+  psp_fallback_reason?: string;
+  /** Hosted IAP resume URL when intent is energy_pack / currency_pack. */
+  checkout_url?: string;
+}
+
+function mapPaymentFromApi(
+  p: Record<string, unknown>,
+  paymentIdFallback?: string,
+): Payment {
+  return {
+    id: String(p.payment_id ?? p.id ?? paymentIdFallback ?? ''),
+    amount: Number(p.amount ?? 0),
+    currency: String(p.currency ?? 'USD'),
+    description: String(p.description ?? ''),
+    status: (p.status as Payment['status']) ?? 'pending',
+    merchant_id: Number(p.merchant_id ?? 0),
+    created_at: String(p.created_at ?? new Date().toISOString()),
+    updated_at: String(p.updated_at ?? p.created_at ?? ''),
+    ...(p.metadata && typeof p.metadata === 'object'
+      ? { metadata: p.metadata as Record<string, unknown> }
+      : {}),
+    ...(p.client_secret ? { client_secret: String(p.client_secret) } : {}),
+    ...(p.payment_url ? { payment_url: String(p.payment_url) } : {}),
+    ...(p.checkout_url ? { checkout_url: String(p.checkout_url) } : {}),
+    ...(p.external_id ? { external_id: String(p.external_id) } : {}),
+    ...(p.wallet_credit ? { wallet_credit: String(p.wallet_credit) } : {}),
+    ...(p.settlement_lane ? { settlement_lane: String(p.settlement_lane) } : {}),
+    ...(p.psp_selected ? { psp_selected: String(p.psp_selected) } : {}),
+    ...(p.psp_fallback_reason
+      ? { psp_fallback_reason: String(p.psp_fallback_reason) }
+      : {}),
+  };
 }
 
 export interface PaymentMethod {
@@ -114,25 +158,11 @@ export class AgentPayments {
         'Idempotency-Key': idempotencyKey,
       },
     });
-    const data = response.data;
-    if (data?.payment) {
-      const p = data.payment;
-      return {
-        id: p.payment_id ?? p.id,
-        amount: p.amount,
-        currency: p.currency ?? 'USD',
-        description: p.description ?? '',
-        status: p.status ?? 'pending',
-        merchant_id: 0,
-        created_at: p.created_at ?? new Date().toISOString(),
-        updated_at: p.updated_at ?? '',
-        ...(p.metadata && { metadata: p.metadata }),
-        ...(p.client_secret && { client_secret: p.client_secret }),
-        ...(p.payment_url && { payment_url: p.payment_url }),
-        ...(p.external_id && { external_id: p.external_id })
-      };
+    const data = response.data as { payment?: Record<string, unknown> } | Payment;
+    if (data && typeof data === 'object' && 'payment' in data && data.payment) {
+      return mapPaymentFromApi(data.payment);
     }
-    return data;
+    return data as Payment;
   }
 
   /**
@@ -151,21 +181,15 @@ export class AgentPayments {
     transactions: Transaction[];
   }> {
     const response = await this.client.get(`/payments/${paymentId}`);
-    const data = response.data;
+    const data = response.data as {
+      payment?: Record<string, unknown>;
+      transactions?: Transaction[];
+    };
     if (data?.payment) {
-      const p = data.payment;
-      const payment: Payment = {
-        id: p.payment_id ?? paymentId,
-        amount: p.amount ?? 0,
-        currency: p.currency ?? 'USD',
-        description: p.description ?? '',
-        status: p.status ?? 'pending',
-        merchant_id: 0,
-        created_at: p.created_at ?? '',
-        updated_at: p.updated_at ?? '',
-        ...(p.metadata && { metadata: p.metadata })
+      return {
+        payment: mapPaymentFromApi(data.payment, paymentId),
+        transactions: data.transactions ?? [],
       };
-      return { payment, transactions: [] };
     }
     return { payment: data as Payment, transactions: [] };
   }

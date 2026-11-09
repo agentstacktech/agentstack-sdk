@@ -35,6 +35,19 @@ export function parseJsonFlag(args: string[], name: string): Record<string, unkn
   return JSON.parse(raw) as Record<string, unknown>;
 }
 
+export function requireArg(args: string[], name: string): string {
+  const value = parseFlagValue(args, name);
+  if (!value) throw new Error(`missing --${name}`);
+  return value;
+}
+
+export function parseBoolFlag(args: string[], name: string): boolean | undefined {
+  const raw = parseFlagValue(args, name);
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  return undefined;
+}
+
 export function positional(args: string[]): string[] {
   return args.filter((a) => !a.startsWith('-'));
 }

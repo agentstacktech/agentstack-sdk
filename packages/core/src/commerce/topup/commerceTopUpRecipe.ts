@@ -54,12 +54,23 @@ export function buildTopUpCreateBody(input: TopUpRecipeInput): Record<string, un
   };
 }
 
-function normalizePayment(raw: Record<string, unknown>, fallbackId: string) {
+function normalizePayment(
+  raw: Record<string, unknown>,
+  fallbackId: string,
+): {
+  id: string;
+  amount: number;
+  currency: string;
+  status: TopUpPaymentStatus;
+  wallet_credit?: string;
+} & Record<string, unknown> {
   return {
     id: String(raw.payment_id ?? raw.id ?? fallbackId),
     amount: Number(raw.amount ?? 0),
     currency: String(raw.currency ?? 'USD'),
     status: String(raw.status ?? 'pending') as TopUpPaymentStatus,
+    wallet_credit:
+      typeof raw.wallet_credit === 'string' ? raw.wallet_credit : undefined,
     ...raw,
   };
 }
@@ -69,25 +80,28 @@ async function pollPaymentUntilComplete(
   paymentId: string,
   opts?: { intervalMs?: number; timeoutMs?: number },
 ): Promise<Record<string, unknown>> {
-  const interval = opts?.intervalMs ?? 2000;
-  const timeout = opts?.timeoutMs ?? 120_000;
-  const start = Date.now();
-  while (Date.now() - start < timeout) {
-    const response = await http.get(`/payments/${paymentId}`);
-    const data = (response.data ?? response) as {
-      payment?: Record<string, unknown>;
-    };
-    const payment = (data.payment ?? data) as Record<string, unknown>;
-    const status = String(payment.status ?? '');
-    if (
-      status === 'completed' ||
-      status === 'failed' ||
-      status === 'cancelled' ||
-      status === 'refunded'
-    ) {
-      return payment;
-    }
-    await sleep(interval);
+  const { pollUntilWalletCredit } = await import('../settlement/pollWalletCredit');
+  let last: Record<string, unknown> = {};
+  const credited = await pollUntilWalletCredit(
+    async () => {
+      const response = await http.get(`/payments/${paymentId}`);
+      const data = (response.data ?? response) as { payment?: Record<string, unknown> };
+      const payment = (data.payment ?? data) as Record<string, unknown>;
+      last = payment;
+      return {
+        wallet_credit: payment.wallet_credit,
+        status: String(payment.status ?? ''),
+      };
+    },
+    {
+      intervalMs: opts?.intervalMs ?? 2000,
+      timeoutMs: opts?.timeoutMs ?? 120_000,
+    },
+  );
+  if (credited) return last;
+  const status = String(last.status ?? '');
+  if (status === 'failed' || status === 'cancelled' || status === 'refunded') {
+    return last;
   }
   throw new Error('top_up_poll_timeout');
 }
@@ -118,14 +132,21 @@ export async function commerceTopUpRecipe(
   }
 
   let payment = initial;
-  if (opts?.poll !== false && payment.status !== 'completed') {
+  const initialCredited = String(payment.wallet_credit ?? '') === 'ok';
+  if (opts?.poll !== false && !(payment.status === 'completed' && initialCredited)) {
     payment = await pollPaymentUntilComplete(http, paymentId, opts);
   }
 
   const normalized = normalizePayment(payment, paymentId);
+  if (
+    normalized.status === 'completed' &&
+    String(normalized.wallet_credit ?? '') !== 'ok'
+  ) {
+    normalized.status = 'pending';
+  }
   let spendable_balance_usdt: string | undefined;
 
-  if (normalized.status === 'completed') {
+  if (normalized.status === 'completed' && String(normalized.wallet_credit ?? '') === 'ok') {
     try {
       const summary = await getParticipantWalletSummary(http, input.project_id);
       const usdtHolding = summary.holdings?.find(

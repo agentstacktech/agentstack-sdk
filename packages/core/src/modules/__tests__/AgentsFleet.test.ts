@@ -194,25 +194,116 @@ describe('AgentsFleet approvals', () => {
     });
   });
 
-  it('passes env_uuid on workNext MCP batch', async () => {
-    const post = jest.fn().mockResolvedValue({
-      data: { ok: true, results: [{ result: { next_work: null } }] },
+  it('uses REST GET work-next with blocked paging on project home', async () => {
+    const get = jest.fn().mockResolvedValue({
+      data: { state: 'idle', revision: 1, next_action: null },
     });
-    const agents = new AgentsFleet({ post } as never);
+    const agents = new AgentsFleet({ get } as never);
+
+    await agents.workNext(42, {
+      home: 'project',
+      claim: false,
+      blocked_cursor: 'bc1',
+      blocked_limit: 16,
+      detail: 'full',
+    });
+
+    expect(get).toHaveBeenCalledWith('/api/projects/42/orchestrator/work-next', {
+      params: expect.objectContaining({
+        blocked_cursor: 'bc1',
+        blocked_limit: '16',
+        detail: 'full',
+      }),
+    });
+  });
+
+  it('passes env_uuid on workNext REST GET', async () => {
+    const get = jest.fn().mockResolvedValue({
+      data: { state: 'idle', revision: 1 },
+    });
+    const agents = new AgentsFleet({ get } as never);
 
     await agents.workNext(9, { env_uuid: 'sandbox-env-1', claim: false });
 
-    expect(post).toHaveBeenCalledWith(
-      '/mcp',
-      expect.objectContaining({
-        steps: [
-          expect.objectContaining({
-            action: 'agents.work_next',
-            params: expect.objectContaining({ env_uuid: 'sandbox-env-1', project_id: 9 }),
-          }),
-        ],
-      }),
-    );
+    expect(get).toHaveBeenCalledWith('/api/projects/9/orchestrator/work-next', {
+      params: expect.objectContaining({ env_uuid: 'sandbox-env-1' }),
+    });
+  });
+
+  it('strips env_uuid on personal workNext REST GET', async () => {
+    const get = jest.fn().mockResolvedValue({
+      data: { state: 'idle', revision: 1 },
+    });
+    const agents = new AgentsFleet({ get } as never);
+
+    await agents.workNext(9, {
+      env_uuid: 'sandbox-env-1',
+      home: 'project_self',
+      claim: false,
+    });
+
+    expect(get).toHaveBeenCalledWith('/api/projects/9/orchestrator/work-next', {
+      params: expect.objectContaining({ home: 'project_self' }),
+    });
+    const params = get.mock.calls[0][1]?.params as Record<string, unknown>;
+    expect(params.env_uuid).toBeUndefined();
+  });
+
+  it('strips env_uuid on personal workStatus MCP batch', async () => {
+    const post = jest.fn().mockResolvedValue({
+      data: { ok: true, results: [{ result: { state: 'idle' } }] },
+    });
+    const agents = new AgentsFleet({ post } as never);
+
+    await agents.workStatus(9, {
+      env_uuid: 'sandbox-env-1',
+      home: 'self',
+    });
+
+    const envelope = post.mock.calls[0][1] as {
+      steps: Array<{ params: Record<string, unknown> }>;
+    };
+    expect(envelope.steps[0].params).toMatchObject({
+      project_id: 9,
+      home: 'project_self',
+    });
+    expect(envelope.steps[0].params.env_uuid).toBeUndefined();
+  });
+
+  it('fleetDiagnosticsMcp strips env on personal home', async () => {
+    const post = jest.fn().mockResolvedValue({
+      data: { ok: true, results: [{ result: { stale_orchestrator_binding_count: 0 } }] },
+    });
+    const agents = new AgentsFleet({ post } as never);
+
+    await agents.fleetDiagnosticsMcp(9, {
+      env_uuid: 'sandbox-env-1',
+      home: 'project_self',
+      include_health_snapshot: true,
+    });
+
+    const envelope = post.mock.calls[0][1] as {
+      steps: Array<{ action: string; params: Record<string, unknown> }>;
+    };
+    expect(envelope.steps[0].action).toBe('agents.fleet_diagnostics');
+    expect(envelope.steps[0].params).toMatchObject({
+      project_id: 9,
+      home: 'project_self',
+      include_health_snapshot: true,
+    });
+    expect(envelope.steps[0].params.env_uuid).toBeUndefined();
+  });
+
+  it('omits env_uuid on personal importOrchestratorPack', async () => {
+    const post = jest.fn().mockResolvedValue({ data: { success: true } });
+    const agents = new AgentsFleet({ post } as never);
+
+    await agents.importOrchestratorPack(9, { pack_version: 1 }, 'env-x', 'project_self');
+
+    expect(post).toHaveBeenCalledWith('/api/projects/9/orchestrator/import-pack', {
+      pack: { pack_version: 1 },
+      home: 'project_self',
+    });
   });
 
   it('passes env_uuid and execution flags on planGet', async () => {
@@ -257,6 +348,68 @@ describe('AgentsFleet approvals', () => {
     });
   });
 
+  it('routes patchPlanOps to REST postPlanOps on project home without locale', async () => {
+    const post = jest.fn().mockResolvedValue({
+      data: { success: true, ok: true, changed: [], revision: 2 },
+    });
+    const agents = new AgentsFleet({ post } as never);
+
+    await agents.patchPlanOps(9, {
+      ops: [{ op: 'set', id: 'n1', title: 't' }],
+      if_match_revision: 1,
+      home: 'project',
+    });
+
+    expect(post).toHaveBeenCalledWith('/api/projects/9/orchestrator/plan/ops', {
+      ops: [{ op: 'set', id: 'n1', title: 't' }],
+      if_match_revision: 1,
+      home: 'project',
+    });
+  });
+
+  it('routes archive_ids-only patchPlanOps to REST postPlanOps', async () => {
+    const post = jest.fn().mockResolvedValue({
+      data: { success: true, ok: true, changed: [{ id: 'c1' }], revision: 5 },
+    });
+    const agents = new AgentsFleet({ post } as never);
+
+    await agents.patchPlanOps(9, {
+      archive_ids: ['c1', 'c2'],
+      if_match_revision: 4,
+      home: 'project',
+    });
+
+    expect(post).toHaveBeenCalledWith('/api/projects/9/orchestrator/plan/ops', {
+      archive_ids: ['c1', 'c2'],
+      if_match_revision: 4,
+      home: 'project',
+    });
+  });
+
+  it('routes patchPlanOps to MCP when locale is set on project home', async () => {
+    const post = jest.fn().mockResolvedValue({
+      data: { steps: [{ status: 'success', result: { ok: true } }] },
+    });
+    const agents = new AgentsFleet({ post } as never);
+
+    await agents.patchPlanOps(9, {
+      ops: [{ op: 'archive', id: 'n1' }],
+      home: 'project',
+      locale: 'en-US',
+    });
+
+    expect(post).toHaveBeenCalledWith(
+      '/mcp',
+      expect.objectContaining({
+        steps: [
+          expect.objectContaining({
+            action: 'agents.plan_patch',
+          }),
+        ],
+      }),
+    );
+  });
+
   it('passes env_uuid on planApplyProposal REST body', async () => {
     const post = jest.fn().mockResolvedValue({
       data: { success: true, applied: true },
@@ -287,6 +440,63 @@ describe('AgentsFleet approvals', () => {
     expect(get).toHaveBeenCalledWith('/api/projects/9/orchestrator/plan/agent/agent-1', {
       params: { include_execution_eligibility: 'true' },
     });
+  });
+
+  it('parses orchestrate focus-run handoff fields', async () => {
+    const post = jest.fn().mockResolvedValue({
+      data: {
+        success: true,
+        run: { status: 'completed' },
+        work_state: 'executable',
+        focus_node_id: 'leaf-1',
+        action_readiness: { can_execute: true },
+      },
+    });
+    const agents = new AgentsFleet({ post } as never);
+
+    const res = await agents.orchestrate(9, 'execute node', {
+      focusNodeId: 'leaf-1',
+      wait: false,
+      channel: 'workspace',
+    });
+
+    expect(post).toHaveBeenCalledWith('/api/projects/9/orchestrator/run', {
+      message: 'execute node',
+      channel: 'workspace',
+      conversation_id: undefined,
+      bot_uuid: undefined,
+      wait: false,
+      surface: undefined,
+      focus_node_id: 'leaf-1',
+    });
+    expect(res.execute?.work_state).toBe('actionable');
+    expect(res.run.status).toBe('completed');
+  });
+
+  it('forwards locale on planRecoveryScan MCP batch', async () => {
+    const post = jest.fn().mockResolvedValue({
+      data: { ok: true, results: [{ result: { candidates: [] } }] },
+    });
+    const agents = new AgentsFleet({ post } as never);
+
+    await agents.planRecoveryScan(9, { limit: 8, env_uuid: 'env-1', locale: 'ru-RU' });
+
+    expect(post).toHaveBeenCalledWith(
+      '/mcp',
+      expect.objectContaining({
+        context: expect.objectContaining({ locale: 'ru-RU', project_id: 9 }),
+        steps: [
+          expect.objectContaining({
+            action: 'agents.plan_recovery_scan',
+            params: expect.objectContaining({
+              project_id: 9,
+              limit: 8,
+              env_uuid: 'env-1',
+            }),
+          }),
+        ],
+      }),
+    );
   });
 
   it('passes pending approval filters including camelCase stale flag', async () => {

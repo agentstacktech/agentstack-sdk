@@ -286,6 +286,21 @@ export class AgentIntegrations {
     }>(`/integrations/connections/${connectionId}/health`);
   }
 
+  telegramDiagnose(connectionId: string) {
+    return this.client.get<{
+      connection_id: string;
+      project_id: number;
+      token_present: boolean;
+      webhook_secret_present: boolean;
+      hook_url: string;
+      hook_url_aligned: boolean;
+      public_url_ok: boolean;
+      heal_circuit_open: boolean;
+      recommended_action: string;
+      telegram_get_webhook_info?: Record<string, unknown>;
+    }>(`/integrations/connections/${connectionId}/telegram-diagnose`);
+  }
+
   getConnectorSetupSchema(provider: string) {
     return integrationGetConnectorSetupSchema(this.client, provider);
   }

@@ -52,6 +52,7 @@ const postExecuteFixture: Playbook = {
       kind: 'outcome',
       id: 'outcome',
       messageDefault: 'Done',
+      messageKey: 'compass.fixture.outcome',
     },
   },
 };
@@ -63,6 +64,14 @@ describe('compilePathPlan post-execute questions', () => {
     const ids = plan.steps.map((s) => s.nodeId);
     expect(ids.indexOf('v_a')).toBeLessThan(ids.indexOf('q_branch'));
     expect(ids).not.toContain('t_b');
+  });
+
+  it('carries messageKey on outcome steps without changing title default', () => {
+    const state = initialPlaybookStateV2('crm-first', 1, 'outcome');
+    const plan = compilePathPlan(postExecuteFixture, state);
+    const outcome = plan.steps.find((s) => s.kind === 'outcome');
+    expect(outcome?.messageKey).toBe('compass.fixture.outcome');
+    expect(outcome?.title).toBe('Done');
   });
 
   it('includes conditional step after post-execute answer', () => {

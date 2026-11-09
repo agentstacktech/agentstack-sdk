@@ -14,12 +14,19 @@ export type DeliverNotificationParams = {
   project_id?: number;
 };
 
+export type NotificationDeliverBody = {
+  status?: string;
+  reason?: string;
+  category?: string;
+  error_code?: string;
+  result?: Array<{ channel?: string; status?: string; error?: string }>;
+};
+
 export type DeliverNotificationResult = {
   success: boolean;
+  deferred?: boolean;
   correlation_key?: string;
-  delivery?: {
-    result?: Array<{ channel?: string; status?: string; error?: string }>;
-  };
+  delivery?: NotificationDeliverBody;
   receipt?: DeliveryReceiptRow;
   error?: string;
 };
@@ -29,14 +36,56 @@ async function unwrap<T>(promise: Promise<APIResponse<T>>): Promise<T> {
   return (response.data ?? response) as T;
 }
 
+/** FastAPI `detail` string when present (e.g. `route_cap`, `channel_not_linked`). */
+export function extractNotifyApiDetail(err: unknown): string | undefined {
+  const e = err as {
+    message?: string;
+    response?: { data?: { detail?: string | { message?: string; reason?: string } } };
+  };
+  const detail = e.response?.data?.detail;
+  if (typeof detail === 'string' && detail.trim()) {
+    return detail.trim();
+  }
+  if (typeof detail === 'object' && detail && !Array.isArray(detail)) {
+    const row = detail as { message?: string; reason?: string };
+    if (typeof row.reason === 'string' && row.reason.trim()) {
+      return row.reason.trim();
+    }
+    if (typeof row.message === 'string' && row.message.trim()) {
+      return row.message.trim();
+    }
+  }
+  const msg = e.message?.trim();
+  if (msg && /^[a-z][a-z0-9_]+$/.test(msg)) {
+    return msg;
+  }
+  return undefined;
+}
+
+export function formatNotifyApiError(err: unknown, fallback = 'Request failed'): string {
+  return deliveryErrorMessage(err, fallback);
+}
+
 function deliveryErrorMessage(err: unknown, fallback: string): string {
   const e = err as {
     message?: string;
     response?: { data?: { detail?: string | { message?: string } } };
   };
   const detail = e.response?.data?.detail;
-  if (typeof detail === 'object' && detail?.message) {
-    return String(detail.message);
+  if (Array.isArray(detail)) {
+    const msg = (detail[0] as { msg?: unknown } | undefined)?.msg;
+    if (typeof msg === 'string' && msg.trim()) {
+      return msg;
+    }
+  }
+  if (typeof detail === 'object' && detail && !Array.isArray(detail)) {
+    const row = detail as { message?: string; reason?: string };
+    if (row.message) {
+      return String(row.message);
+    }
+    if (row.reason) {
+      return String(row.reason);
+    }
   }
   if (typeof detail === 'string' && detail.trim()) {
     return detail;
@@ -52,8 +101,16 @@ export async function deliverNotification(
     const data = await unwrap<DeliverNotificationResult>(
       http.post('/users/me/notification-deliver', params),
     );
+    if (data.deferred || data.delivery?.status === 'deferred') {
+      return { ...data, success: true, deferred: true };
+    }
     if (data.success === false) {
-      throw new Error(data.error || 'Delivery failed');
+      const detail =
+        data.delivery?.error_code ||
+        data.delivery?.reason ||
+        data.error ||
+        'Delivery failed';
+      throw new Error(String(detail));
     }
     return data;
   } catch (err) {

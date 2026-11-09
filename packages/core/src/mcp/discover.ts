@@ -3,6 +3,7 @@
  * Genetic tag: repo.tooling.user_cli.gen1 · repo.platform.sdk.gen1
  */
 
+import { normalizeMcpToolEnvelope } from '../agents/planGraph';
 import { resolvePublicOrigin } from './urls';
 
 export interface McpDiscoverOptions {
@@ -21,6 +22,12 @@ export interface McpActionEffect {
   destructive?: boolean;
   external_side_effect?: boolean;
   audit_side_effect?: boolean;
+  execution_class?: string;
+  audit_batch_allowed?: boolean;
+  /** When true, some param slices (mutates_when) require options.goal on batch execute. */
+  audit_batch_param_sensitive?: boolean;
+  audit_batch_note?: string;
+  requires_preflight?: boolean;
 }
 
 export interface McpInstructionSlice {
@@ -37,6 +44,48 @@ export interface McpInstructionSlice {
   capability_descriptor?: Record<string, unknown>;
   error_hints?: Array<{ code: string; tip: string }>;
   effect?: McpActionEffect;
+  verify?: string[];
+  rollback?: string[];
+  when_blocked?: Record<string, string>;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+/** Read MCP `instruction_slice` from execute / work_next payloads. */
+export function extractInstructionSlice(
+  payload: Record<string, unknown> | undefined,
+): McpInstructionSlice | null {
+  const slice = asRecord(payload?.instruction_slice);
+  if (!slice) return null;
+  const verify = Array.isArray(slice.verify) ? slice.verify.map(String) : undefined;
+  const rollback = Array.isArray(slice.rollback) ? slice.rollback.map(String) : undefined;
+  const whenBlockedRaw = asRecord(slice.when_blocked);
+  const when_blocked: Record<string, string> = {};
+  if (whenBlockedRaw) {
+    for (const [key, val] of Object.entries(whenBlockedRaw)) {
+      const hint = String(val ?? '').trim();
+      if (hint) when_blocked[key] = hint;
+    }
+  }
+  const out: McpInstructionSlice = {
+    ...(typeof slice.when_to_use === 'string' ? { when_to_use: slice.when_to_use } : {}),
+    ...(typeof slice.when_not_to_use === 'string' ? { when_not_to_use: slice.when_not_to_use } : {}),
+    ...(typeof slice.do_not_use_when === 'string' ? { do_not_use_when: slice.do_not_use_when } : {}),
+    ...(Array.isArray(slice.anti_patterns)
+      ? { anti_patterns: slice.anti_patterns.map(String).filter(Boolean) }
+      : {}),
+    ...(verify?.length ? { verify } : {}),
+    ...(rollback?.length ? { rollback } : {}),
+    ...(Object.keys(when_blocked).length ? { when_blocked } : {}),
+    ...(slice.effect && typeof slice.effect === 'object'
+      ? { effect: slice.effect as McpActionEffect }
+      : {}),
+  };
+  return Object.keys(out).length ? out : null;
 }
 
 export interface McpDiscoverIntentRow {
@@ -63,6 +112,8 @@ export interface McpDiscoverByIntentResult {
     total: number;
     query: string;
     message?: string;
+    routed_goal?: Record<string, unknown>;
+    semantic_contract?: Record<string, unknown>;
   };
 }
 
@@ -109,10 +160,24 @@ export async function mcpDiscoverByIntent(
     },
     opts,
   );
-  return raw as McpDiscoverByIntentResult;
+  const env = normalizeMcpToolEnvelope(raw);
+  const base = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const merged = { ...base, ...env.data };
+  const data =
+    merged.data && typeof merged.data === 'object'
+      ? (merged.data as McpDiscoverByIntentResult['data'])
+      : (merged as McpDiscoverByIntentResult['data']);
+  return {
+    success: env.success && merged.success !== false,
+    data,
+  };
 }
 
 /** GET /mcp/discovery — API key capability context. */
 export async function mcpGetDiscovery(opts: McpDiscoverOptions): Promise<unknown> {
-  return mcpRestJson(opts.apiBase, '/mcp/discovery', { method: 'GET' }, opts);
+  const locale = opts.locale?.trim();
+  const path = locale
+    ? `/mcp/discovery?locale=${encodeURIComponent(locale)}&verbose=1`
+    : '/mcp/discovery?verbose=1';
+  return mcpRestJson(opts.apiBase, path, { method: 'GET' }, opts);
 }

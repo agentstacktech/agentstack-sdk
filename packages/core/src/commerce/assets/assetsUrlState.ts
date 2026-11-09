@@ -11,6 +11,9 @@ export type StudioTab = 'quick' | 'bulk' | 'ai' | 'fill' | 'hosted';
 
 export type AssetsCatalogView = 'grid' | 'table' | 'kanban';
 
+export const DEFAULT_ASSETS_CATALOG_PAGE = 1;
+export const DEFAULT_ASSETS_CATALOG_PAGE_SIZE = 48;
+
 export type AssetLifecycleFilter = 'draft' | 'published' | 'archived';
 
 export type AssetsUrlState = {
@@ -33,6 +36,8 @@ export type AssetsUrlState = {
   commerceAssetId: string | null;
   studioTab: StudioTab;
   pack: string | null;
+  page: number;
+  pageSize: number;
 };
 
 const STEPS: AssetsWizardStep[] = ['intent', 'basics', 'media', 'publish', 'review'];
@@ -95,6 +100,17 @@ export function parseAssetsSearchParams(sp: URLSearchParams): AssetsUrlState {
     commerceAssetId: sp.get('assetId'),
     studioTab: parseStudioTab(sp.get('studioTab')),
     pack: sp.get('pack'),
+    page: Math.max(1, parseInt(sp.get('page') ?? '1', 10) || 1),
+    pageSize: Math.min(
+      96,
+      Math.max(
+        12,
+        parseInt(
+          sp.get('pageSize') ?? String(DEFAULT_ASSETS_CATALOG_PAGE_SIZE),
+          10,
+        ) || DEFAULT_ASSETS_CATALOG_PAGE_SIZE,
+      ),
+    ),
   };
 }
 
@@ -179,6 +195,14 @@ export function writeAssetsSearchParams(
   }
   if (patch.pack !== undefined) {
     setOrDelete(sp, 'pack', patch.pack);
+  }
+  if (patch.page !== undefined) {
+    if (patch.page <= DEFAULT_ASSETS_CATALOG_PAGE) sp.delete('page');
+    else sp.set('page', String(patch.page));
+  }
+  if (patch.pageSize !== undefined) {
+    if (patch.pageSize === DEFAULT_ASSETS_CATALOG_PAGE_SIZE) sp.delete('pageSize');
+    else sp.set('pageSize', String(patch.pageSize));
   }
 
   return sp;

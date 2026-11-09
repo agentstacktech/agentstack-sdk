@@ -18,5 +18,7 @@ export {
   isPlanRevisionConflict,
   isPlanRoleMismatch,
   isPlanSpecializationMismatch,
+  isPlanCompletionGates,
+  isPlanGraphChildrenExceeded,
   isPlanWipFull,
 } from './planGraphErrors';

@@ -3,6 +3,7 @@
  */
 
 import { HTTPClient } from '../client/http-client';
+import { commitBodyFromKnowledgePreview } from '../atoms/knowledgePatch';
 
 export type KnowledgeChunkSpan = {
   index: number;
@@ -12,6 +13,51 @@ export type KnowledgeChunkSpan = {
 };
 
 /** Operator corpus row from GET /knowledge/content (joined body in ``text``). */
+/** PATCH /knowledge/content/{source_doc_id} body (REST + MCP parity). */
+export type KnowledgeContentPatchBody = {
+  title?: string;
+  text?: string;
+  access_tier?: string;
+  gene_stems?: string[];
+  content_type?: string;
+  source_url?: string;
+  status?: string;
+  product_ids?: string[];
+  audience?: string;
+  contraindications?: string;
+  write_mode?:
+    | 'search_replace'
+    | 'unified_diff'
+    | 'replace'
+    | 'append'
+    | 'prepend'
+    | 'patch'
+    | 'merge';
+  replacements?: Array<{ find: string; replace: string; count?: number }>;
+  unified_diff?: string;
+  strict_diff?: boolean;
+  allow_shrink?: boolean;
+  dry_run?: boolean;
+  expected_sha256?: string;
+};
+
+/** PATCH content success / dry_run preview envelope. */
+export type KnowledgeContentPatchResponse = {
+  ok: boolean;
+  metadata?: Record<string, unknown> | null;
+  text_updated?: boolean;
+  dry_run?: boolean;
+  previous_sha256?: string;
+  leaf_sha256?: string;
+  write_mode?: string;
+  before_chars?: number;
+  after_chars?: number;
+  before_chunks?: number;
+  next_actions?: Array<{ action: string; params: Record<string, unknown> }>;
+  preview_only?: boolean;
+  state?: string;
+};
+
 export type KnowledgeContentItem = {
   source_doc_id?: string;
   title?: string;
@@ -168,6 +214,31 @@ export type KnowledgeConfigPatch = Omit<Partial<KnowledgeConfig>, 'crisis_playbo
   crisis_playbooks?: Record<string, unknown>;
 };
 
+/** REST/MCP `response` query on GET/PATCH /knowledge/config (default full). */
+export type KnowledgeConfigResponseMode = 'full' | 'compact' | 'stats';
+
+export type KnowledgeConfigQuery = {
+  response?: KnowledgeConfigResponseMode;
+  /** json_view detail when response=compact */
+  detail?: string;
+};
+
+export type KnowledgeConfigStats = {
+  gene_pack_phenotype_n: number;
+  product_id_map_keys: number;
+  material_offer_catalog_n: number;
+};
+
+export type KnowledgeConfigEnvelope = {
+  ok: boolean;
+  config?: KnowledgeConfig | null;
+  outline?: Record<string, unknown>;
+  shape?: Record<string, unknown>;
+  config_stats?: KnowledgeConfigStats;
+  safety_playbooks?: Record<string, unknown>;
+  crisis_playbooks?: Record<string, unknown>;
+};
+
 /** Platform overlay slots written via existing prompt/config PATCH. */
 export type KnowledgePolicyTemplateSlot =
   | 'synthesis'
@@ -232,6 +303,8 @@ export type KnowledgePlaygroundBody = {
   external_user_id?: string;
   chat_type?: string;
   external_chat_id?: string;
+  /** telegram|max|… — resolve channel principal when principal_user_id omitted */
+  channel_kind?: string;
   principal_user_id?: number;
   access_tier?: string;
   product_id?: string;
@@ -295,9 +368,12 @@ export type KnowledgeEvalSuite = {
 
 export type KnowledgeRetrievalEvalResult = {
   ok?: boolean;
+  /** MCP/REST parity with mentor.eval.retrieval — transport success is separate from pass/fail */
+  eval_passed?: boolean;
   hits?: number;
   total?: number;
   hit_rate?: number;
+  failed_ids?: string[];
   results?: unknown[];
 };
 
@@ -330,25 +406,37 @@ export type KnowledgeEvalBaselineStored = {
   at?: string;
 };
 
+export function knowledgeConfigQueryParams(
+  query?: KnowledgeConfigQuery,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (query?.response) out.response = query.response;
+  if (query?.detail) out.detail = query.detail;
+  return out;
+}
+
 export class AgentKnowledge {
   constructor(private client: HTTPClient) {}
 
-  config(projectId: number) {
-    return this.client.get<{
-      ok: boolean;
-      config: KnowledgeConfig;
-      safety_playbooks?: Record<string, unknown>;
-      crisis_playbooks?: Record<string, unknown>;
-    }>(`/projects/${projectId}/knowledge/config`);
+  config(projectId: number, query?: KnowledgeConfigQuery) {
+    const params = knowledgeConfigQueryParams(query);
+    return this.client.get<KnowledgeConfigEnvelope>(
+      `/projects/${projectId}/knowledge/config`,
+      params,
+    );
   }
 
-  patchConfig(projectId: number, body: KnowledgeConfigPatch) {
-    return this.client.patch<{
-      ok: boolean;
-      config: KnowledgeConfig;
-      safety_playbooks?: Record<string, unknown>;
-      crisis_playbooks?: Record<string, unknown>;
-    }>(`/projects/${projectId}/knowledge/config`, body);
+  patchConfig(
+    projectId: number,
+    body: KnowledgeConfigPatch,
+    query?: KnowledgeConfigQuery,
+  ) {
+    const params = knowledgeConfigQueryParams(query);
+    return this.client.patch<KnowledgeConfigEnvelope>(
+      `/projects/${projectId}/knowledge/config`,
+      body,
+      Object.keys(params).length ? { params } : undefined,
+    );
   }
 
   listPolicyTemplates(projectId: number) {
@@ -524,12 +612,30 @@ export class AgentKnowledge {
   patchKbChunk(
     projectId: number,
     docId: string,
-    body: { text: string; collection_id?: string },
+    body: {
+      text?: string;
+      collection_id?: string;
+      write_mode?: 'search_replace' | 'unified_diff' | 'replace';
+      replacements?: Array<{ find: string; replace: string; count?: number }>;
+      unified_diff?: string;
+      strict_diff?: boolean;
+      allow_shrink?: boolean;
+    },
   ) {
-    return this.client.patch<{ ok: boolean; source_doc_id?: string; chunks_added?: number }>(
-      `/projects/${projectId}/knowledge/kb/chunks/${encodeURIComponent(docId)}`,
-      body,
-    );
+    const next: Record<string, unknown> = { ...body };
+    if (next.replacements != null && next.write_mode == null) {
+      next.write_mode = 'search_replace';
+    } else if (next.unified_diff != null && next.write_mode == null) {
+      next.write_mode = 'unified_diff';
+    } else if (next.text != null && next.write_mode == null) {
+      next.write_mode = 'replace';
+    }
+    return this.client.patch<{
+      ok: boolean;
+      source_doc_id?: string;
+      chunks_added?: number;
+      write_mode?: string;
+    }>(`/projects/${projectId}/knowledge/kb/chunks/${encodeURIComponent(docId)}`, next);
   }
 
   ingestJobStatus(projectId: number, jobId: string) {
@@ -926,30 +1032,82 @@ export class AgentKnowledge {
   patchContent(
     projectId: number,
     sourceDocId: string,
-    body: {
-      title?: string;
-      text?: string;
-      access_tier?: string;
-      gene_stems?: string[];
-      [key: string]: unknown;
-    },
+    body: KnowledgeContentPatchBody,
     collectionId = 'knowledge_kb',
   ) {
     const qs = `?collection_id=${encodeURIComponent(collectionId)}`;
-    const next: Record<string, unknown> = { ...body };
-    if (next.text != null) {
+    const next: KnowledgeContentPatchBody = { ...body };
+    if (next.replacements != null && next.write_mode == null) {
+      next.write_mode = 'search_replace';
+    } else if (next.unified_diff != null && next.write_mode == null) {
+      next.write_mode = 'unified_diff';
+    } else if (next.text != null) {
       if (next.write_mode == null) next.write_mode = 'replace';
-      if (next.allow_shrink == null) next.allow_shrink = true;
     } else if (next.write_mode == null) {
       next.write_mode = 'patch';
     }
-    return this.client.patch<{
-      ok: boolean;
-      metadata?: Record<string, unknown> | null;
-      text_updated?: boolean;
-    }>(
+    return this.client.patch<KnowledgeContentPatchResponse>(
       `/projects/${projectId}/knowledge/content/${encodeURIComponent(sourceDocId)}${qs}`,
       next,
+    );
+  }
+
+  /** Server-side body edit preview (`dry_run: true`) — no re-embed. */
+  previewContentPatch(
+    projectId: number,
+    sourceDocId: string,
+    body: KnowledgeContentPatchBody,
+    collectionId = 'knowledge_kb',
+  ) {
+    return this.patchContent(
+      projectId,
+      sourceDocId,
+      { ...body, dry_run: true },
+      collectionId,
+    );
+  }
+
+  /**
+   * Optimistic concurrency on joined document body: dry_run yields previous_sha256 for CAS commit.
+   */
+  async patchContentWithRevision(
+    projectId: number,
+    sourceDocId: string,
+    body: KnowledgeContentPatchBody,
+    collectionId = 'knowledge_kb',
+    options?: { skipPreflightPreview?: boolean },
+  ) {
+    let expected = body.expected_sha256;
+    const isBodyEdit =
+      body.text != null ||
+      (body.replacements?.length ?? 0) > 0 ||
+      Boolean(String(body.unified_diff ?? '').trim()) ||
+      (body.write_mode != null &&
+        body.write_mode !== 'patch' &&
+        body.write_mode !== 'merge');
+    const needsPreflight = !body.dry_run && isBodyEdit;
+    if (!expected && !options?.skipPreflightPreview && needsPreflight) {
+      const preview = await this.previewContentPatch(
+        projectId,
+        sourceDocId,
+        body,
+        collectionId,
+      );
+      const data = preview.data;
+      if (data?.next_actions?.length) {
+        const commitBody = commitBodyFromKnowledgePreview(data, body);
+        return this.patchContent(projectId, sourceDocId, commitBody, collectionId);
+      }
+      const cas = data?.previous_sha256?.trim();
+      if (cas) {
+        expected = cas;
+      }
+    }
+    return this.patchContent(
+      projectId,
+      sourceDocId,
+      { ...body, expected_sha256: expected, dry_run: false },
+      collectionId,
     );
   }
 

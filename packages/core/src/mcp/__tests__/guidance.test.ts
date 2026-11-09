@@ -154,4 +154,15 @@ describe('mcp guidance', () => {
       'https://agentstack.tech/api/mcp/health',
     );
   });
+
+  it('unityPriemkaCoverageFromOpsReport separates coverage from report.ok', () => {
+    const { unityPriemkaCoverageFromOpsReport } = require('../guidance');
+    expect(unityPriemkaCoverageFromOpsReport(null)).toBeNull();
+    const cov = unityPriemkaCoverageFromOpsReport({
+      ok: false,
+      priemka_coverage: { pass: 40, partial: 12, fail: 0, manual: 16, skip: 0, total_items: 68 },
+    });
+    expect(cov?.total_items).toBe(68);
+    expect(cov?.manual).toBe(16);
+  });
 });

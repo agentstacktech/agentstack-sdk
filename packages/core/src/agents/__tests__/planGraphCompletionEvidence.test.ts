@@ -1,5 +1,3 @@
-import { describe, expect, it } from 'vitest';
-
 import {
   extractPlanCompletionFromRun,
   parsePlanCompletionEvidence,
@@ -49,5 +47,16 @@ describe('extractPlanCompletionFromRun', () => {
       },
     });
     expect(env?.missing_evidence).toContain('browser_verify');
+  });
+
+  it('reads plan_completion from MCP structuredContent envelope', () => {
+    const env = extractPlanCompletionFromRun({
+      success: true,
+      structuredContent: {
+        plan_completion: { allowed: true, status: 'passed', predicates_satisfied: ['gates_passed'] },
+      },
+    });
+    expect(env?.allowed).toBe(true);
+    expect(env?.predicates_satisfied).toContain('gates_passed');
   });
 });
