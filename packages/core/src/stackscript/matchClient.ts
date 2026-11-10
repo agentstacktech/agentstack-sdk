@@ -1,11 +1,6 @@
 import type { HTTPClient } from '../client/http-client';
-import { mcpBatchStep, unwrapFirstMcpBatchStepData } from '../mcp/batchStepData';
-import {
-  hostedMcpCookieMinted,
-  markHostedMcpCookieMinted,
-  mintHostedAppSession,
-} from '../commerce/hosted/hostedAppSession';
-import { resolveHostedMcpUrl } from '../mcp/urls';
+import { unwrapFirstMcpBatchStepData } from '../mcp/batchStepData';
+import { executeHostedMcpSteps } from '../commerce/hosted/executeHostedMcpSteps';
 import { pollWithBackoff } from './pollBackoff';
 import { matchRuntimePrefix } from './runtimePaths';
 import type { createStackScriptClient } from './client';
@@ -28,7 +23,11 @@ export function buildMatchTurnIdempotencyKey(
 }
 
 export type MatchClientOptions = {
-  /** Operator REST bulk read (default) vs player MCP my-data (hosted). */
+  /**
+   * Operator REST bulk read (default) vs player MCP my-data (hosted).
+   * Shared game journal leaves (`config.games.*`) → `@agentstack/sdk/commerce/hosted`
+   * `readHostedProjectLeaf`, not match runtime poll.
+   */
   readMode?: 'operator' | 'player';
   /** POST /s/{pid}/mcp instead of /mcp when readMode=player. */
   hostedMcp?: boolean;
@@ -46,39 +45,34 @@ export function createStackScriptMatchClient(
   const readMatchLeaves = async (matchId: string, leaves: string[], signal?: AbortSignal) => {
     const dotted = leaves.map((leaf) => matchRuntimePrefix(matchId, leaf));
     if (readMode === 'player') {
-      const mcpPath = options?.hostedMcp
-        ? resolveHostedMcpUrl(projectId, options?.hostedApiBase)
-        : '/mcp';
-      const hostedOpts = options?.hostedMcp
-        ? { skipCache: true, signal, skipAuthStateCheck: true, cookieSessionMcp: true }
-        : { skipCache: true, signal, skipAuthStateCheck: true };
-      if (
-        options?.hostedMcp &&
-        !hostedMcpCookieMinted(projectId) &&
-        'getAuthToken' in http
-      ) {
-        const bearer = (
-          http as { getAuthToken?: () => string | null }
-        ).getAuthToken?.();
-        if (bearer) {
-          await mintHostedAppSession(projectId, bearer, {
-            apiBase: options?.hostedApiBase,
-          });
-          markHostedMcpCookieMinted(projectId);
-        }
-      }
-      const res = await http.post(
-        mcpPath,
-        options?.hostedMcp
-          ? { steps: [mcpBatchStep('projects.get_my_data', { paths: dotted }, projectId)] }
-          : {
-              action: 'projects.get_my_data',
-              params: { paths: dotted, project_id: projectId },
-              context: { project_id: projectId },
+      const row = options?.hostedMcp
+        ? await executeHostedMcpSteps(
+            http,
+            projectId,
+            [
+              {
+                id: 'step_0',
+                action: 'projects.get_my_data',
+                params: { paths: dotted },
+              },
+            ],
+            {
+              pickStepId: 'step_0',
+              hostedApiBase: options?.hostedApiBase,
+              signal,
             },
-        hostedOpts,
-      );
-      const row = unwrapFirstMcpBatchStepData(res);
+          )
+        : unwrapFirstMcpBatchStepData(
+            await http.post(
+              '/mcp',
+              {
+                action: 'projects.get_my_data',
+                params: { paths: dotted, project_id: projectId },
+                context: { project_id: projectId },
+              },
+              { skipCache: true, signal, skipAuthStateCheck: true },
+            ),
+          );
       const value =
         (row.value as Record<string, unknown>) ??
         (row.data as Record<string, unknown>)?.value;
@@ -97,7 +91,7 @@ export function createStackScriptMatchClient(
   const submitTurn = async (args: {
     scriptId: string;
     export: string;
-    input: unknown;
+    input?: Record<string, unknown> | unknown[];
     idempotencyKey: string;
     version?: string;
   }) => {

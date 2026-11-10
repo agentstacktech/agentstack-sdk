@@ -1,4 +1,4 @@
-import type { HTTPClient } from '../../http/HTTPClient';
+import type { HTTPClient } from '../../client/http-client';
 
 export interface PlaceAuctionBidParams {
   listingId: string;
@@ -17,13 +17,14 @@ export async function listAuctionBids(
   if (query?.limit != null) params.set('limit', String(query.limit));
   if (query?.offset != null) params.set('offset', String(query.offset));
   const qs = params.toString() ? `?${params}` : '';
-  const res = await http.get<{ bids?: unknown[]; total?: number }>(
+  const response = await http.get<{ bids?: unknown[]; total?: number }>(
     `/api/marketplace/listings/${encodeURIComponent(listingId)}/bids${qs}`,
     { skipAuthStateCheck: true },
   );
+  const data = response.data ?? response;
   return {
-    bids: res.bids ?? [],
-    total: res.total ?? (res.bids?.length ?? 0),
+    bids: data.bids ?? [],
+    total: data.total ?? (data.bids?.length ?? 0),
   };
 }
 
@@ -33,7 +34,7 @@ export async function placeAuctionBid(
 ): Promise<unknown> {
   const headers: Record<string, string> = {};
   if (params.idempotencyKey) headers['Idempotency-Key'] = params.idempotencyKey;
-  return http.post(
+  const response = await http.post<unknown>(
     `/api/marketplace/listings/${encodeURIComponent(params.listingId)}/bids`,
     {
       amount: params.amount,
@@ -42,4 +43,5 @@ export async function placeAuctionBid(
     },
     { headers },
   );
+  return response.data ?? response;
 }
