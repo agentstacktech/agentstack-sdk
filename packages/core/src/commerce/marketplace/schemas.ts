@@ -38,6 +38,18 @@ export const storefrontAssetCardSchema = z
   })
   .passthrough();
 
+export const storefrontAuctionSnapshotSchema = z
+  .object({
+    ends_at: z.string().optional(),
+    current_bid: z.string().optional(),
+    bid_count: z.number().optional(),
+    reserve_met: z.boolean().optional(),
+    min_next_bid: z.string().optional(),
+    anti_snipe_sec: z.number().optional(),
+    revision: z.number().optional(),
+  })
+  .passthrough();
+
 export const storefrontListingCardSchema = z.object({
   listing_uuid: z.string(),
   seller_project_id: z.number(),
@@ -45,7 +57,10 @@ export const storefrontListingCardSchema = z.object({
   status: z.string(),
   price_usdt: z.string(),
   asset_id: z.string(),
+  title: z.string().optional(),
+  image_url: z.string().optional(),
   asset_card: storefrontAssetCardSchema.optional(),
+  auction: storefrontAuctionSnapshotSchema.optional(),
   facet: z.record(z.unknown()).optional(),
   fulfillment_mode: z.string().optional(),
   created_at: z.string().optional(),

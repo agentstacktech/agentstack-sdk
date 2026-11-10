@@ -11,3 +11,4 @@ export {
   rebuildStorefrontIndex,
   type StorefrontHealth,
 } from './storefrontHealthClient';
+export { listAuctionBids, placeAuctionBid, type PlaceAuctionBidParams } from './bidsClient';

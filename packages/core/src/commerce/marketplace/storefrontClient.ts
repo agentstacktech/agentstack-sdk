@@ -6,7 +6,7 @@ export type ListStorefrontParams = {
   project_id?: number;
   type?: string;
   search?: string;
-  sort?: 'recent' | 'price_asc' | 'price_desc' | 'recommended';
+  sort?: 'recent' | 'price_asc' | 'price_desc' | 'recommended' | 'ending';
   category?: string;
   collection?: string;
   page?: number;

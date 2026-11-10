@@ -181,9 +181,13 @@ export interface AuctionConfig {
   bid_increment: string;
 
   /**
-   * End time
+   * End time (canonical: ends_at on API/DNA)
    */
   end_time: string;
+  ends_at?: string;
+  min_increment?: string;
+  anti_snipe_sec?: number;
+  reserve?: string;
 
   /**
    * Highest bidder ID
