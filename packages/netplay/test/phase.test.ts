@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   defineGame, openPhase, phaseDone, phaseLeft, phaseTimedOut, phaseWaiting, readyPhase, resolvePhase, touchPhase, turnSeconds, unreadyPhase, TURN_CHOICES, type SimPhase,
 } from '../src/index.js';
-import { createTable } from '../src/testing/index.js';
+import { createLobby, createSession, memoryHub } from '../src/index.js';
+import { createTable, microtasks } from '../src/testing/index.js';
+import { choiceLine, turnChoice, LOBBY_LABELS } from '../src/ui/index.js';
 
 describe('simultaneous phase with a deadline', () => {
   it('resolves when everyone who acts is ready; others and repeats are ignored', () => {
@@ -84,5 +86,41 @@ describe('simultaneous phase with a deadline', () => {
     await t.run(ms + 1000); // b never bids → default 0 at the deadline
     expect(b!.snapshot.view!.shown).toEqual([5, 0]);
     expect(b!.snapshot.view!.round).toBe(2);
+  });
+});
+
+
+describe('lobby turn-timer choice', () => {
+  it('turnChoice lists off / 30 / 60 / 90 in each language; choiceLine reads the room params', () => {
+    const ru = turnChoice(LOBBY_LABELS.ru, 60);
+    expect(ru.options.map((o) => o.label)).toEqual(['Выкл', '30 с', '60 с', '90 с']);
+    expect(ru.param).toBe('turnS');
+    expect(turnChoice(LOBBY_LABELS.pt, 45).value).toBe(0); // not a choice → the first one
+    expect(turnChoice(LOBBY_LABELS.en, 30, { hint: false }).hint).toBeUndefined();
+    expect(choiceLine(ru, { turnS: 90 })).toBe('Время на ход: 90 с');
+    expect(choiceLine(turnChoice(LOBBY_LABELS.en, 0), { turnS: 0 })).toBe('Time per move: Off');
+    expect(choiceLine(ru, {})).toBe('');
+    expect(choiceLine(ru, undefined)).toBe('');
+    for (const L of Object.values(LOBBY_LABELS)) expect(L.turnHint.length).toBeGreaterThan(20);
+  });
+
+  it("the creator's pick reaches everyone through the room params (a joiner's own params are ignored)", async () => {
+    const g = defineGame<{ n: number }, number>({
+      id: 'tt', version: 1, seats: { min: 2, max: 2 }, mode: 'fold',
+      setup: () => ({ n: 0 }), input: () => undefined, apply: () => {},
+    });
+    const hub = memoryHub({ manual: true, latencyMs: 20 });
+    const pick = { a: turnChoice(LOBBY_LABELS.en, 90), b: turnChoice(LOBBY_LABELS.en, 30) };
+    const mk = (u: 'a' | 'b') => createLobby({
+      game: 'tt', baseUrl: 'https://g.example/',
+      connect: (room) => createSession(g, { transport: hub.transport(u), room, name: u, now: () => hub.now, params: { turnS: pick[u].value } }),
+    });
+    const a = mk('a'), b = mk('b');
+    a.create();
+    for (let i = 0; i < 20; i++) { hub.advance(50); await microtasks(); }
+    b.join(a.state.code!);
+    for (let i = 0; i < 40; i++) { hub.advance(50); await microtasks(); }
+    expect(choiceLine(pick.b, b.session!.model.params)).toBe('Time per move: 90 s');
+    expect(choiceLine(pick.a, a.session!.model.params)).toBe('Time per move: 90 s');
   });
 });

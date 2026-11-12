@@ -14,7 +14,7 @@
 | Your game | Mode | Notes |
 |-----------|------|-------|
 | Realtime, everyone acts every frame (shooter, co-op action) | `lockstep` | `idle` input for silent seats; `hashEvery` ~10–60; tune `inputDelay` |
-| Simultaneous secret turns (RPS, formations, beats) | `lockstep` + `secret: true` + `timeouts.turnMs` | inputs revealed only when all committed; `idle` = "no move"; pass `secretStore: sessionStorage` so a reload after locking still reveals |
+| Simultaneous secret turns (RPS, formations, beats) | `lockstep` + `secret: true` + `timeouts.turnMs` (or `authority` + `openPhase`/`resolvePhase`, below) | inputs revealed only when all committed; `idle` = "no move"; pass `secretStore: sessionStorage` so a reload after locking still reveals |
 | Each player on their own board / race / async turns, open info | `fold` | `apply(state, seat, cmd)` in log order; replays verify scores |
 | Hidden hands, fog of war, private dice | `authority` | seat 0 simulates; `view(state, seat)` must strip secrets; needs a transport with private entries; add `clock` + `clockMs` for timers/bots; persist `secretSeed` per room so a reloading host resumes; show `snapshot.hostWaitMs` ("host reconnecting…"); `timeouts.hostGraceMs` then ends as `host-lost`, the rest can rematch with a new host |
 
@@ -107,6 +107,19 @@ When the design says «play together on one screen» (shared keyboard, gamepads,
 5. `secret` games: no local seats (one screen shows every hidden move); offer a pass-the-device screen offline instead.
 Tests: `test/locals.test.ts` (lockstep, fold, authority views, presence, leave, rematch, the unchanged generated room script).
 
+## Simultaneous phases with a timer (fold / authority)
+
+When the design says «everyone picks at the same time, reveal when all are ready or time runs out» (sealed bids, drafts, hero picks) and the game is `fold` / `authority` (lockstep games: `secret: true` + `timeouts.turnMs` does it for you):
+
+1. Keep a `SimPhase` in the state: `openPhase(ctx.now, needs, turnSeconds(params.turnS, 60) * 1000)` (0 s = no clock).
+2. In `apply`: store the pick (private: `authority` only — fold logs are public), `touchPhase(p, ctx.now, 5000)` (a last-second pick still lands), `readyPhase(p, seat)`.
+3. In `clock` and after each input: `resolvePhase(p, ctx.now, ctx.absent)` → `'all-ready'` reveal now, `'timeout'` apply a **legal default** for `phaseWaiting(p)` then reveal, `null` wait. A seat that left never holds the table.
+4. Screen: the clock `phaseLeft(p, now)` (highlight the last 10 s), per seat «thinking… / ready» = `mountMatchBar({ done: (k) => phaseDone(p, k) })`; never show what others picked before the reveal.
+5. Lobby: `mountLobby(…, { choices: [turnChoice(LOBBY_LABELS.ru, 60)] })` — the creator picks off / 30 / 60 / 90 s; `connect` passes `choice.value` as `params.turnS`; the waiting screen shows the room's real value to everyone (`choiceLine`).
+6. Reload: an `authority` host refolds the log, so a guest's locked pick survives a reload with no extra storage; secret lockstep needs `secretStore: sessionStorage`.
+7. Local seats on one device: one seat at a time with a pass-the-device screen inside the same phase (the clock keeps running).
+Tests: `test/phase.test.ts` (resolve / timeout / grace / a sealed-bid fold game / the lobby choice). Real game: Tribute (`MatchHost` clock, the friends lobby timer).
+
 ## Do / don't
 
 - **Do** keep `input()` cheap — it runs on every client for every entry.
@@ -141,6 +154,7 @@ Keep the screen a **presenter**: one pure function `snapshot → plain data` (st
 | `src/session.ts` | client: join, inputs, batching, heartbeats/clock, reconnect, authority views |
 | `src/rng.ts`, `src/hash.ts` | sfc32 RNG, seed derivation, canonical hashing |
 | `src/transports/*` | `memory` (tests), `polling` (any HTTP log), `stackscript` (SDK client), `wss` |
+| `src/phase.ts` | simultaneous phase with a deadline (`openPhase`, `resolvePhase`, `phaseLeft`, `phaseDone`, `turnSeconds`, `TURN_CHOICES`) |
 | `src/matchmaking.ts` | quick match / private room codes (`<prefix>.lobby.find`) |
 | `src/generator/roomScript.ts` | StackScript room referee generator |
 | `src/testing/*` | `createTable`, `loadRoomScript`, `scriptServer`, `microtasks` |

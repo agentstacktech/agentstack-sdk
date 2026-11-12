@@ -7,6 +7,7 @@
  *   ui.destroy();
  */
 import type { LobbyController, LobbyState } from '../lobby.js';
+import { TURN_CHOICES } from '../phase.js';
 
 export interface LobbyLabels {
   title: string; create: string; createHint: string; join: string; joinHint: string; codePlaceholder: string; joinGo: string;
@@ -15,6 +16,7 @@ export interface LobbyLabels {
   badCode: string; offline: string; version: string; signIn: string; unavailable: string; close: string;
   yourName: string;
   addLocal: string; sameScreen: string; removeLocal: string; /** Someone else's local seat: «на экране {name}». */ withOwner: string;
+  /** `turnChoice`: label, «Off», «{s} s», the hint under the buttons. */ turnTimer: string; turnOff: string; turnSeconds: string; turnHint: string;
 }
 const en: LobbyLabels = {
   title: 'Play with friends', create: 'Create a room', createHint: 'You get a code to send to friends', join: 'Join with a code',
@@ -26,6 +28,7 @@ const en: LobbyLabels = {
   signIn: 'Online play needs an account. Sign in, then try again.', unavailable: 'Online play is not switched on on the server yet. Try again later.',
   close: 'Close', yourName: 'Your name (friends see it)',
   addLocal: '+ Player on this device', sameScreen: 'same screen', removeLocal: 'Remove', withOwner: "on {name}'s screen",
+  turnTimer: 'Time per move', turnOff: 'Off', turnSeconds: '{s} s', turnHint: 'Everyone moves at the same time. When time runs out, a default move is made for whoever has not chosen.',
 };
 const ru: LobbyLabels = {
   title: 'Игра с друзьями', create: 'Создать комнату', createHint: 'Вы получите код для друзей', join: 'Войти по коду',
@@ -37,6 +40,7 @@ const ru: LobbyLabels = {
   signIn: 'Для игры онлайн нужен аккаунт. Войдите и попробуйте ещё раз.', unavailable: 'Онлайн-игра ещё не включена на сервере. Попробуйте позже.',
   close: 'Закрыть', yourName: 'Ваше имя (его увидят друзья)',
   addLocal: '+ Игрок на этом устройстве', sameScreen: 'этот экран', removeLocal: 'Убрать', withOwner: 'на экране {name}',
+  turnTimer: 'Время на ход', turnOff: 'Выкл', turnSeconds: '{s} с', turnHint: 'Все ходят одновременно. Когда время выйдет, за тех, кто не выбрал, сделается ход по умолчанию.',
 };
 const pt: LobbyLabels = {
   title: 'Jogar com amigos', create: 'Criar sala', createHint: 'Você recebe um código para enviar aos amigos', join: 'Entrar com código',
@@ -48,6 +52,7 @@ const pt: LobbyLabels = {
   signIn: 'O jogo online precisa de uma conta. Entre e tente de novo.', unavailable: 'O jogo online ainda não está ativado no servidor. Tente mais tarde.',
   close: 'Fechar', yourName: 'Seu nome (os amigos verão)',
   addLocal: '+ Jogador neste aparelho', sameScreen: 'mesma tela', removeLocal: 'Remover', withOwner: 'na tela de {name}',
+  turnTimer: 'Tempo por jogada', turnOff: 'Desl.', turnSeconds: '{s} s', turnHint: 'Todos jogam ao mesmo tempo. Quando o tempo acaba, quem não escolheu recebe a jogada padrão.',
 };
 
 /**
@@ -80,6 +85,37 @@ export interface MountLobbyOptions {
    * `name(j)` = the default name of local player j (1, 2, …); `max` = most local players (default 3, capped by free seats).
    */
   locals?: { name: (j: number) => string; max?: number };
+  /**
+   * Room settings the creator picks before «Create» (e.g. the turn timer: `TURN_CHOICES`). Kept on the object
+   * like `nameField` (`value` changes on tap); the game's `connect` puts it into `createSession({ params })`.
+   * The waiting screen shows what the room actually uses («Turn timer: 60 s»), read from the room params,
+   * so a friend who joined by code sees the creator's choice.
+   */
+  choices?: LobbyChoice[];
+}
+export interface LobbyChoice {
+  /** Room param key (`params[param]`). */
+  param: string;
+  label: string;
+  options: { value: string | number; label: string }[];
+  value: string | number;
+  /** One plain line under the buttons (e.g. «When time runs out, a default move is made»). */
+  hint?: string;
+}
+/** The turn-timer room choice (`TURN_CHOICES` by default: off / 30 / 60 / 90 s) in the lobby's language. */
+export function turnChoice(L: Pick<LobbyLabels, 'turnTimer' | 'turnOff' | 'turnSeconds' | 'turnHint'>, value: number, o: { param?: string; seconds?: readonly number[]; hint?: boolean } = {}): LobbyChoice {
+  const secs = o.seconds ?? TURN_CHOICES;
+  return {
+    param: o.param ?? 'turnS', label: L.turnTimer, value: secs.includes(value) ? value : secs[0]!,
+    options: secs.map((s) => ({ value: s, label: s ? L.turnSeconds.replace('{s}', String(s)) : L.turnOff })),
+    ...(o.hint === false ? {} : { hint: L.turnHint }),
+  };
+}
+/** «Turn timer: 60 s» for the waiting screen, from the room params (pure; '' when the room has no such param). */
+export function choiceLine(c: Pick<LobbyChoice, 'param' | 'label' | 'options'>, params: Readonly<Record<string, unknown>> | undefined): string {
+  const v = params?.[c.param];
+  const opt = c.options.find((o) => o.value === v);
+  return opt ? `${c.label}: ${opt.label}` : '';
 }
 export interface LobbyUi { readonly el: HTMLElement; show(): void; hide(): void; destroy(): void }
 
@@ -110,6 +146,10 @@ const CSS = `
 .np-code span+span{margin-left:.35em}
 .np-name{min-height:48px;border-radius:12px;border:2px solid #ffffff33;background:#0004;color:inherit;font:inherit;font-size:18px;padding:8px 12px;width:100%;box-sizing:border-box}
 .np-name:focus-visible{outline:3px solid var(--np-accent,#e0a33a);outline-offset:2px}
+.np-seg{display:flex;gap:6px;flex-wrap:wrap}.np-seg>button{flex:1 1 60px;min-height:44px;border:2px solid transparent;border-radius:10px;font:inherit;font-weight:600;cursor:pointer;background:#ffffff1a;color:inherit;padding:6px 8px}
+.np-seg>button[aria-pressed="true"]{background:var(--np-accent,#e0a33a);color:var(--np-accent-fg,#1b130b)}
+.np-seg>button:focus-visible{outline:3px solid var(--np-accent,#e0a33a);outline-offset:2px}
+.np-choice{display:flex;flex-direction:column;gap:6px}.np-choice>.np-hint{margin:0}
 .np-sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;padding:0}`;
 
 const CSS_ESCAPE = (v: string): string => v.replace(/["\\]/g, '\\$&');
@@ -197,6 +237,16 @@ export function mountLobby<S, I, V>(parent: HTMLElement, lobby: LobbyController<
         card.append(el('label', { class: 'np-hint', for: id }, L.yourName), input);
       }
       if (!joining) {
+        for (const c of o.choices ?? []) {
+          const id = `${titleId}-${c.param}`;
+          card.append(el('div', { class: 'np-choice', role: 'group', 'aria-labelledby': id },
+            el('span', { id, class: 'np-hint' }, c.label),
+            el('div', { class: 'np-seg' }, ...c.options.map((op) => el('button', {
+              type: 'button', 'aria-pressed': String(op.value === c.value), 'data-k': `${c.param}-${op.value}`,
+              onclick: () => { c.value = op.value; render(lobby.state); },
+            }, op.label))),
+            c.hint ? el('p', { class: 'np-hint' }, c.hint) : null));
+        }
         card.append(btn(L.create, () => lobby.create(), true), el('p', { class: 'np-hint' }, L.createHint),
           btn(L.join, () => { joining = true; render(lobby.state); }), el('p', { class: 'np-hint' }, L.joinHint));
         if (o.onClose) card.append(btn(L.close, o.onClose));
@@ -227,6 +277,9 @@ export function mountLobby<S, I, V>(parent: HTMLElement, lobby: LobbyController<
         const nl = o.locals;
         card.append(btn(L.addLocal, () => setLocals([...mine.map((q) => q.name), nl.name(mine.length + 1)]), false, false, 'add-local'));
       }
+      const params = ses?.model.params;
+      const set = (o.choices ?? []).map((c) => choiceLine(c, params)).filter(Boolean);
+      if (set.length) card.append(el('p', { class: 'np-hint', 'data-k': 'room-set' }, set.join(' · ')));
       if (o.note) card.append(el('p', { class: 'np-hint' }, o.note));
       const waitLine = seated.length < s.min ? fmt(L.waitingMore, { n: seated.length, min: s.min }) : s.ready ? L.waitingStart : '';
       if (waitLine) card.append(el('p', { class: 'np-msg' }, waitLine));

@@ -101,6 +101,24 @@ One device can hold **several seats**: friends on one screen (shared keyboard, s
 
 Rules: local seats share their device's presence (they go away and come back together); one `ready()` / `rematch()` from the device counts for all its seats; a device that omits a local seat's batch plays `idle` there (it cannot stall the room). **Not for `secret` games** (`locals` is ignored): one screen would show every hidden move — use a pass-the-device flow instead.
 
+## Simultaneous phase with a deadline (`openPhase` …, fold / authority)
+
+Plain data kept in your state; every function is pure and returns a new value.
+
+| Function | Meaning |
+|---|---|
+| `openPhase(now, needs, ms)` | new phase: `needs` = seats that act, `ms` = limit (0 = no clock) |
+| `readyPhase(p, seat)` / `unreadyPhase(p, seat)` | mark a seat done / undo before the reveal |
+| `touchPhase(p, now, graceMs)` | an input with < `graceMs` left stretches the clock once to `graceMs` |
+| `phaseLeft(p, now)` | ms left, or `null` without a clock |
+| `phaseTimedOut(p, now, slackMs?)` | the clock ran out (+ optional on-screen slack) |
+| `phaseWaiting(p, absent?)` | seats still thinking (absent seats never wait) |
+| `resolvePhase(p, now, absent?)` | `'all-ready'` / `'timeout'` (apply defaults) / `null` |
+| `phaseDone(p, seat)` | for `mountMatchBar({ done })`: ready / thinking / not acting |
+| `turnSeconds(raw, fallback, max?)` · `TURN_CHOICES` | sanitize `params.turnS`; `[0, 30, 60, 90]` |
+
+UI (`@agentstack/netplay/ui`): `mountLobby(…, { choices: [turnChoice(LOBBY_LABELS.ru, 60)] })` — the room creator picks the timer before «Create»; the waiting screen shows the room's value to everyone (`choiceLine(choice, session.model.params)`).
+
 ## Private rooms & lobby (`createLobby`)
 
 `roomCode()` → `'K7MQ2X'` (alphabet without 0/O/1/I/L) · `parseRoomCode(text)` accepts `k7mq 2x`, `K7MQ-2X` or a pasted invite link → code | null ·
