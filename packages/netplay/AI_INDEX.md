@@ -21,4 +21,4 @@
 ## Sideways
 
 - Parent SDK: [../../AI_INDEX.md](../../AI_INDEX.md) · [../../AGENTS.md](../../AGENTS.md)
-- StackScript client used as transport: `packages/core` `createStackScriptClient` / `createHostedStackScriptClient`
+- StackScript client used as transport: `sdk.stackscript(projectId, { hostedMcp? })` (`packages/core/src/stackscript/client.ts`)

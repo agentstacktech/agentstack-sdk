@@ -25,6 +25,12 @@
 
 ## Что внутри
 
-Лобби и места · таймауты (`presenceMs`, `turnMs`) · реванш · реконнект с `afterSeq` · хэши состояния и
+Лобби и места · таймауты (`presenceMs`, `turnMs`) · реванш · реконнект с `afterSeq` и exactly-once (счётчик отправителя `n`, ретраи безопасны) · `clock`/`clockMs` для таймеров в `fold`/`authority` · хэши состояния и
 `snapshot.desync` · `ctx.rng`/`deriveSeed` · анти-чит (повторная валидация `input()` у всех,
 commit–reveal, приватные `view` в `authority`) · input delay и `confirmed(tick)` для своего цикла.
+
+## AgentStack
+
+Раннер — клиент из основного SDK: `new AgentStackSDK({...}).stackscript(projectId, { hostedMcp: true })`
+(для игроков на hosted-странице; без `hostedMcp` — с API-ключом для агентов/серверов). Скрипт комнаты:
+`generateRoomScript(game, { prefix })` или `npm run gen:room -- <id> <min> <max>`; публикация — только инструментами платформы.

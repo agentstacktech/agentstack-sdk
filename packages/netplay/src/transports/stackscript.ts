@@ -4,8 +4,7 @@
  * StackScript client — no raw fetch here:
  *
  * ```ts
- * import { createHostedStackScriptClient } from '@agentstack/sdk';
- * const runner = createHostedStackScriptClient(sdk.http, projectId);   // players (cookie MCP)
+ * const runner = sdk.stackscript(projectId, { hostedMcp: true });   // players (cookie MCP); AgentStackSDK from @agentstack/sdk
  * const transport = stackscriptTransport(runner, { scriptId: 'tribute-room', exportPrefix: 'tribute' });
  * ```
  */
@@ -13,7 +12,7 @@ import type { QueueApi } from '../matchmaking.js';
 import type { Body, Entry, Transport } from '../types.js';
 import { pollingTransport, type PollingOptions, type RoomApi } from './polling.js';
 
-/** Structural subset of `createStackScriptClient(...)` / `createHostedStackScriptClient(...)` from @agentstack/sdk. */
+/** Structural subset of the client returned by `sdk.stackscript(projectId, opts)` in @agentstack/sdk. */
 export interface ScriptRunner {
   run(params: { script_id: string; export: string; input?: Record<string, unknown> | unknown[]; idempotency_key?: string; version?: string }): Promise<unknown>;
 }

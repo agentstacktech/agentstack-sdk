@@ -73,4 +73,5 @@ See [test/recipe.test.ts](test/recipe.test.ts) — rock-paper-scissors built onl
 
 - StackScript P2 (`defineCommand` + `ctx.dna`) is what the generator targets; no room `onTick` needed.
 - Guest (no sign-in) script calls may return 401 on some projects; WSS upgrade may be refused (403) → use `stackscriptTransport` (polling).
-- Use the SDK client (`createStackScriptClient` / `createHostedStackScriptClient`) as the `ScriptRunner`; do not hand-roll fetch.
+- Use the SDK client as the `ScriptRunner`: `sdk.stackscript(projectId, { hostedMcp: true })` for players on a hosted page (cookie MCP), `sdk.stackscript(projectId)` with an API key for agents/servers; do not hand-roll fetch. Its `run()` already matches `ScriptRunner`.
+- Exactly-once: every body carries the sender counter `n`; the reducer drops `n <= lastN[from]`, so transports may retry appends freely. Never strip `n` in a custom transport. One identity = one live session per room (two tabs as the same user share `from`, so the older tab's counter loses).

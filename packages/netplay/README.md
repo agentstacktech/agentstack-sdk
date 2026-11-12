@@ -48,11 +48,12 @@ me.rematch();      // after 'over', when all seats vote, a new match starts
 ### On AgentStack (StackScript room)
 
 ```ts
-import { createHostedStackScriptClient } from '@agentstack/sdk';
+import { AgentStackSDK } from '@agentstack/sdk';
 import { generateRoomScript, stackscriptTransport, createMatchmaker, stackscriptRoomApi } from '@agentstack/netplay';
 
 const source = generateRoomScript(ticTacToe, { prefix: 'ttt' }); // save as server/ttt-room.ts, publish with the platform tools
-const runner = createHostedStackScriptClient({ /* your project config */ });
+const sdk = new AgentStackSDK({ apiBase: '…' });                        // players on a hosted /s/ page: no API key
+const runner = sdk.stackscript(projectId, { hostedMcp: true });         // cookie-session MCP; omit hostedMcp for server/agent keys
 const opts = { scriptId: 'ttt-room', exportPrefix: 'ttt' };
 const { room } = await createMatchmaker(stackscriptRoomApi(runner, opts)).quickMatch('tic-tac-toe', 2);
 const s = createSession(ticTacToe, { transport: stackscriptTransport(runner, opts), room, autoPumpMs: 50 });
