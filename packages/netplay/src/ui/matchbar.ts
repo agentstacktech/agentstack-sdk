@@ -186,7 +186,9 @@ export function mountMatchBar<S, I, V>(session: Session<S, I, V>, o: MatchBarOpt
     if (model.series) { const c = el('span', 'np-chip', model.series); c.dataset.test = 'np-series'; chips.push(c); }
     const e = model.end;
     if (e?.inline) {
-      // the game shows its own result screen: only the vote and the way out live in the strip
+      // the game shows its own result screen: only the vote and the way out live in the strip — plus the result
+      // itself when the room (not the rules) ended the match (someone left / lost connection): no game screen then
+      if (e.reason) { const c = el('span', 'np-chip', `${e.title} — ${e.reason}`); c.dataset.test = 'np-result'; chips.push(c); }
       if (e.note) chips.push(el('span', 'np-chip', e.note));
       if (e.rematch) chips.push(button(e.rematch.label, () => session.rematch(), true, !e.rematch.enabled, 'rematch'));
       if (o.onNewRoom) chips.push(button(o.labels?.newRoom ?? en.newRoom, o.onNewRoom, false, false, 'new'));
