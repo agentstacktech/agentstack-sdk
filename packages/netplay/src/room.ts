@@ -393,17 +393,21 @@ export function reduceRoom<S, I, V>(m: RoomModel<S, I, V>, e: Entry): void {
       return;
     }
     case 'cmd': {
-      const l = Number.isInteger(b.l) && (b.l as number) > 0 ? (b.l as number) : 0;
-      const a = l > 0 ? playerById(m, localId(e.from, l)) : p; // the acting seat: own or one of this device's local seats
-      if (g.mode === 'lockstep' || !p || !a || m.phase !== 'playing' || b.m !== m.match || a.status === 'left') return;
+      if (g.mode === 'lockstep' || !p || m.phase !== 'playing' || b.m !== m.match) return;
       if (!m.simulate || !m.state || !g.apply) return;
-      const v = g.input(b.d, a.seat, m.state);
-      if (v === undefined) { m.notice = `rejected command seat ${a.seat}`; return; }
-      const next = g.apply(m.state, a.seat, v, ctxFor(m, m.tick));
-      if (next !== undefined) m.state = next;
-      m.tick += 1;
-      m.onStep?.(m.tick);
-      checkOutcome(m);
+      const l = Number.isInteger(b.l) && (b.l as number) > 0 ? (b.l as number) : 0;
+      // the acting seats: own, one of this device's local seats (`l`), or all of them (`a: 1`, one entry per device)
+      const acting = b.a === 1 ? [p, ...localsOf(m, e.from)] : [l > 0 ? playerById(m, localId(e.from, l)) : p];
+      for (const a of acting) {
+        if (!a || a.status === 'left' || m.phase !== 'playing' || !m.state) continue;
+        const v = g.input(b.d, a.seat, m.state);
+        if (v === undefined) { m.notice = `rejected command seat ${a.seat}`; continue; }
+        const next = g.apply(m.state, a.seat, v, ctxFor(m, m.tick));
+        if (next !== undefined) m.state = next;
+        m.tick += 1;
+        m.onStep?.(m.tick);
+        checkOutcome(m);
+      }
       return;
     }
     case 'hash': {

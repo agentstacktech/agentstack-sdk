@@ -9,7 +9,7 @@ export { createRng, deriveSeed, seedFromString, mix32, type Rng, type RngState }
 export { hashState, hashString, canonicalJson } from './hash.js';
 export { memoryHub, type MemoryHub, type MemoryHubOptions } from './transports/memory.js';
 export { pollingTransport, type RoomApi, type PollingOptions } from './transports/polling.js';
-export { stackscriptRoomApi, stackscriptTransport, type ScriptRunner, type StackscriptRoomOptions } from './transports/stackscript.js';
+export { conflictDelayMs, stackscriptRoomApi, stackscriptTransport, type ScriptRunner, type StackscriptRoomOptions } from './transports/stackscript.js';
 export { wssTransport, type WssOptions } from './transports/wss.js';
 /** DEV ONLY (LAN relay, no auth): see tools/dev-relay.mjs. */
 export { devRelayTransport, devRelayRoomApi } from './transports/devrelay.js';

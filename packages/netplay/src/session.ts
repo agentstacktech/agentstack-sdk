@@ -324,6 +324,23 @@ export class Session<S, I, V = S> {
   }
 
   /**
+   * fold / authority: the same command for EVERY seat on this device (mine first, then the local seats) in ONE entry
+   * (`{ k: 'cmd', a: 1 }`), e.g. a clock report on a shared table. Per-seat `input(cmd, j)` would cost one entry per
+   * seat against the room's per-user rate limit. Returns false when no seat accepts it.
+   */
+  inputAll(value: I): boolean {
+    const m = this.model;
+    const g = this.game;
+    const own = this.seat;
+    if (g.mode === 'lockstep' || own < 0 || m.phase !== 'playing') return false;
+    if (m.state !== null && m.state !== undefined && !this.seats.some((seat) => g.input(value, seat, m.state as S) !== undefined)) return false;
+    const host = m.players[0]?.id;
+    const to = g.mode === 'authority' && this.opts.transport.caps.privateEntries && host && host !== this.self ? host : undefined;
+    this.push({ k: 'cmd', m: m.match, d: value, a: 1 }, to);
+    return true;
+  }
+
+  /**
    * lockstep (realtime / turns, not secret): this tick's input for every seat on this device —
    * `values[0]` mine, `values[j]` local seat j (missing = idle). One entry carries them all. Same stall rule as `input`.
    */

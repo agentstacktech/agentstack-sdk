@@ -167,7 +167,8 @@ type BodyKind =
   | { k: 'in'; m: number; t: number; d: unknown[]; salt?: string; x?: unknown[][] }
   | { k: 'commit'; m: number; t: number; h: number }
   /** `l`: local seat index (0 / missing = the member's own seat). */
-  | { k: 'cmd'; m: number; d: unknown; l?: number }
+  /** `l`: one local seat of the sender's device; `a: 1`: every seat of that device (own first, then locals) — one entry, e.g. a clock report. */
+  | { k: 'cmd'; m: number; d: unknown; l?: number; a?: 1 }
   | { k: 'hash'; m: number; t: number; h: number }
   | { k: 'view'; m: number; s: number; seat: Seat; d: unknown; o?: Outcome | null }
   | { k: 'clock' }
