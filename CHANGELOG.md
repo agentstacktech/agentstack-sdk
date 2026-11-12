@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `@agentstack/netplay` pass 4: quiet-room polling — presence beats and hash checks no longer reset the poll to full speed, stackscript `idleMaxMs` 1200 → 2000: both players thinking in a turn game 1.03 → 0.53 req/s per client.
 - `@agentstack/netplay`: secret lockstep — the reveal kept in `secretStore` stays until the room moves past that turn (it was cleared when merely queued: a reveal that could not go out before a reload was lost and the turn waited for the clock).
 - `@agentstack/netplay` pass 3 (fuzz: drops, hide/show, rematch, reloads on fold / realtime / secret / authority games): hash checkpoints carry their match (a reload after a rematch reported match-1 hashes as match 2 → a false desync); a catch-up reports only the newest 2 unreported checkpoints (was every one → rate-limit burst, 14 → ≤3 entries in the test); `memoryHub.disconnect` tells the client like a dropped socket (a silent spectator stayed stuck).
 - `@agentstack/netplay`: a move from a background tab (a game that keeps playing while hidden) restores normal polling — it used to stay at `hiddenPollMs` while counted present.

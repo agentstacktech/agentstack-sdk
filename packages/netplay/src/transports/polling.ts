@@ -41,6 +41,9 @@ export function backoffMs(attempt: number, baseMs: number, capMs: number): numbe
   return Math.min(capMs, baseMs * 2 ** Math.min(Math.max(attempt, 0), 6));
 }
 
+/** Entries that mean something happened (a move, a join, a vote…), as opposed to presence beats and hash checks. */
+const active = (e: { body: Body }): boolean => { const k = (e.body as { k?: string } | null)?.k; return k !== 'clock' && k !== 'hash'; };
+
 export function pollingTransport(api: RoomApi, o: PollingOptions = {}): Transport {
   const interval = o.intervalMs ?? 400;
   const cap = o.maxBackoffMs ?? 5000;
@@ -67,7 +70,8 @@ export function pollingTransport(api: RoomApi, o: PollingOptions = {}): Transpor
       const deliver = (es: readonly Entry[]): void => {
         const fresh = es.filter((e) => e.seq > cursor);
         if (!fresh.length) return;
-        period = interval;
+        // heartbeats / hash checks are not activity: a room where both players think keeps stretching its poll
+        if (fresh.some(active)) period = interval;
         cursor = fresh[fresh.length - 1]!.seq;
         opts.onEntries(fresh);
       };
@@ -130,7 +134,7 @@ export function pollingTransport(api: RoomApi, o: PollingOptions = {}): Transpor
         close() { alive = false; if (timer) clearTimeout(timer); },
       };
       const enqueue = (items: readonly { body: Body; to?: string }[]): Promise<void> => {
-          period = interval; // we are active: look for answers at the normal pace
+          if (items.some((it) => active(it))) period = interval; // we are active: look for answers at the normal pace
           if (!alive || broken) return Promise.reject(new Error('polling: link closed'));
           // serialize appends so the server sees them in call order
           const p = chain.then(async () => {

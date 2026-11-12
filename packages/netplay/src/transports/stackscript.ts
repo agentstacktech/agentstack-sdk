@@ -112,7 +112,7 @@ export function stackscriptRoomApi(runner: ScriptRunner, o: StackscriptRoomOptio
   };
 }
 
-/** Defaults for the hosted room: inputs batched every 100 ms, entries piggybacked on appends, poll 400 ms stretching to 1.2 s in a quiet room. */
+/** Defaults for the hosted room: inputs batched every 100 ms, entries piggybacked on appends, poll 400 ms stretching to 2 s in a quiet room (presence beats and hash checks do not count as activity). */
 export function stackscriptTransport(runner: ScriptRunner, o: StackscriptRoomOptions): Transport {
-  return pollingTransport(stackscriptRoomApi(runner, o), { sendEveryMs: 100, idleMaxMs: 1200, ...o });
+  return pollingTransport(stackscriptRoomApi(runner, o), { sendEveryMs: 100, idleMaxMs: 2000, ...o });
 }
