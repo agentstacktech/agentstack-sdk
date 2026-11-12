@@ -11,6 +11,7 @@ export interface Game<S, I, V = S> extends GameDef<S, I, V> {
   readonly presenceMs: number;
   readonly onTimeout: 'idle' | 'forfeit';
   readonly clockMs: number;
+  readonly hostGraceMs: number;
 }
 
 const ID = /^[a-z0-9][a-z0-9-]{0,47}$/;
@@ -46,5 +47,6 @@ export function defineGame<S, I, V = S>(def: GameDef<S, I, V>): Game<S, I, V> {
     presenceMs: def.timeouts?.presenceMs ?? 20_000,
     onTimeout: def.timeouts?.onTimeout ?? 'idle',
     clockMs: def.clock && def.clockMs ? Math.max(250, def.clockMs) : 0,
+    hostGraceMs: def.timeouts?.hostGraceMs ?? 60_000,
   };
 }

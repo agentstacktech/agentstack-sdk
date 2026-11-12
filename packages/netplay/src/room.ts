@@ -56,6 +56,10 @@ export interface RoomModel<S, I, V = S> {
   history: Map<number, I[]>;
   commits: Map<number, (number | undefined)[]>;
   hashes: Map<number, Map<string, number>>;
+  /** This client's user id (authority games: who simulates after a rematch re-seats players). '' = unknown. */
+  self: string;
+  /** authority: server time the authority seat was first seen away in this match (null = present). */
+  hostLostAt: number | null;
 }
 
 export interface RoomOptions {
@@ -71,6 +75,7 @@ export function createRoom<S, I, V>(game: Game<S, I, V>, room: string, opts: Roo
     params: {}, players: [], spectators: new Set(), phase: 'lobby', match: 0, seed: 0, seats: 0,
     state: null, tick: 0, now: 0, tickStartT: 0, outcome: null, desync: null, rematch: new Set(), notice: null, lastSeq: 0, lastN: new Map(),
     inputs: new Map(), commits: new Map(), hashes: new Map(), onStep: null, closedTick: -1, closedAt: 0, history: new Map(),
+    self: '', hostLostAt: null,
   };
 }
 
@@ -123,6 +128,9 @@ function startMatch<S, I, V>(m: RoomModel<S, I, V>): void {
   m.closedTick = -1;
   m.history.clear();
   for (const p of m.players) p.ready = false;
+  m.hostLostAt = null;
+  // authority: seat 0 simulates — after a rematch dropped the old host, the new seat 0 takes over
+  if (g.mode === 'authority' && m.self) m.simulate = m.players[0]?.id === m.self;
   m.state = m.simulate ? g.setup({ seed: m.seed, seats: m.seats, rng: createRng(deriveSeed(m.seed, -1)), params: m.params }) : null;
 }
 
@@ -184,6 +192,16 @@ function sweepTime<S, I, V>(m: RoomModel<S, I, V>): void {
       if (m.phase === 'playing' && g.onTimeout === 'forfeit') forfeit(m, p.seat, 'timeout');
     }
   }
+  if (g.mode === 'authority' && m.phase === 'playing') {
+    // the host holds the hidden state, so nobody can take over mid-match: wait `hostGraceMs` for it to come back
+    // (reconnect / reload refolds the same match), then end the match for everyone instead of freezing
+    const host = m.players[0];
+    if (host && host.status === 'on') m.hostLostAt = null;
+    else if (host) {
+      m.hostLostAt ??= m.now;
+      if (m.now - m.hostLostAt > g.hostGraceMs) { setOutcome(m, { winner: -1, reason: 'host-lost' }); return; }
+    }
+  }
   if (m.phase !== 'playing' || !m.state) return;
   if (g.mode === 'lockstep') {
     if (g.turnMs > 0 && m.now - m.tickStartT > g.turnMs) {
@@ -214,7 +232,7 @@ export function reduceRoom<S, I, V>(m: RoomModel<S, I, V>, e: Entry): void {
   const p = playerById(m, e.from);
   if (p) {
     p.lastT = m.now;
-    if (p.status === 'away') p.status = 'on';
+    if (p.status === 'away') { p.status = 'on'; if (p.seat === 0) m.hostLostAt = null; }
   }
   sweepTime(m);
   const b = e.body as Body;
@@ -243,6 +261,7 @@ export function reduceRoom<S, I, V>(m: RoomModel<S, I, V>, e: Entry): void {
       p.ready = false;
       if (m.phase === 'playing') {
         forfeit(m, p.seat, 'left');
+        if (g.mode === 'authority' && p.seat === 0 && m.phase === 'playing') setOutcome(m, { winner: -1, reason: 'host-left' });
         if (g.mode === 'lockstep') drainLockstep(m);
       }
       return;
@@ -299,7 +318,8 @@ export function reduceRoom<S, I, V>(m: RoomModel<S, I, V>, e: Entry): void {
     case 'rematch': {
       if (!p || m.phase !== 'over' || b.m !== m.match || p.status === 'left') return;
       m.rematch.add(p.seat);
-      const voters = m.players.filter((q) => q.status !== 'left');
+      // only present players vote; away/left seats are dropped from the next match (an authority host that was lost too)
+      const voters = m.players.filter((q) => q.status === 'on');
       if (voters.length >= g.seats.min && voters.every((q) => m.rematch.has(q.seat))) {
         m.players = voters;
         renumber(m);

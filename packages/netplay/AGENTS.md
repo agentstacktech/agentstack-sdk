@@ -16,7 +16,7 @@
 | Realtime, everyone acts every frame (shooter, co-op action) | `lockstep` | `idle` input for silent seats; `hashEvery` ~10–60; tune `inputDelay` |
 | Simultaneous secret turns (RPS, formations, beats) | `lockstep` + `secret: true` + `timeouts.turnMs` | inputs revealed only when all committed; `idle` = "no move" |
 | Each player on their own board / race / async turns, open info | `fold` | `apply(state, seat, cmd)` in log order; replays verify scores |
-| Hidden hands, fog of war, private dice | `authority` | seat 0 simulates; `view(state, seat)` must strip secrets; needs a transport with private entries; add `clock` + `clockMs` for timers/bots |
+| Hidden hands, fog of war, private dice | `authority` | seat 0 simulates; `view(state, seat)` must strip secrets; needs a transport with private entries; add `clock` + `clockMs` for timers/bots; persist `secretSeed` per room so a reloading host resumes; show `snapshot.hostWaitMs` ("host reconnecting…"); `timeouts.hostGraceMs` then ends as `host-lost`, the rest can rematch with a new host |
 
 ## Recipe: a new game from scratch (copy this order)
 

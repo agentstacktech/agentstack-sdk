@@ -158,6 +158,7 @@ export class Session<S, I, V = S> {
       state: own ? m.state : null,
       view: own ? this.game.view(m.state as S, seat) : this.lastView,
       outcome, desync: m.desync, rematch: [...m.rematch], notice: m.notice, connection: this.connection,
+      hostWaitMs: m.hostLostAt === null || m.phase !== 'playing' ? null : Math.max(0, m.hostLostAt + this.game.hostGraceMs - m.now),
     };
     return this.snap;
   }
@@ -275,6 +276,7 @@ export class Session<S, I, V = S> {
     for (const e of es) {
       if (e.seq <= m.lastSeq) continue;
       if (e.from === this.self && typeof (e.body as Body)?.n === 'number') this.sendN = Math.max(this.sendN, (e.body as Body).n!); // reload: continue our counter
+      m.self = this.self;
       if (this.game.mode === 'authority') m.simulate = m.players.length === 0 ? true : m.players[0]!.id === this.self;
       const prevMatch = m.match;
       if (e.body && (e.body as Body).k === 'view') this.takeView(e);

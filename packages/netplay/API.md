@@ -30,6 +30,7 @@ seats not `1 ≤ min ≤ max ≤ 64`, missing `step` (lockstep) / `apply` (fold,
 | `timeouts.presenceMs` | `number` | 20000 | silent seat → `away` |
 | `timeouts.turnMs` | `number` | none | lockstep: max wait for one tick/turn |
 | `timeouts.onTimeout` | `'idle' \| 'forfeit'` | `'idle'` | `forfeit` ends a 2-seat match when a seat goes away/leaves |
+| `timeouts.hostGraceMs` | `number` | 60000 | authority: host away → wait this long for it to return (reconnect / reload with the same `secretSeed`), then end as `host-lost`; host `leave()` ends at once (`host-left`) |
 
 **`StepCtx`** (`step`, `apply`, `clock`): `{ tick, now, seed, rng, absent: boolean[] }` — `tick` = lockstep tick or command index.
 
@@ -60,7 +61,7 @@ seats not `1 ≤ min ≤ max ≤ 64`, missing `step` (lockstep) / `apply` (fold,
 | `snapshot` | `Snapshot` | see below |
 | `input(value)` | `boolean` | `false` = not sent: not playing / spectator / fails `game.input` locally (fold, and the authority host) / lockstep too far ahead / secret already committed this tick. `true` = queued; **sent on the next `update()`** (or `autoPumpMs`) |
 | `ready()` | — | lobby vote; the match starts when the room is full, or when ≥ `min` seated and all ready |
-| `rematch()` | — | only in `over`; new match when every seat voted |
+| `rematch()` | — | only in `over`; new match when every **present** seat voted (`away`/`left` seats are dropped; in authority the new seat 0 hosts) |
 | `leave()` / `close()` | — | `leave` = tell the room (lobby seat freed, in-game forfeit); `close` = drop the link |
 | `update()` | — | flush queued inputs, heartbeats, `clock` entries, reconnects |
 | `onStep(fn)` / `confirmed(tick)` | | lockstep: hook your own render loop |
@@ -68,7 +69,7 @@ seats not `1 ≤ min ≤ max ≤ 64`, missing `step` (lockstep) / `apply` (fold,
 
 **`Snapshot`**: `{ room, self, seat (-1 spectator), phase: 'lobby'|'playing'|'over', match, players: PlayerInfo[], spectators, tick,
 state (null on non-authority clients in authority mode), view, outcome (null while playing), desync (null = in sync), rematch: seat[],
-notice (last rejection / protocol hint, string|null), connection: 'idle'|'connecting'|'online'|'reconnecting'|'offline' }`.
+notice (last rejection / protocol hint, string|null), hostWaitMs (authority: ms left before `host-lost`, null = host present), connection: 'idle'|'connecting'|'online'|'reconnecting'|'offline' }`.
 `PlayerInfo = { id, seat, name, status: 'on'|'away'|'left', ready, lastT }`.
 
 ## Private rooms & lobby (`createLobby`)

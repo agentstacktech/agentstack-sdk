@@ -104,6 +104,12 @@ export interface GameDef<S, I, V = S> {
     readonly presenceMs?: number;
     /** Default 'idle' (lockstep continues with `idle`); 'forfeit' ends a 2-seat match. */
     readonly onTimeout?: TimeoutPolicy;
+    /**
+     * authority: after the host seat goes away (no entries for `presenceMs`), wait this long for it to come back
+     * (reconnect, or a reload with the same `secretSeed` refolds the match) before ending the match for everyone
+     * with `{ winner: -1, reason: 'host-lost' }`. A host that leaves ends it at once (`'host-left'`). Default 60000.
+     */
+    readonly hostGraceMs?: number;
   };
   /** lockstep: report a state hash every N ticks (default 30; 1 for turn-based). 0 disables. */
   readonly hashEvery?: number;
@@ -178,6 +184,8 @@ export interface Snapshot<S, V = S> {
   readonly rematch: readonly Seat[];
   /** Last rejection or protocol problem, for UI hints and logs. */
   readonly notice: string | null;
+  /** authority: the host is away — ms left (as of the last entry) before the match ends as 'host-lost'; null = host present. */
+  readonly hostWaitMs: number | null;
   readonly connection: ConnectionState;
 }
 
