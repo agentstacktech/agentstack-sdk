@@ -30,4 +30,11 @@ describe('localName (ui)', () => {
     expect(cleanName('x'.repeat(40), 'id')).toHaveLength(24);
     expect(cleanName('\n\t', 'id')).toBe('id');
   });
+  it('works when every storage call throws (private mode / blocked cookies)', () => {
+    const bad = { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); } };
+    const me = localName('g', { local: bad, session: bad });
+    expect(me.id).toMatch(/^P-[0-9A-Z]{1,4}$/);
+    me.name = '  Саша\u0007  ';
+    expect(me.name).toBe('Саша');
+  });
 });
