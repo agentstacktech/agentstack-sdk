@@ -21,6 +21,8 @@ export interface HostedMcpOptions {
   /** Bearer token source (signed-in player). Without it the cookie session is used. */
   token?: () => string | null | undefined;
   fetch?: typeof fetch;
+  /** Abort a request that hangs (ms). Default 15000 — the session then re-sends. */
+  timeoutMs?: number;
 }
 
 type Json = Record<string, unknown>;
@@ -50,6 +52,7 @@ export function hostedMcpRunner(o: HostedMcpOptions): ScriptRunner {
   const f = o.fetch ?? ((...a: Parameters<typeof fetch>) => fetch(...a));
   const base = (o.origin ?? '').replace(/\/+$/, '');
   let id = 0;
+  const timeout = (): AbortSignal | undefined => (typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(o.timeoutMs ?? 15_000) : undefined);
   const headers = (): Record<string, string> => {
     const h: Record<string, string> = { 'content-type': 'application/json', accept: 'application/json', 'x-project-id': String(o.projectId) };
     const t = o.token?.();
@@ -65,7 +68,7 @@ export function hostedMcpRunner(o: HostedMcpOptions): ScriptRunner {
     } catch { return false; }
   };
   const once = (params: Json) => f(`${base}/s/${o.projectId}/mcp`, {
-    method: 'POST', credentials: 'include', headers: headers(),
+    method: 'POST', credentials: 'include', headers: headers(), signal: timeout(),
     body: JSON.stringify({ jsonrpc: '2.0', id: ++id, method: 'tools/call', params: { name: 'agentstack.execute', arguments: {
       action: 'script.run', params: { project_id: o.projectId, ...params }, context: { project_id: o.projectId }, options: { execution_intent: 'direct' },
     } } }),
