@@ -93,6 +93,7 @@ mountLobby(document.body, lobby, { labels: LOBBY_LABELS.en, title: 'Tic-tac-toe'
 
 - **Lobby & seats** — join order = seat order; `min`/`max` seats; a full room starts by itself, otherwise when all seated pressed `ready()`; spectators (`spectate: true`, or anyone joining a full/running room). Private rooms: `createLobby` (codes, invite links, optional UI).
 - **Desync recovery** — hash checkpoints (`hashEvery`); a client outside the majority re-folds from the log (`autoResync`, or `session.resync()`), the next agreeing checkpoint clears `snapshot.desync`.
+- **Dev relay (DEV ONLY)** — `npm run dev-relay` + `devRelayTransport(url, user)`: two windows or phones on one Wi-Fi play before any server exists. No auth, memory only; never deploy it.
 - **Timeouts** — `timeouts: { presenceMs = 20000, turnMs?, onTimeout: 'idle' | 'forfeit' }` (silent seat → away; `forfeit` ends a 2-seat match), heartbeats.
 - **Rematch** — `rematch()` votes of present players; new seed per match (`match` counter in every entry).
 - **Host drop (authority)** — the host's secret state can't migrate, so others see `hostWaitMs` while it reconnects (a reload with the same `secretSeed` refolds the match); after `timeouts.hostGraceMs` the match ends as `host-lost` and the rest rematch under a new host.
