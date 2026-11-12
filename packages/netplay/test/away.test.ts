@@ -124,3 +124,17 @@ describe('away: background polling slows down (battery, data, request budget)', 
     } finally { vi.useRealTimers(); }
   });
 });
+
+describe('away: a move from a background tab restores normal polling', () => {
+  it('pace(3000) on away, pace(null) on the first move (was: stayed slow while counted present)', async () => {
+    const t = await createTable(race, { players: 2 });
+    await t.run(200, (c) => c.input(1));
+    const b = t.clients[1]!;
+    const calls: (number | null)[] = [];
+    (b as unknown as { link: { pace?: (ms: number | null) => void } }).link.pace = (ms) => { calls.push(ms); };
+    b.away(true);
+    expect(calls).toEqual([3000]);
+    await t.run(300, (c) => c.input(1)); // b plays from the background (e.g. an auto clock)
+    expect(calls).toEqual([3000, null]);
+  });
+});

@@ -394,7 +394,7 @@ export class Session<S, I, V = S> {
     this.batch.d.push(values[0] ?? g.idle);
     if (this.batch.x) for (let j = 1; j <= this.batch.x.length; j++) this.batch.x[j - 1]!.push(values[j] ?? g.idle);
     this.nextTick = t + 1;
-    this.hidden = false; // a move = back
+    this.wake(); // a move = back
     return true;
   }
 
@@ -445,8 +445,14 @@ export class Session<S, I, V = S> {
     else if (this.link && this.model.phase !== 'over' && now - this.lastSendAt >= beat) { this.push({ k: 'clock' }); this.flush(); }
   }
 
+  /** A move from a background tab = back: normal polling again (it used to stay at `hiddenPollMs` while counted present). */
+  private wake(): void {
+    if (!this.hidden) return;
+    this.hidden = false;
+    this.link?.pace?.(null);
+  }
   private push(body: Body, to?: string): void {
-    if (body.k !== 'away' && body.k !== 'hash' && body.k !== 'clock' && body.k !== 'view') this.hidden = false; // a move = back
+    if (body.k !== 'away' && body.k !== 'hash' && body.k !== 'clock' && body.k !== 'view') this.wake(); // a move = back
     const stamped = { ...body, n: ++this.sendN } as Body;
     this.outbox.push(to ? { body: stamped, to } : { body: stamped });
   }
