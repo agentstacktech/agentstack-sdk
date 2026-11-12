@@ -143,6 +143,10 @@ Keep the screen a **presenter**: one pure function `snapshot → plain data` (st
 - **Rematch**: show the vote count, «your opponent wants a rematch», and when they left (`status === 'left'`) hide Rematch and offer «New room». Keep a series score by **player id** (seats can change after a rematch).
 - **Clock**: `turnMs - (now - model.tickStartT)`; highlight the last 10 s; consider locking a legal pending move at the buzzer instead of losing the turn.
 - **Errors**: map `input()` refusal codes to sentences in every language you ship.
+- **Teams / shared wins**: return `winners: [0, 2]` from `outcome` — not one seat of the team plus a relabelled «lose». Pass `team` / `teamName` to `mountMatchBar`.
+- **Bets, cheers, audience votes**: `GameDef.audience` + `session.audience(v)`, never fake player commands (they would need a seat and move the tick).
+- **Background tab**: `bindVisibility(session)` — the room stops waiting for a hidden tab at once; on return lockstep re-anchors by itself. Your own world still has to catch up (run the missed ticks quietly, a slice per frame).
+- **Hiding a widget**: anything with `display:flex` beats `[hidden]` — add `[hidden]{display:none!important}` for your own panels (the SDK's match bar does).
 
 ## File map
 
@@ -158,7 +162,8 @@ Keep the screen a **presenter**: one pure function `snapshot → plain data` (st
 | `src/matchmaking.ts` | quick match / private room codes (`<prefix>.lobby.find`) |
 | `src/generator/roomScript.ts` | StackScript room referee generator |
 | `src/testing/*` | `createTable`, `loadRoomScript`, `scriptServer`, `microtasks` |
-| `src/ui/*` | `localName`, `mountLobby`, `mountMatchBar`, `mountNetStatus` (+ ru/en/pt labels) |
+| `src/outcome.ts` | `outcomeWinners`, `isWinner`, `resultWinners`, `normalizeOutcome` (several winners / teams) |
+| `src/ui/*` | `localName`, `mountLobby`, `mountMatchBar` (teams), `mountNetStatus` (+ ru/en/pt labels), `bindVisibility` (background tab → `session.away`) |
 | `examples/starter.ts` | whole browser game in 67 lines: rules + lobby + board + match bar + theme (start here) |
 | `src/ui/theme.ts` | `applyTheme()` / `themeCss()`: default look (dark / light / auto), `--np-*` variables |
 

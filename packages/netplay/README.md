@@ -102,6 +102,9 @@ mountLobby(document.body, lobby, { labels: LOBBY_LABELS.en, title: 'Tic-tac-toe'
 - **Timeouts** — `timeouts: { presenceMs = 20000, turnMs?, onTimeout: 'idle' | 'forfeit' }` (silent seat → away; `forfeit` ends a 2-seat match), heartbeats.
 - **Local seats** — several players on one device next to remote players (`locals: ['Bia']`, `session.inputs([...])`, `input(cmd, j)`, lobby «+ Player on this device»); no server change. Not for `secret` games.
 - **Rematch** — `rematch()` votes of present players; new seed per match (`match` counter in every entry).
+- **Teams & several winners** — `outcome` may return `winners: [0, 2]`; results, `seriesScore` and the match bar (`team`, `teamName`) count the win for every winner.
+- **Audience commands** — spectators bet / cheer / vote via `GameDef.audience` + `session.audience(v)`, apart from player commands; same fold on every client.
+- **Background tab** — `session.away(hidden)` (`bindVisibility(session)` in `/ui`): the room stops waiting for a hidden tab at once, without false «no connection» alarms.
 - **Host drop (authority)** — the host's secret state can't migrate, so others see `hostWaitMs` while it reconnects (a reload with the same `secretSeed` refolds the match); after `timeouts.hostGraceMs` the match ends as `host-lost` and the rest rematch under a new host.
 - **Reconnect & exactly-once** — transports resume from the last seq; every body carries the sender counter `n`, so a retried append whose first copy landed is applied once.
 - **Desync detection** — state hashes every `hashEvery` ticks (`hash` default: canonical FNV); `snapshot.desync`.

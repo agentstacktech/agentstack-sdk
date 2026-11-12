@@ -2,6 +2,16 @@
 
 **EN (полный):** [CHANGELOG.md](./CHANGELOG.md)
 
+## [Unreleased]
+
+### Добавлено
+
+- `@agentstack/netplay`: несколько победителей (`Outcome.winners`, команды и общая победа), команды зрителей (`GameDef.audience`, `session.audience`), фоновая вкладка (`session.away`, `bindVisibility`), команды в полосе матча (`team`, `teamName`).
+
+### Исправлено
+
+- Полоса матча: `.np-bar{display:flex}` перебивал `[hidden]`, тихая полоса не пряталась (второй список игроков на телефоне).
+
 ## [0.4.18] — 2026-09-08
 
 ### Changed

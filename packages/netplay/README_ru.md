@@ -28,6 +28,9 @@
 Лобби и места · несколько игроков на одном устройстве вместе с удалёнными (`locals`, `inputs([...])`) · таймауты (`presenceMs`, `turnMs`) · реванш · реконнект с `afterSeq` и exactly-once (счётчик отправителя `n`, ретраи безопасны) · `clock`/`clockMs` для таймеров в `fold`/`authority` · хэши состояния и
 `snapshot.desync` · `ctx.rng`/`deriveSeed` · анти-чит (повторная валидация `input()` у всех,
 commit–reveal, приватные `view` в `authority`) · input delay и `confirmed(tick)` для своего цикла.
+Команды и несколько победителей (`winners: [0, 2]`, полоса матча с `team`/`teamName`) · команды зрителей —
+ставки, болельщики, голосования (`GameDef.audience`, `session.audience(v)`) · фоновая вкладка
+(`session.away(hidden)`, `bindVisibility(session)`): комната сразу перестаёт ждать скрытую вкладку.
 
 ## AgentStack
 

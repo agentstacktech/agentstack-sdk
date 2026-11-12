@@ -1,7 +1,7 @@
 # @agentstack/netplay — API reference
 
 Everything public, with signatures and defaults. Types live in `src/types.ts` (every field has a doc comment).
-Entry points: `@agentstack/netplay` (core), `@agentstack/netplay/testing` (test harness), `@agentstack/netplay/ui` (optional DOM lobby).
+Entry points: `@agentstack/netplay` (core), `@agentstack/netplay/testing` (test harness), `@agentstack/netplay/ui` (optional DOM lobby, match bar, status pill, `bindVisibility`).
 
 ## `defineGame<State, Input, View = State>(def): Game`
 
@@ -21,7 +21,8 @@ seats not `1 ≤ min ≤ max ≤ 64`, missing `step` (lockstep) / `apply` (fold,
 | `apply(state, seat, input, ctx)` | fold / authority | — | one command, log order |
 | `clock(state, now, ctx)` | optional | — | deadlines; called with server time before each entry |
 | `clockMs` | `number` | presence beat | fold/authority: min interval of `clock` entries while playing (≥ 250) |
-| `outcome(state)` | `=> Outcome \| null` | never ends | `{ winner: seat \| -1, ranks?, reason? }` |
+| `outcome(state)` | `=> Outcome \| null` | never ends | `{ winner: seat \| -1, winners?: seat[], ranks?, reason? }` — `winners` for teams / shared wins (see below) |
+| `audience` | `{ input, apply, from? }` | none | commands from spectators (bets, cheers, votes), see «Audience commands» |
 | `view(state, seat)` | `=> V` | identity | authority: must strip secrets; `seat -1` = spectator |
 | `hash(state)` | `=> number` | canonical FNV-1a | provide a fast one for big/class states |
 | `idle` | `I` | `null` | lockstep input for a silent seat |
@@ -69,6 +70,8 @@ seats not `1 ≤ min ≤ max ≤ 64`, missing `step` (lockstep) / `apply` (fold,
 | `rematch()` | — | only in `over`; new match when every **present** seat voted (`away`/`left` seats are dropped; in authority the new seat 0 hosts) |
 | `leave()` / `close()` | — | `leave` = tell the room (lobby seat freed, in-game forfeit); `close` = drop the link |
 | `update()` | — | flush queued inputs, heartbeats, `clock` entries, reconnects |
+| `audience(value)` | `boolean` | an audience command (`game.audience`); `false` = no hook / not playing / a player without `from: 'all'` / rejected locally |
+| `away(hidden)` | — | the tab went to the background / came back (`bindVisibility(session)` from `/ui` wires it): hidden seats are `away` at once, nobody waits for them, no heartbeats; back = present again. `forfeit` still applies after `presenceMs` |
 | `onStep(fn)` / `confirmed(tick)` | | lockstep: hook your own render loop |
 | `resync()` | `boolean` | rebuild `model` from `log` (false if `keepLog: false`); fixes a locally corrupted state, not different code |
 | `seat`, `model`, `log`, `game` | | low-level access |
@@ -76,7 +79,8 @@ seats not `1 ≤ min ≤ max ≤ 64`, missing `step` (lockstep) / `apply` (fold,
 **`Snapshot`**: `{ room, self, seat (-1 spectator), phase: 'lobby'|'playing'|'over', match, players: PlayerInfo[], spectators, tick,
 state (null on non-authority clients in authority mode), view, outcome (null while playing), desync (null = in sync), rematch: seat[],
 notice (last rejection / protocol hint, string|null), hostWaitMs (authority: ms left before `host-lost`, null = host present), connection: 'idle'|'connecting'|'online'|'reconnecting'|'offline' }`.
-`PlayerInfo = { id, seat, name, status: 'on'|'away'|'left', ready, lastT }`.
+`PlayerInfo = { id, seat, name, status: 'on'|'away'|'left', ready, lastT, owner?, local?, hidden? }` (`hidden` = away because its tab is in the background, not a lost connection: `netStatus` raises no alarm for it, the match bar says «stepped away»).
+`MatchResult = { match, winner: id | '', winners?: id[], reason? }` (`winners` only when the outcome had several).
 
 **What to show the player:** `netStatus(snapshot)` → `null` (all good) | `{kind:'offline'}` | `{kind:'reconnecting'}` | `{kind:'host-away', seconds}` | `{kind:'player-away', names}` | `{kind:'desync'}` (priority in that order).
 Ready-made pill: `mountNetStatus(session, { labels?: NET_STATUS_LABELS.ru, parent? })` → `{ el, destroy }` from `@agentstack/netplay/ui` (hidden while all is well).
@@ -100,6 +104,33 @@ One device can hold **several seats**: friends on one screen (shared keyboard, s
 | `matchBar(…)` | local seats of this device count as `you` (no «thinking…», never «asked for a rematch») |
 
 Rules: local seats share their device's presence (they go away and come back together); one `ready()` / `rematch()` from the device counts for all its seats; a device that omits a local seat's batch plays `idle` there (it cannot stall the room). **Not for `secret` games** (`locals` is ignored): one screen would show every hidden move — use a pass-the-device flow instead.
+
+## Several winners and teams (`Outcome.winners`)
+
+Return `{ winner: 0, winners: [0, 2], reason: 'team' }` from `outcome` when a team (2 on 2), a co-op group or a joint first place wins together. `winners` takes precedence over `winner` (which stays the first winner, or -1 for `[]`); every client stores the same normalized value (integer seats in range, no duplicates).
+
+| API | What it does |
+|---|---|
+| `outcomeWinners(o)` / `isWinner(o, seat)` | read both forms (single `winner` or `winners`) |
+| `resultWinners(r)` | every winner id of a `MatchResult` |
+| `seriesScore(snapshot, id?)` | a shared win counts as `mine` for each winner |
+| `matchBar(…, { team: (seat) => seat % 2, teamName: (t) => (t ? '☾' : '☀') })` | teammates listed together with their team sign, series per team, «You won!» for every member of the winning team, «Winner: ☀» for spectators; without `team`, spectators read «Winners: Ana, Caio» |
+
+Migration: nothing to do for single-winner games. Team games that returned one seat of the team (and relabelled `lose`) can return `winners` instead and drop the workaround.
+
+## Audience commands (`GameDef.audience`: bets, cheers, votes)
+
+```ts
+audience: {
+  input: (raw, who, state) => (raw === 0 || raw === 1 ? raw : undefined), // who = { id, seat: -1 for spectators }
+  apply: (state, who, pick) => { state.bets[who.id] = pick as number; },
+  from: 'spectators', // default; 'all' lets players send them too
+}
+// a spectator's screen:
+session.audience(1); // → false when there is no hook, the match is not running, or the game rejects it
+```
+
+Kept apart from player commands: no seat, no tick, never waited for, never blocks anyone. Every client that holds the state (fold / lockstep: all; authority: the host, which receives them privately) validates and applies them at their place in the log, so everyone agrees and desync hashes cover them. lockstep games that step their own world from `confirmed(t)` must read the audience part from `session.model.state`. Old clients (before this field) ignore `aud` entries; the room script needs no change.
 
 ## Simultaneous phase with a deadline (`openPhase` …, fold / authority)
 
@@ -129,7 +160,7 @@ UI (`@agentstack/netplay/ui`): `mountLobby(…, { choices: [turnChoice(LOBBY_LAB
 `LobbyState = { screen: 'menu'|'waiting'|'playing'|'error', code, link, host, players, min, max, ready, canStart, error: 'bad-code'|'offline'|'version'|null }`.
 A full/running room is not an error: you watch as a spectator (`session.seat === -1`). Optional UI: `mountLobby(el, lobby, { labels: LOBBY_LABELS.ru, title, note?, onClose?, hideOnStart? = true, nameField? })` → `{ el, show, hide, destroy }` from `@agentstack/netplay/ui`.
 **Theme:** `applyTheme({ scheme?: 'dark'|'light'|'auto', doc? })` (`/ui`) injects `<style id="np-theme-css">` first in `<head>` (your CSS wins): page background, `.np-app` / `.np-stage` card, `.np-title`, `.np-score`, `.np-meter>i`, `.np-sub`/`.np-turn`, `.np-keys>.np-key` (64 px; `.np-keys.np-live` = accent), and the variables the lobby + match bar read (`--np-page`, `--np-surface`, `--np-bg`, `--np-fg`, `--np-muted`, `--np-line`, `--np-accent`, `--np-accent-fg`, `--np-font`, `--np-radius`). `themeCss(scheme)` returns the CSS string (SSR / your own file).
-**Match bar:** `mountMatchBar(session, { labels: MATCH_BAR_LABELS.ru, kind?: 'versus'|'coop', done?(seat), detail?(seat), clock?(), reason?(outcome), pace?: 'turns'|'race', endPanel?, position?: 'top'|'bottom', quiet?, onNewRoom?, onMenu? })` (`/ui`) — players with thinking / ready / no connection / left, turn clock (red under 10 s), series, «You are watching»; at the end: result, «Rematch (1/2)», «Аня wants a rematch», blocked when too few players, New room, Menu. 48 px buttons, one polite live region. `endPanel: false` keeps your own result screen (the vote and New room sit in the strip); `quiet` shows the strip only for a spectator, an away/left player or the end. `matchBar(snapshot, options)` is the pure presenter — test it instead of the DOM.
+**Match bar:** `mountMatchBar(session, { labels: MATCH_BAR_LABELS.ru, kind?: 'versus'|'coop', done?(seat), detail?(seat), clock?(), reason?(outcome), pace?: 'turns'|'race', endPanel?, position?: 'top'|'bottom', quiet?, onNewRoom?, onMenu? })` (`/ui`) — players with thinking / ready / no connection / left, turn clock (red under 10 s), series, «You are watching»; at the end: result, «Rematch (1/2)», «Аня wants a rematch», blocked when too few players, New room, Menu. 48 px buttons, one polite live region. `endPanel: false` keeps your own result screen (the vote and New room sit in the strip); `quiet` shows the strip only for a spectator, an away/left player or the end. Teams: `team?(seat)`, `teamName?(t)` (see «Several winners and teams»). The strip and the end panel honour `[hidden]` (`.np-bar[hidden]{display:none!important}`), so a `quiet` strip really disappears — games no longer need their own CSS for it. `MATCH_BAR_CSS` is the injected stylesheet. `matchBar(snapshot, options)` is the pure presenter — test it instead of the DOM.
 
 **Own loop + reload (lockstep):** `createSession(game, { keepHistory: true })` keeps every confirmed row of the match, so a game that steps its own world can rebuild it after a reload / late join: `while ((row = session.confirmed(w.tick))) step(w, row)`. Without it only the last 1024 rows are kept.
 
