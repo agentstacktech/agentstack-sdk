@@ -245,8 +245,18 @@ export class Session<S, I, V = S> {
       return true;
     }
     const delay = this.inputDelay;
-    // keep a steady lead of `delay` ticks; only re-anchor if we fell behind (our ticks were idle-filled)
-    const t = this.nextTick >= m.tick ? this.nextTick : m.tick + delay;
+    // keep a steady lead of `delay` ticks; only re-anchor if we fell behind (idle-filled while away, or a reload)
+    let t = this.nextTick;
+    if (t < m.tick) {
+      // a seat that is present is waited for: fill our own gap with idle up to the new anchor, or the room
+      // stalls at m.tick forever (a reloaded tab used to). Skip ticks the old tab already sent.
+      let from = m.tick;
+      while (m.inputs.get(from)?.[seat] !== undefined) from++;
+      t = Math.max(from, m.tick + delay);
+      if (this.batch && this.batch.t + this.batch.d.length <= m.tick) this.batch = null; // ticks already confirmed (e.g. queued during the reload's refold)
+      this.flushBatch();
+      if (t > from) this.batch = { t: from, d: new Array(t - from).fill(g.idle) };
+    }
     if (t > m.tick + delay + (this.opts.maxAhead ?? 8)) return false;
     if (this.batch && this.batch.t + this.batch.d.length !== t) this.flushBatch();
     if (!this.batch) this.batch = { t, d: [] };

@@ -32,3 +32,22 @@ describe('lockstep keepHistory: a fresh world catches up from tick 0', () => {
     expect(w).toEqual(m.state);
   });
 });
+
+describe('realtime lockstep: a reload mid-match does not stall the room', () => {
+  it('the reloaded seat fills its own input gap, ticks keep coming, no desync', async () => {
+    const t = await createTable(tugOfWar, { players: 2, latencyMs: 20 });
+    await t.run(4_000, (c, i) => c.input(((c.snapshot.tick >> 3) + i) % 7 === 0 ? 1 : 0));
+    const room = t.clients[1]!.snapshot.room;
+    t.clients[1]!.close(); // the old tab is gone (no leave: a reload)
+    const again = createSession(tugOfWar, { transport: t.hub.transport('u2'), room, name: 'u2', now: () => t.hub.now });
+    await again.join();
+    t.clients[1] = again;
+    const before = t.clients[0]!.snapshot.tick;
+    await t.run(3_000, (c) => c.input(0));
+    const [a, b] = t.snaps();
+    expect(a!.tick).toBeGreaterThan(before + 100); // ~16 ms frames → ~180 ticks; a stall would leave it at `before`
+    expect(b!.tick).toBe(a!.tick);
+    expect(a!.desync).toBeNull();
+    expect(b!.players.map((p) => p.status)).toEqual(['on', 'on']);
+  });
+});
