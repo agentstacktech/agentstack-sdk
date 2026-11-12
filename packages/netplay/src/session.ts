@@ -257,6 +257,8 @@ export class Session<S, I, V = S> {
     } else {
       if (this.hidden || this.seat < 0 || this.model.phase !== 'playing') return;
       this.hidden = true;
+      // inputs still batched (sendEveryMs) go out BEFORE the away entry: any entry after it would mark the seats present again
+      this.flushBatch();
       this.push({ k: 'away' });
     }
     this.flush();

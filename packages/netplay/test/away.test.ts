@@ -35,6 +35,20 @@ describe('away (background tab)', () => {
     expect(b!.snapshot.tick).toBeGreaterThan(0);
   });
 
+  it('lockstep with batched inputs (HTTP sendEveryMs): inputs queued before away() do not bring the seat back', async () => {
+    const t = await createTable(race, { players: 2, session: { sendEveryMs: 100 } });
+    const [a, b] = t.clients;
+    await t.run(300, (c) => c.input(1));
+    b!.input(1); // still in b's batch when the tab hides
+    b!.away(true);
+    await t.run(1500, (c, i) => { if (i === 0) c.input(1); else c.update(); }); // b's throttled timer keeps pumping
+    expect(a!.snapshot.players[1]).toMatchObject({ status: 'away', hidden: true });
+    b!.away(false);
+    await t.run(400, (c) => c.input(1));
+    expect(a!.snapshot.players[1]!.status).toBe('on');
+    expect(a!.snapshot.desync).toBeNull();
+  });
+
   it('a hidden seat is still held to the forfeit timeout', async () => {
     const strict = defineGame({ ...race, id: 'away-strict', timeouts: { presenceMs: 3_000, onTimeout: 'forfeit' as const } });
     const t = await createTable(strict, { players: 2 });
