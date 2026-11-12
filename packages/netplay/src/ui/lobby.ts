@@ -78,7 +78,11 @@ const CSS = `
 .np-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
 .np-list li{display:flex;justify-content:space-between;padding:8px 12px;border-radius:10px;background:#ffffff0d}
 .np-msg{min-height:1.4em;color:var(--np-muted,#bfae93);font-size:14px;text-align:center}
-.np-err{color:#ff9b8a}`;
+.np-err{color:#ff9b8a}
+.np-code span+span{margin-left:.35em}
+.np-sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;padding:0}`;
+
+const CSS_ESCAPE = (v: string): string => v.replace(/["\\]/g, '\\$&');
 
 export function mountLobby<S, I, V>(parent: HTMLElement, lobby: LobbyController<S, I, V>, o: MountLobbyOptions = {}): LobbyUi {
   const L: LobbyLabels = { ...en, ...o.labels };
@@ -104,7 +108,15 @@ export function mountLobby<S, I, V>(parent: HTMLElement, lobby: LobbyController<
   });
   const card = doc.createElement('div');
   card.className = 'np-card';
-  root.append(card);
+  // one persistent live region (a re-created node is not reliably announced): code, player count, errors, «copied»
+  const live = doc.createElement('p');
+  live.className = 'np-sr';
+  live.setAttribute('aria-live', 'polite');
+  const titleId = `np-title-${Math.random().toString(36).slice(2, 8)}`;
+  root.setAttribute('aria-labelledby', titleId);
+  root.append(card, live);
+  let said = '';
+  const say = (text: string) => { if (text && text !== said) { said = text; live.textContent = text; } };
   parent.append(root);
   let joining = false;
   open();
@@ -120,8 +132,11 @@ export function mountLobby<S, I, V>(parent: HTMLElement, lobby: LobbyController<
     for (const k of kids) if (k !== null) e.append(k);
     return e;
   };
-  const btn = (label: string, on: () => void, main = false, disabled = false) =>
-    el('button', { type: 'button', class: main ? 'np-btn np-main' : 'np-btn', onclick: on, disabled }, label);
+  // `k` = stable key so focus survives a re-render (a player joining must not throw a keyboard user off «Start»)
+  const btn = (label: string, on: () => void, main = false, disabled = false, k = label) =>
+    el('button', { type: 'button', class: main ? 'np-btn np-main' : 'np-btn', onclick: on, disabled, 'data-k': k }, label);
+  /** «K7M Q2X» on screen, «K 7 M Q 2 X» for screen readers; copying still gives K7MQ2X */
+  const codeEl = (code: string) => el('div', { class: 'np-code', 'aria-label': code.split('').join(' ') }, el('span', {}, code.slice(0, 3)), el('span', {}, code.slice(3)));
   const fmt = (s: string, v: Record<string, number>) => s.replace(/\{(\w+)\}/g, (_, k: string) => String(v[k] ?? ''));
 
   const copy = async (link: string) => {
@@ -136,8 +151,9 @@ export function mountLobby<S, I, V>(parent: HTMLElement, lobby: LobbyController<
 
   const render = (s: LobbyState) => {
     if (s.screen !== lastScreen) { msg = ''; lastScreen = s.screen; }
+    const focusKey = card.contains(doc.activeElement) ? (doc.activeElement as HTMLElement).getAttribute('data-k') : null;
     card.replaceChildren();
-    card.append(el('h2', {}, o.title ?? L.title));
+    card.append(el('h2', { id: titleId }, o.title ?? L.title));
     if (s.screen === 'menu') {
       if (!joining) {
         card.append(btn(L.create, () => lobby.create(), true), el('p', { class: 'np-hint' }, L.createHint),
@@ -152,20 +168,23 @@ export function mountLobby<S, I, V>(parent: HTMLElement, lobby: LobbyController<
       }
     } else if (s.screen === 'waiting') {
       const seated = s.players.filter((p) => p.status !== 'left');
-      card.append(el('p', { class: 'np-hint' }, L.yourCode), el('div', { class: 'np-code', 'aria-live': 'polite' }, s.code ?? ''), el('p', { class: 'np-hint' }, L.shareHint));
+      card.append(el('p', { class: 'np-hint' }, L.yourCode), codeEl(s.code ?? ''), el('p', { class: 'np-hint' }, L.shareHint));
       const share = (navigator as Navigator & { share?: (d: ShareData) => Promise<void> }).share;
       card.append(el('div', { class: 'np-row' }, btn(L.copy, () => void copy(s.link ?? '')), share ? btn(L.share, () => void share.call(navigator, { url: s.link ?? '', title: o.title ?? L.title }).catch(() => undefined)) : null));
       card.append(el('h2', {}, `${L.players} · ${seated.length}/${s.max}`));
       const self = lobby.session?.snapshot.self;
       card.append(el('ul', { class: 'np-list' }, ...seated.map((p) => el('li', {}, `${p.name}${p.id === self ? ` (${L.you})` : ''}`, p.ready ? `✓ ${L.ready}` : ''))));
       if (o.note) card.append(el('p', { class: 'np-hint' }, o.note));
-      if (seated.length < s.min) card.append(el('p', { class: 'np-msg' }, fmt(L.waitingMore, { n: seated.length, min: s.min })));
-      else if (s.ready) card.append(el('p', { class: 'np-msg' }, L.waitingStart));
-      card.append(btn(L.start, () => lobby.start(), true, !s.canStart), btn(L.leave, () => lobby.cancel()));
+      const waitLine = seated.length < s.min ? fmt(L.waitingMore, { n: seated.length, min: s.min }) : s.ready ? L.waitingStart : '';
+      if (waitLine) card.append(el('p', { class: 'np-msg' }, waitLine));
+      card.append(btn(L.start, () => lobby.start(), true, !s.canStart, 'start'), btn(L.leave, () => lobby.cancel(), false, false, 'leave'));
+      say(`${L.yourCode} ${(s.code ?? '').split('').join(' ')}. ${L.players} ${seated.length}/${s.max}. ${waitLine}`);
     } else if (s.screen === 'error') {
       card.append(el('p', { class: 'np-err', role: 'alert' }, s.error === 'bad-code' ? L.badCode : s.error === 'version' ? L.version : s.error === 'sign-in' ? L.signIn : s.error === 'unavailable' ? L.unavailable : L.offline), btn(L.back, () => lobby.back(), true));
+      queueMicrotask(() => (card.querySelector('.np-btn') as HTMLElement | null)?.focus());
     }
-    if (msg) card.append(el('p', { class: 'np-msg', 'aria-live': 'polite' }, msg));
+    if (msg) { card.append(el('p', { class: 'np-msg' }, msg)); say(msg); }
+    if (focusKey) (card.querySelector(`[data-k="${CSS_ESCAPE(focusKey)}"]`) as HTMLElement | null)?.focus();
     if (s.screen === 'playing' && (o.hideOnStart ?? true)) close();
   };
   const off = lobby.subscribe(render);
