@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `@agentstack/netplay` 0.1.0 (`sdk.netplay.gen1`): game-agnostic deterministic multiplayer — `defineGame` (lockstep / fold / authority), room-log reducer (lobby, ready, rematch, timeouts, spectators, commit–reveal, desync hashes), transports (memory, polling, StackScript via the SDK client, WSS), matchmaking, StackScript room-script generator, `@agentstack/netplay/testing` harness. Docs: `packages/netplay/README.md`, `AGENTS.md`.
+
 ## [0.4.21] - 2026-10-03
 
 ### Changed
