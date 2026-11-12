@@ -30,6 +30,8 @@ export interface TableOptions extends MemoryHubOptions {
   spectators?: number;
   frameMs?: number;
   session?: Partial<Omit<SessionOptions, 'transport' | 'room'>>;
+  /** Players press Ready after joining (needed when players < seats.max). Default: players < seats.max. */
+  ready?: boolean;
 }
 
 /** Seat `players` clients (+ spectators) in one room. Users are 'u1', 'u2', … ('s1' … for spectators). */
@@ -47,6 +49,11 @@ export async function createTable<S, I, V>(game: Game<S, I, V>, o: TableOptions 
     hub.advance(frameMs);
     await microtasks(); // deterministic join order = seat order
     clients.push(s);
+  }
+  if (o.ready ?? n < game.seats.max) {
+    for (const c of clients.slice(0, n)) c.ready();
+    hub.advance(frameMs);
+    await microtasks();
   }
   const t: Table<S, I, V> = {
     hub, clients,
