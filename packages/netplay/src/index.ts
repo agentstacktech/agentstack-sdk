@@ -12,5 +12,6 @@ export { pollingTransport, type RoomApi, type PollingOptions } from './transport
 export { stackscriptRoomApi, stackscriptTransport, type ScriptRunner, type StackscriptRoomOptions } from './transports/stackscript.js';
 export { wssTransport, type WssOptions } from './transports/wss.js';
 export { createMatchmaker, memoryMatchmaker, type Matchmaker, type MatchTicket, type QueueApi } from './matchmaking.js';
+export { createLobby, roomCode, parseRoomCode, roomIdFor, inviteLink, codeFromUrl, CODE_ALPHABET, CODE_LENGTH, type LobbyController, type LobbyOptions, type LobbyState, type LobbyScreen, type LobbyError } from './lobby.js';
 export { generateRoomScript, type RoomScriptOptions } from './generator/roomScript.js';
 export type * from './types.js';

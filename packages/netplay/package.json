@@ -1,7 +1,7 @@
 {
   "name": "@agentstack/netplay",
   "version": "0.1.0",
-  "description": "AgentStack netplay \u2014 game-agnostic deterministic multiplayer: defineGame, room log sessions, pluggable transports, StackScript room generator",
+  "description": "AgentStack netplay — game-agnostic deterministic multiplayer: defineGame, room log sessions, pluggable transports, StackScript room generator",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -15,6 +15,11 @@
       "types": "./dist/testing/index.d.ts",
       "import": "./dist/testing/index.js",
       "default": "./dist/testing/index.js"
+    },
+    "./ui": {
+      "types": "./dist/ui/index.d.ts",
+      "import": "./dist/ui/index.js",
+      "default": "./dist/ui/index.js"
     }
   },
   "files": [
@@ -24,7 +29,8 @@
     "README_ru.md",
     "AGENTS.md",
     "AI_INDEX.md",
-    "examples"
+    "examples",
+    "API.md"
   ],
   "sideEffects": false,
   "scripts": {
