@@ -74,6 +74,24 @@ describe('lockstep: tug-of-war with latency', () => {
     expect(Object.keys(A.snapshot.desync!.hashes).sort()).toEqual(['a', 'b']);
   });
 
+  it('desync recovery: a locally corrupted state is re-folded from the log and the next checkpoint clears the desync', async () => {
+    const t = await createTable(tugOfWar, { players: 2, latencyMs: 30 });
+    const [a, b] = t.clients;
+    await t.run(1500, (c) => c.input(0));
+    (b!.model.state as { pos: number }).pos += 7; // a torn save / stray mutation outside the rules
+    let seen = false;
+    for (let i = 0; i < 400 && !(seen && a!.snapshot.desync === null); i++) {
+      await t.run(16, (c) => c.input(0));
+      if (a!.snapshot.desync) seen = true;
+    }
+    expect(seen).toBe(true); // everyone saw it…
+    expect(a!.snapshot.desync).toBeNull(); // …and everyone saw it resolved
+    expect(b!.snapshot.desync).toBeNull();
+    expect(hashState(b!.snapshot.state)).toBe(hashState(a!.snapshot.state));
+    expect(b!.snapshot.phase).toBe('playing');
+    expect(b!.resync()).toBe(true); // also callable by hand (e.g. a «fix it» button)
+  });
+
   it('reconnect: a dropped client resumes from its last seq and converges', async () => {
     const t = await createTable(tugOfWar, { players: 2, latencyMs: 30 });
     const [a, b] = t.clients;

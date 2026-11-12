@@ -52,7 +52,8 @@ seats not `1 ≤ min ≤ max ≤ 64`, missing `step` (lockstep) / `apply` (fold,
 | `now` | `Date.now` | inject virtual time in tests |
 | `secretSeed`, `salt` | crypto | authority seed / commit salts (persist `secretSeed` if the host must survive a reload) |
 | `allowPublicViews` | `false` | authority over a transport without private entries |
-| `keepLog` | `true` | keep `session.log` for replays |
+| `keepLog` | `true` | keep `session.log` for replays and desync recovery |
+| `autoResync` | `true` | on a desync where our hash is not the majority, re-fold from the log (≤ 3 per match); the next agreeing checkpoint clears `desync` for all |
 
 | Member | Returns | Notes |
 |---|---|---|
@@ -65,12 +66,16 @@ seats not `1 ≤ min ≤ max ≤ 64`, missing `step` (lockstep) / `apply` (fold,
 | `leave()` / `close()` | — | `leave` = tell the room (lobby seat freed, in-game forfeit); `close` = drop the link |
 | `update()` | — | flush queued inputs, heartbeats, `clock` entries, reconnects |
 | `onStep(fn)` / `confirmed(tick)` | | lockstep: hook your own render loop |
+| `resync()` | `boolean` | rebuild `model` from `log` (false if `keepLog: false`); fixes a locally corrupted state, not different code |
 | `seat`, `model`, `log`, `game` | | low-level access |
 
 **`Snapshot`**: `{ room, self, seat (-1 spectator), phase: 'lobby'|'playing'|'over', match, players: PlayerInfo[], spectators, tick,
 state (null on non-authority clients in authority mode), view, outcome (null while playing), desync (null = in sync), rematch: seat[],
 notice (last rejection / protocol hint, string|null), hostWaitMs (authority: ms left before `host-lost`, null = host present), connection: 'idle'|'connecting'|'online'|'reconnecting'|'offline' }`.
 `PlayerInfo = { id, seat, name, status: 'on'|'away'|'left', ready, lastT }`.
+
+**What to show the player:** `netStatus(snapshot)` → `null` (all good) | `{kind:'offline'}` | `{kind:'reconnecting'}` | `{kind:'host-away', seconds}` | `{kind:'player-away', names}` | `{kind:'desync'}` (priority in that order).
+Ready-made pill: `mountNetStatus(session, { labels?: NET_STATUS_LABELS.ru, parent? })` → `{ el, destroy }` from `@agentstack/netplay/ui` (hidden while all is well).
 
 ## Private rooms & lobby (`createLobby`)
 

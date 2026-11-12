@@ -31,6 +31,8 @@ export interface SessionOptions {
   keepLog?: boolean;
   /** Call update() on this interval (ms). 0 = you call update() yourself (game loop / tests). */
   autoPumpMs?: number;
+  /** Refold from the log when a desync shows our hash outside the majority (needs keepLog). Default true. */
+  autoResync?: boolean;
 }
 
 export type Listener<S, V> = (snap: Snapshot<S, V>) => void;
@@ -43,7 +45,8 @@ function randomU32(): number {
 
 export class Session<S, I, V = S> {
   readonly game: Game<S, I, V>;
-  readonly model: RoomModel<S, I, V>;
+  /** The folded room (replaced by `resync()`). */
+  model: RoomModel<S, I, V>;
   readonly log: Entry[] = [];
   private link: Link | null = null;
   private self = '';
@@ -65,6 +68,11 @@ export class Session<S, I, V = S> {
   private retryAt = 0;
   private retries = 0;
   private readonly now: () => number;
+  /** Last tick whose hash we reported (no duplicate reports after a resync refold). */
+  private hashedUpTo = -1;
+  /** Desync tick we already re-folded for, and how many auto-resyncs this match. */
+  private resyncedFor = -1;
+  private resyncCount = 0;
   /** Counter stamped into every outgoing body (`n`); resumes from the log after a reload. */
   private sendN: number;
 
@@ -264,7 +272,8 @@ export class Session<S, I, V = S> {
   private handleStep(tick: number): void {
     for (const fn of this.stepListeners) fn(this.model.state, tick);
     const every = this.game.hashEvery;
-    if (!every || tick % every !== 0 || this.seat < 0 || !this.model.state) return;
+    if (!every || tick % every !== 0 || this.seat < 0 || !this.model.state || tick <= this.hashedUpTo) return;
+    this.hashedUpTo = tick;
     if (this.game.mode === 'authority') return;
     const h = this.game.hash(this.model.state);
     this.hashLog.push({ t: tick, h });
@@ -285,6 +294,7 @@ export class Session<S, I, V = S> {
       if (this.opts.keepLog !== false) this.log.push(e);
     }
     if (m.lastSeq === before) return;
+    this.maybeResync();
     for (const h of this.hashLog) this.push({ k: 'hash', m: m.match, t: h.t, h: h.h });
     this.hashLog = [];
     this.revealReady();
@@ -295,7 +305,45 @@ export class Session<S, I, V = S> {
     for (const fn of this.listeners) fn(s);
   }
 
+  /**
+   * Desync recovery: rebuild the room from the kept log with a fresh reducer. A state that was corrupted locally
+   * (a mutation outside the rules, a torn save) comes back identical to everyone else's; the next agreeing hash
+   * checkpoint clears `snapshot.desync` for all clients. If the divergence is real (different code), it persists.
+   * Returns false when the log is not kept (`keepLog: false`).
+   */
+  resync(): boolean {
+    if (this.opts.keepLog === false) return false;
+    const old = this.model;
+    const m = createRoom(this.game, this.opts.room, { simulate: this.game.mode !== 'authority', secretSeed: old.secretSeed });
+    for (const e of this.log) {
+      m.self = this.self;
+      if (this.game.mode === 'authority') m.simulate = m.players.length === 0 ? true : m.players[0]!.id === this.self;
+      reduceRoom(m, e);
+    }
+    m.onStep = (tick) => this.handleStep(tick);
+    this.model = m;
+    this.snap = null;
+    return true;
+  }
+
+  /** autoResync: refold once per desync checkpoint where our hash is not the clear majority (max 3 per match). */
+  private maybeResync(): void {
+    const d = this.model.desync;
+    if (!d || this.opts.autoResync === false || this.seat < 0 || d.tick === this.resyncedFor || this.resyncCount >= 3) return;
+    const mine = d.hashes[this.self];
+    if (mine === undefined) return;
+    const votes = Object.values(d.hashes);
+    const same = votes.filter((h) => h === mine).length;
+    if (same * 2 > votes.length) return; // we are the majority: the others should refold
+    this.resyncedFor = d.tick;
+    this.resyncCount += 1;
+    this.resync();
+  }
+
   private onNewMatch(): void {
+    this.hashedUpTo = -1;
+    this.resyncedFor = -1;
+    this.resyncCount = 0;
     this.nextTick = 0;
     this.batch = null;
     const g = this.game;

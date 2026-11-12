@@ -32,7 +32,7 @@
    - server: `loadRoomScript(generateRoomScript(game, { prefix }))` + `scriptServer(rt, prefix)` with two sessions.
 8. **Room script**: commit the generated file and a test that it equals the generator output. Publishing it is a platform action that needs the project owner's approval.
 9. **Lobby**: private rooms = `createLobby({ game, connect, onStart })` (+ optional `mountLobby` from `/ui`); quick match = `createMatchmaker(...)`.
-10. **UI**: render from `session.subscribe(snapshot)`; `input()` only queues — `update()` (or `autoPumpMs`) sends; for realtime loops use `onStep()` / `confirmed(tick)`; for an existing engine write a thin adapter (see "Ports" below).
+10. **UI**: render from `session.subscribe(snapshot)`; `input()` only queues — `update()` (or `autoPumpMs`) sends; for realtime loops use `onStep()` / `confirmed(tick)`; show connection trouble with `netStatus(snapshot)` (or the `mountNetStatus` pill from `/ui`); for an existing engine write a thin adapter (see "Ports" below).
 
 See [test/recipe.test.ts](test/recipe.test.ts) — rock-paper-scissors built only from this file.
 

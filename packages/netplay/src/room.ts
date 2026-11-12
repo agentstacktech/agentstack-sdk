@@ -306,12 +306,15 @@ export function reduceRoom<S, I, V>(m: RoomModel<S, I, V>, e: Entry): void {
       return;
     }
     case 'hash': {
-      if (b.m !== m.match || m.desync) return;
+      if (b.m !== m.match || !p || p.status === 'left') return;
       const row = m.hashes.get(b.t) ?? new Map<string, number>();
       row.set(e.from, b.h >>> 0);
       m.hashes.set(b.t, row);
       const vals = new Set(row.values());
-      if (vals.size > 1) m.desync = { tick: b.t, hashes: Object.fromEntries(row) };
+      if (vals.size > 1) { if (!m.desync || b.t >= m.desync.tick) m.desync = { tick: b.t, hashes: Object.fromEntries(row) }; }
+      else if (m.desync && b.t > m.desync.tick && m.players.every((q) => q.status !== 'on' || q.seat >= m.seats || row.has(q.id))) {
+        m.desync = null; // a later checkpoint where every present seat agrees: recovered (resync)
+      }
       if (m.hashes.size > 64) m.hashes.delete(m.hashes.keys().next().value as number);
       return;
     }
