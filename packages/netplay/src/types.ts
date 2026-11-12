@@ -132,16 +132,22 @@ export interface Entry<B = Body> {
  */
 export type Body = BodyKind & { n?: number };
 type BodyKind =
-  | { k: 'hello'; g: string; v: number; name?: string; spectate?: boolean; params?: Record<string, unknown> }
+  /** `locals`: names of extra players on the same device (local seats, see SessionOptions.locals). */
+  | { k: 'hello'; g: string; v: number; name?: string; spectate?: boolean; params?: Record<string, unknown>; locals?: string[] }
+  /** Lobby only: replace this member's local seats. */
+  | { k: 'locals'; names: string[] }
   | { k: 'ready' }
-  | { k: 'in'; m: number; t: number; d: unknown[]; salt?: string }
+  /** `x[j-1]`: the batch of local seat j for the same ticks as `d` (missing = idle). */
+  | { k: 'in'; m: number; t: number; d: unknown[]; salt?: string; x?: unknown[][] }
   | { k: 'commit'; m: number; t: number; h: number }
-  | { k: 'cmd'; m: number; d: unknown }
+  /** `l`: local seat index (0 / missing = the member's own seat). */
+  | { k: 'cmd'; m: number; d: unknown; l?: number }
   | { k: 'hash'; m: number; t: number; h: number }
   | { k: 'view'; m: number; s: number; seat: Seat; d: unknown; o?: Outcome | null }
   | { k: 'clock' }
   | { k: 'rematch'; m: number }
-  | { k: 'leave' };
+  /** `l`: only that local seat leaves; missing = the member and all its local seats. */
+  | { k: 'leave'; l?: number };
 
 export type PlayerStatus = 'on' | 'away' | 'left';
 
@@ -153,6 +159,10 @@ export interface PlayerInfo {
   readonly ready: boolean;
   /** Server time of this player's last entry. */
   readonly lastT: number;
+  /** Local seat: the member id of the device that plays it (same screen as that player). Missing = an own member. */
+  readonly owner?: string;
+  /** Local seat index on its device (1, 2, …); 0 = the member's own seat. */
+  readonly local?: number;
 }
 
 export type Phase = 'lobby' | 'playing' | 'over';
@@ -176,6 +186,8 @@ export interface Snapshot<S, V = S> {
   readonly self: string;
   /** My seat, -1 when spectating or not joined. */
   readonly seat: Seat;
+  /** Every seat played on this device: my own seat first, then my local seats in local order (empty when spectating). */
+  readonly seats: readonly Seat[];
   readonly phase: Phase;
   readonly match: number;
   readonly players: readonly PlayerInfo[];

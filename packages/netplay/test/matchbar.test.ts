@@ -7,7 +7,7 @@ import type { Snapshot } from '../src/index.js';
 const ru = { labels: MATCH_BAR_LABELS.ru };
 type Snap = Snapshot<unknown, unknown>;
 const base = (over: Partial<Snap>): Snap => ({
-  room: 'r', self: 'a', seat: 0, phase: 'playing', match: 1, spectators: 0, tick: 0, state: null, view: null, outcome: null, desync: null,
+  room: 'r', self: 'a', seat: 0, seats: [0], phase: 'playing', match: 1, spectators: 0, tick: 0, state: null, view: null, outcome: null, desync: null,
   rematch: [], results: [], notice: null, hostWaitMs: null, connection: 'online', issue: null,
   players: [{ id: 'a', seat: 0, name: 'Аня', status: 'on', ready: false, lastT: 0 }, { id: 'b', seat: 1, name: 'Бруно', status: 'on', ready: false, lastT: 0 }],
   ...over,

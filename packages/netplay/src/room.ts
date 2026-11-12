@@ -18,6 +18,10 @@ export interface RoomPlayer {
   status: PlayerStatus;
   ready: boolean;
   lastT: number;
+  /** Local seat: the member id of the device that plays it. */
+  owner?: string;
+  /** Local seat index on that device (1, 2, …). */
+  local?: number;
 }
 
 export interface RoomModel<S, I, V = S> {
@@ -86,6 +90,36 @@ export function createRoom<S, I, V>(game: Game<S, I, V>, room: string, opts: Roo
 
 export function playerById<S, I, V>(m: RoomModel<S, I, V>, id: string): RoomPlayer | undefined {
   return m.players.find((p) => p.id === id);
+}
+
+/** Player id of local seat `j` (1, 2, …) of member `owner`. `~` never appears in a server user id. */
+export function localId(owner: string, j: number): string {
+  return `${owner}~${j}`;
+}
+
+/** Local seats of a member, in local order. */
+export function localsOf<S, I, V>(m: RoomModel<S, I, V>, owner: string): RoomPlayer[] {
+  return m.players.filter((p) => p.owner === owner).sort((a, b) => (a.local ?? 0) - (b.local ?? 0));
+}
+
+/** Every seat played on one device: the member's own seat first, then its local seats (seat order of locals = local order). */
+export function seatsOf<S, I, V>(m: RoomModel<S, I, V>, self: string): Seat[] {
+  const own = playerById(m, self);
+  if (!own) return [];
+  return [own.seat, ...localsOf(m, self).map((p) => p.seat)];
+}
+
+/** Max local seats one hello / `locals` entry can claim (plus the member's own seat). */
+export const MAX_LOCALS = 3;
+
+/** Seat up to MAX_LOCALS local players of `owner` while the table has room (lobby only; secret games have none). */
+function addLocals<S, I, V>(m: RoomModel<S, I, V>, owner: string, names: unknown): void {
+  if (m.game.secret || !Array.isArray(names)) return;
+  const n = Math.min(names.length, MAX_LOCALS);
+  for (let j = 1; j <= n && m.players.length < m.game.seats.max; j++) {
+    const name = String(names[j - 1] ?? '').slice(0, 32) || `P${m.players.length + 1}`;
+    m.players.push({ id: localId(owner, j), owner, local: j, seat: m.players.length, name, status: 'on', ready: false, lastT: m.now });
+  }
 }
 
 /** Seats whose input a lockstep tick does not wait for. */
@@ -239,6 +273,21 @@ function sweepTime<S, I, V>(m: RoomModel<S, I, V>): void {
   }
 }
 
+/** lockstep: write `len` ticks of one seat from `t0` (values past the array or invalid = idle; first write wins). */
+function putInputs<S, I, V>(m: RoomModel<S, I, V>, seat: Seat, t0: number, d: readonly unknown[], len: number): void {
+  const g = m.game;
+  for (let i = 0; i < len; i++) {
+    const t = t0 + i;
+    if (t < m.tick) continue; // late (already filled with idle)
+    const v = i < d.length ? g.input(d[i], seat, m.state as S) : undefined;
+    const row = m.inputs.get(t) ?? [];
+    // invalid input = idle for that tick (deterministic on every client): a hacked client cannot stall the others
+    if (v === undefined) { if (i < d.length) m.notice = `rejected input seat ${seat} tick ${t}`; if (row[seat] === undefined) { row[seat] = g.idle as I; m.inputs.set(t, row); } continue; }
+    if (row[seat] === undefined) row[seat] = v; // first write wins, no rewrites
+    m.inputs.set(t, row);
+  }
+}
+
 /** Apply one log entry. Never throws on bad input: bad entries are ignored with `notice`. */
 export function reduceRoom<S, I, V>(m: RoomModel<S, I, V>, e: Entry): void {
   if (e.seq <= m.lastSeq) return; // duplicate delivery after reconnect
@@ -247,8 +296,12 @@ export function reduceRoom<S, I, V>(m: RoomModel<S, I, V>, e: Entry): void {
   const g = m.game;
   const p = playerById(m, e.from);
   if (p) {
-    p.lastT = m.now;
-    if (p.status === 'away') { p.status = 'on'; if (p.seat === 0) m.hostLostAt = null; }
+    // local seats share their device's link: any entry from it is presence for all of them
+    for (const q of m.players) {
+      if (q !== p && q.owner !== e.from) continue;
+      q.lastT = m.now;
+      if (q.status === 'away') { q.status = 'on'; if (q.seat === 0) m.hostLostAt = null; }
+    }
   }
   sweepTime(m);
   const b = e.body as Body;
@@ -266,20 +319,36 @@ export function reduceRoom<S, I, V>(m: RoomModel<S, I, V>, e: Entry): void {
       if (!canSit) { m.spectators.add(e.from); return; }
       m.spectators.delete(e.from);
       m.players.push({ id: e.from, seat: m.players.length, name: String(b.name ?? '').slice(0, 32) || `P${m.players.length + 1}`, status: 'on', ready: false, lastT: m.now });
+      addLocals(m, e.from, b.locals);
       maybeStart(m);
       return;
     }
-    case 'ready': if (p && m.phase === 'lobby') { p.ready = true; maybeStart(m); } return;
+    case 'locals': {
+      if (!p || m.phase !== 'lobby' || p.owner !== undefined) return;
+      m.players = m.players.filter((q) => q.owner !== e.from);
+      renumber(m);
+      addLocals(m, e.from, b.names);
+      maybeStart(m);
+      return;
+    }
+    case 'ready': if (p && m.phase === 'lobby') { p.ready = true; for (const q of localsOf(m, e.from)) q.ready = true; maybeStart(m); } return;
     case 'leave': {
       if (!p) { m.spectators.delete(e.from); return; }
-      if (m.phase === 'lobby') { m.players.splice(m.players.indexOf(p), 1); renumber(m); return; }
-      p.status = 'left';
-      p.ready = false;
-      if (m.phase === 'playing') {
-        forfeit(m, p.seat, 'left');
-        if (g.mode === 'authority' && p.seat === 0 && m.phase === 'playing') setOutcome(m, { winner: -1, reason: 'host-left' });
-        if (g.mode === 'lockstep') drainLockstep(m);
+      const l = Number.isInteger(b.l) && (b.l as number) > 0 ? (b.l as number) : 0;
+      const one = l > 0 ? playerById(m, localId(e.from, l)) : undefined;
+      if (l > 0 && !one) return;
+      const gone = one ? [one] : [p, ...localsOf(m, e.from)];
+      if (m.phase === 'lobby') { m.players = m.players.filter((q) => !gone.includes(q)); renumber(m); return; }
+      for (const q of gone) {
+        if (q.status === 'left') continue;
+        q.status = 'left';
+        q.ready = false;
+        if (m.phase === 'playing') {
+          forfeit(m, q.seat, 'left');
+          if (g.mode === 'authority' && q.seat === 0 && m.phase === 'playing') setOutcome(m, { winner: -1, reason: 'host-left' });
+        }
       }
+      if (m.phase === 'playing' && g.mode === 'lockstep') drainLockstep(m);
       return;
     }
     case 'commit': {
@@ -308,25 +377,20 @@ export function reduceRoom<S, I, V>(m: RoomModel<S, I, V>, e: Entry): void {
         }
       }
       if (b.t > m.tick + MAX_AHEAD_TICKS) { m.notice = `input too far ahead seat ${p.seat}`; return; }
-      for (let i = 0; i < b.d.length; i++) {
-        const t = b.t + i;
-        if (t < m.tick) continue; // late (already filled with idle)
-        const v = g.input(b.d[i], p.seat, m.state);
-        const row = m.inputs.get(t) ?? [];
-        // invalid input = idle for that tick (deterministic on every client): a hacked client cannot stall the others
-        if (v === undefined) { m.notice = `rejected input seat ${p.seat} tick ${t}`; if (row[p.seat] === undefined) { row[p.seat] = g.idle; m.inputs.set(t, row); } continue; }
-        if (row[p.seat] === undefined) row[p.seat] = v; // first write wins, no rewrites
-        m.inputs.set(t, row);
-      }
+      putInputs(m, p.seat, b.t, b.d, b.d.length);
+      // local seats ride in the same entry, tick for tick (a missing or short batch = idle: a device cannot stall the room)
+      if (!g.secret) for (const q of localsOf(m, e.from)) if (q.status !== 'left') putInputs(m, q.seat, b.t, Array.isArray(b.x?.[(q.local ?? 1) - 1]) ? b.x![(q.local ?? 1) - 1]! : [], b.d.length);
       drainLockstep(m);
       return;
     }
     case 'cmd': {
-      if (g.mode === 'lockstep' || !p || m.phase !== 'playing' || b.m !== m.match || p.status === 'left') return;
+      const l = Number.isInteger(b.l) && (b.l as number) > 0 ? (b.l as number) : 0;
+      const a = l > 0 ? playerById(m, localId(e.from, l)) : p; // the acting seat: own or one of this device's local seats
+      if (g.mode === 'lockstep' || !p || !a || m.phase !== 'playing' || b.m !== m.match || a.status === 'left') return;
       if (!m.simulate || !m.state || !g.apply) return;
-      const v = g.input(b.d, p.seat, m.state);
-      if (v === undefined) { m.notice = `rejected command seat ${p.seat}`; return; }
-      const next = g.apply(m.state, p.seat, v, ctxFor(m, m.tick));
+      const v = g.input(b.d, a.seat, m.state);
+      if (v === undefined) { m.notice = `rejected command seat ${a.seat}`; return; }
+      const next = g.apply(m.state, a.seat, v, ctxFor(m, m.tick));
       if (next !== undefined) m.state = next;
       m.tick += 1;
       m.onStep?.(m.tick);
@@ -340,7 +404,7 @@ export function reduceRoom<S, I, V>(m: RoomModel<S, I, V>, e: Entry): void {
       m.hashes.set(b.t, row);
       const vals = new Set(row.values());
       if (vals.size > 1) { if (!m.desync || b.t >= m.desync.tick) m.desync = { tick: b.t, hashes: Object.fromEntries(row) }; }
-      else if (m.desync && b.t > m.desync.tick && m.players.every((q) => q.status !== 'on' || q.seat >= m.seats || row.has(q.id))) {
+      else if (m.desync && b.t > m.desync.tick && m.players.every((q) => q.owner !== undefined || q.status !== 'on' || q.seat >= m.seats || row.has(q.id))) {
         m.desync = null; // a later checkpoint where every present seat agrees: recovered (resync)
       }
       if (m.hashes.size > 64) m.hashes.delete(m.hashes.keys().next().value as number);
@@ -349,6 +413,7 @@ export function reduceRoom<S, I, V>(m: RoomModel<S, I, V>, e: Entry): void {
     case 'rematch': {
       if (!p || m.phase !== 'over' || b.m !== m.match || p.status === 'left') return;
       m.rematch.add(p.seat);
+      for (const q of localsOf(m, e.from)) if (q.status === 'on') m.rematch.add(q.seat); // one device votes for its local seats
       // only present players vote; away/left seats are dropped from the next match (an authority host that was lost too)
       const voters = m.players.filter((q) => q.status === 'on');
       if (voters.length >= g.seats.min && voters.every((q) => m.rematch.has(q.seat))) {

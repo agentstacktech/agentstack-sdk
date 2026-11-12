@@ -96,6 +96,17 @@ Tested by doing exactly these steps in an empty folder (`test/starter.test.ts` c
 | UI `MatchPort.view/submit/subscribe` | private views + event window in `view()` | Tribute `RemotePort` |
 | Local game loop that steps its own board | `fold` with `{t, inputs}` commands; others replay | Stones `DuelLink` |
 
+## Several players on one screen (local seats)
+
+When the design says «play together on one screen» (shared keyboard, gamepads, touch zones) **and** online, use local seats instead of a second code path:
+
+1. Offline same-screen = the same `step` with `seats = N` fed from N local input devices (no session at all).
+2. Online + same screen = `createSession(game, { locals: ['Bia'] })` (or the lobby button: `mountLobby(…, { locals: { name } })`). `session.seats` lists every seat on this device; send `session.inputs([mine, bia])` each tick (lockstep) or `session.input(cmd, j)` (fold / authority).
+3. Show each seat's **name and colour** next to its piece, and the **controls of each local seat** before the first move (keys / pad / touch zone).
+4. Pause: offline same-screen may pause everything; online it never pauses the room (others keep playing) — show «you can't pause an online match» instead.
+5. `secret` games: no local seats (one screen shows every hidden move); offer a pass-the-device screen offline instead.
+Tests: `test/locals.test.ts` (lockstep, fold, authority views, presence, leave, rematch, the unchanged generated room script).
+
 ## Do / don't
 
 - **Do** keep `input()` cheap — it runs on every client for every entry.

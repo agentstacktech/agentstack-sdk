@@ -14,6 +14,7 @@ export interface LobbyLabels {
   players: string; you: string; waitingMore: string; start: string; waitingStart: string; ready: string;
   badCode: string; offline: string; version: string; signIn: string; unavailable: string; close: string;
   yourName: string;
+  addLocal: string; sameScreen: string; removeLocal: string;
 }
 const en: LobbyLabels = {
   title: 'Play with friends', create: 'Create a room', createHint: 'You get a code to send to friends', join: 'Join with a code',
@@ -24,6 +25,7 @@ const en: LobbyLabels = {
   offline: 'Can’t reach the game server. Check your connection and try again.', version: 'Your friend has a different version of the game. Both of you should reload the page.',
   signIn: 'Online play needs an account. Sign in, then try again.', unavailable: 'Online play is not switched on on the server yet. Try again later.',
   close: 'Close', yourName: 'Your name (friends see it)',
+  addLocal: '+ Player on this device', sameScreen: 'same screen', removeLocal: 'Remove',
 };
 const ru: LobbyLabels = {
   title: 'Игра с друзьями', create: 'Создать комнату', createHint: 'Вы получите код для друзей', join: 'Войти по коду',
@@ -34,6 +36,7 @@ const ru: LobbyLabels = {
   offline: 'Нет связи с игровым сервером. Проверьте интернет и попробуйте ещё раз.', version: 'У друга другая версия игры. Обновите страницу оба.',
   signIn: 'Для игры онлайн нужен аккаунт. Войдите и попробуйте ещё раз.', unavailable: 'Онлайн-игра ещё не включена на сервере. Попробуйте позже.',
   close: 'Закрыть', yourName: 'Ваше имя (его увидят друзья)',
+  addLocal: '+ Игрок на этом устройстве', sameScreen: 'этот экран', removeLocal: 'Убрать',
 };
 const pt: LobbyLabels = {
   title: 'Jogar com amigos', create: 'Criar sala', createHint: 'Você recebe um código para enviar aos amigos', join: 'Entrar com código',
@@ -44,6 +47,7 @@ const pt: LobbyLabels = {
   offline: 'Sem conexão com o servidor do jogo. Verifique a internet e tente de novo.', version: 'Seu amigo tem outra versão do jogo. Recarreguem a página.',
   signIn: 'O jogo online precisa de uma conta. Entre e tente de novo.', unavailable: 'O jogo online ainda não está ativado no servidor. Tente mais tarde.',
   close: 'Fechar', yourName: 'Seu nome (os amigos verão)',
+  addLocal: '+ Jogador neste aparelho', sameScreen: 'mesma tela', removeLocal: 'Remover',
 };
 export const LOBBY_LABELS = { en, ru, pt } as const;
 
@@ -59,6 +63,11 @@ export interface MountLobbyOptions {
   hideOnStart?: boolean;
   /** Show a «Your name» field on the first screen (e.g. `localName('my-game')`); the game's `connect` reads `.name`. */
   nameField?: { name: string };
+  /**
+   * Waiting screen: let this device add players who share its screen (local seats, `Session.setLocals`).
+   * `name(j)` = the default name of local player j (1, 2, …); `max` = most local players (default 3, capped by free seats).
+   */
+  locals?: { name: (j: number) => string; max?: number };
 }
 export interface LobbyUi { readonly el: HTMLElement; show(): void; hide(): void; destroy(): void }
 
@@ -79,7 +88,11 @@ const CSS = `
 .np-input{min-height:48px;border-radius:12px;border:2px solid #ffffff33;background:#0004;color:inherit;font:inherit;font-size:20px;letter-spacing:.15em;text-align:center;text-transform:uppercase;padding:8px;width:100%;box-sizing:border-box}
 .np-code{font-size:36px;font-weight:800;letter-spacing:.2em;text-align:center;padding:8px;border-radius:12px;background:#0004;user-select:all}
 .np-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
-.np-list li{display:flex;justify-content:space-between;padding:8px 12px;border-radius:10px;background:#ffffff0d}
+.np-list li{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;background:#ffffff0d}
+.np-list li.np-local{border-left:3px solid var(--np-accent,#e0a33a)}
+.np-tag{color:var(--np-muted,#bfae93);font-size:13px}
+.np-mini{min-height:36px;min-width:44px;border:0;border-radius:10px;padding:4px 10px;font:inherit;font-size:14px;cursor:pointer;background:#ffffff1a;color:inherit}
+.np-mini:focus-visible{outline:3px solid var(--np-accent,#e0a33a);outline-offset:2px}
 .np-msg{min-height:1.4em;color:var(--np-muted,#bfae93);font-size:14px;text-align:center}
 .np-err{color:#ff9b8a}
 .np-code span+span{margin-left:.35em}
@@ -142,6 +155,8 @@ export function mountLobby<S, I, V>(parent: HTMLElement, lobby: LobbyController<
   const btn = (label: string, on: () => void, main = false, disabled = false, k = label) =>
     el('button', { type: 'button', class: main ? 'np-btn np-main' : 'np-btn', onclick: on, disabled, 'data-k': k }, label);
   /** «K7M Q2X» on screen, «K 7 M Q 2 X» for screen readers; copying still gives K7MQ2X */
+  const btn2 = (label: string, on: () => void, k: string, aria: string) =>
+    el('button', { type: 'button', class: 'np-mini', onclick: on, 'data-k': k, 'aria-label': aria }, label);
   const codeEl = (code: string) => el('div', { class: 'np-code', 'aria-label': code.split('').join(' ') }, el('span', {}, code.slice(0, 3)), el('span', {}, code.slice(3)));
   const fmt = (s: string, v: Record<string, number>) => s.replace(/\{(\w+)\}/g, (_, k: string) => String(v[k] ?? ''));
 
@@ -186,8 +201,20 @@ export function mountLobby<S, I, V>(parent: HTMLElement, lobby: LobbyController<
       const share = (navigator as Navigator & { share?: (d: ShareData) => Promise<void> }).share;
       card.append(el('div', { class: 'np-row' }, btn(L.copy, () => void copy(s.link ?? '')), share ? btn(L.share, () => void share.call(navigator, { url: s.link ?? '', title: o.title ?? L.title }).catch(() => undefined)) : null));
       card.append(el('h2', {}, `${L.players} · ${seated.length}/${s.max}`));
-      const self = lobby.session?.snapshot.self;
-      card.append(el('ul', { class: 'np-list' }, ...seated.map((p) => el('li', {}, `${p.name}${p.id === self ? ` (${L.you})` : ''}`, p.ready ? `✓ ${L.ready}` : ''))));
+      const ses = lobby.session;
+      const self = ses?.snapshot.self;
+      const mine = seated.filter((p) => p.owner !== undefined && p.owner === self).sort((a, b) => (a.local ?? 0) - (b.local ?? 0));
+      const setLocals = (names: string[]) => { ses?.setLocals(names); };
+      card.append(el('ul', { class: 'np-list' }, ...seated.map((p) => {
+        const local = p.owner !== undefined && p.owner === self;
+        const tag = p.id === self ? ` (${L.you})` : p.owner !== undefined ? ` · ${L.sameScreen}` : '';
+        const right = local ? btn2(L.removeLocal, () => setLocals(mine.filter((q) => q !== p).map((q) => q.name)), `rm-${p.local}`, `${L.removeLocal} ${p.name}`) : p.ready ? `✓ ${L.ready}` : '';
+        return el('li', local || p.owner !== undefined ? { class: 'np-local' } : {}, el('span', {}, p.name, el('span', { class: 'np-tag' }, tag)), right);
+      })));
+      if (o.locals && ses && !s.ready && seated.length < s.max && mine.length < Math.min(3, o.locals.max ?? 3) && !ses.game.secret) {
+        const nl = o.locals;
+        card.append(btn(L.addLocal, () => setLocals([...mine.map((q) => q.name), nl.name(mine.length + 1)]), false, false, 'add-local'));
+      }
       if (o.note) card.append(el('p', { class: 'np-hint' }, o.note));
       const waitLine = seated.length < s.min ? fmt(L.waitingMore, { n: seated.length, min: s.min }) : s.ready ? L.waitingStart : '';
       if (waitLine) card.append(el('p', { class: 'np-msg' }, waitLine));

@@ -64,7 +64,7 @@ seats not `1 ≤ min ≤ max ≤ 64`, missing `step` (lockstep) / `apply` (fold,
 | `join()` | `Promise<void>` | connect + `hello`; resolves when connected (seat comes with the next snapshot) |
 | `subscribe(fn)` | unsubscribe | `fn(snapshot)` after every batch of entries |
 | `snapshot` | `Snapshot` | see below |
-| `input(value)` | `boolean` | `false` = not sent: not playing / spectator / fails `game.input` locally (fold, and the authority host) / lockstep too far ahead / secret already committed this tick. `true` = queued; **sent on the next `update()`** (or `autoPumpMs`) |
+| `input(value, local?)` | `boolean` | `false` = not sent: not playing / spectator / fails `game.input` locally (fold, and the authority host) / lockstep too far ahead / secret already committed this tick. `true` = queued; **sent on the next `update()`** (or `autoPumpMs`) |
 | `ready()` | — | lobby vote; the match starts when the room is full, or when ≥ `min` seated and all ready |
 | `rematch()` | — | only in `over`; new match when every **present** seat voted (`away`/`left` seats are dropped; in authority the new seat 0 hosts) |
 | `leave()` / `close()` | — | `leave` = tell the room (lobby seat freed, in-game forfeit); `close` = drop the link |
@@ -80,6 +80,24 @@ notice (last rejection / protocol hint, string|null), hostWaitMs (authority: ms 
 
 **What to show the player:** `netStatus(snapshot)` → `null` (all good) | `{kind:'offline'}` | `{kind:'reconnecting'}` | `{kind:'host-away', seconds}` | `{kind:'player-away', names}` | `{kind:'desync'}` (priority in that order).
 Ready-made pill: `mountNetStatus(session, { labels?: NET_STATUS_LABELS.ru, parent? })` → `{ el, destroy }` from `@agentstack/netplay/ui` (hidden while all is well).
+
+## Local seats (several players on one device, mixed with remote players)
+
+One device can hold **several seats**: friends on one screen (shared keyboard, several gamepads, touch zones) play in the same room as remote players. Nothing changes on the server: the extra seats ride on the device's member (same login, same request budget), the reducer seats them.
+
+| API | What it does |
+|---|---|
+| `createSession(game, { locals: ['Bia'] })` | extra players on this device (max 3); each takes a seat right after mine while the table has room |
+| `session.setLocals(names)` | lobby only: replace this device's extra players (`[]` removes them); `false` outside the lobby |
+| `session.seats` / `snapshot.seats` | every seat played here: mine first, then the local seats in local order |
+| `snapshot.players[i].owner` / `.local` | a local seat: the member id of its device, and its index there (1, 2, …) |
+| `session.inputs([mine, local1, …])` | lockstep: this tick's input for every seat here, one entry (missing = `idle`) |
+| `session.input(cmd, j)` | fold / authority: a command as local seat `j` (validated as that seat) |
+| `session.viewFor(seat)` | authority: the view of one of my seats (the host sends each device its local seats' views) |
+| `session.leaveLocal(j)` | only local seat `j` leaves; `leave()` takes the device with all its seats |
+| `mountLobby(…, { locals: { name: (j) => 'Player ' + (j + 1) } })` | waiting screen: «+ Player on this device», «same screen» tags, remove buttons |
+
+Rules: local seats share their device's presence (they go away and come back together); one `ready()` / `rematch()` from the device counts for all its seats; a device that omits a local seat's batch plays `idle` there (it cannot stall the room). **Not for `secret` games** (`locals` is ignored): one screen would show every hidden move — use a pass-the-device flow instead.
 
 ## Private rooms & lobby (`createLobby`)
 

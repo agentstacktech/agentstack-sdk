@@ -4,7 +4,7 @@
  */
 import { isIssue, NetplayError, type NetIssue } from './errors.js';
 import type { Game } from './define.js';
-import { commitHash, createRoom, playerById, reduceRoom, type RoomModel } from './room.js';
+import { commitHash, createRoom, localsOf, playerById, reduceRoom, seatsOf, type RoomModel } from './room.js';
 type OutItem = { body: Body; to?: string };
 import type { Body, ConnectionState, Entry, Link, Outcome, Seat, Snapshot, Transport } from './types.js';
 
@@ -15,6 +15,13 @@ export interface SessionOptions {
   name?: string;
   /** Join as a spectator even if a seat is free. */
   spectate?: boolean;
+  /**
+   * Extra players on THIS device (same screen / shared keyboard / several gamepads): their names. Each takes its own
+   * seat right after mine while the table has room (max 3). lockstep: send every local seat's input with
+   * `inputs([mine, local1, …])`; fold / authority: `input(cmd, j)`. Not for `secret` games (one screen shows every move).
+   * Change them in the lobby with `setLocals(names)`. Nothing changes on the server: the seats ride on my member.
+   */
+  locals?: string[];
   /** Room params (only the first player's params are used). */
   params?: Record<string, unknown>;
   /** lockstep: ticks of input delay. Default 0 for turn-based/secret games, 2 for realtime. */
@@ -70,7 +77,7 @@ export class Session<S, I, V = S> {
   private readonly stepListeners = new Set<(state: S | null, tick: number) => void>();
   private snap: Snapshot<S, V> | null = null;
   private outbox: OutItem[] = [];
-  private batch: { t: number; d: unknown[] } | null = null;
+  private batch: { t: number; d: unknown[]; x?: unknown[][] } | null = null;
   private nextTick = 0;
   private lastSendAt = -Infinity;
   /** sends not yet acknowledged by the transport */
@@ -80,6 +87,8 @@ export class Session<S, I, V = S> {
   private reveals = new Map<number, { d: unknown[]; salt: string }>();
   private committed = new Set<number>();
   private lastView: V | null = null;
+  /** authority: last views of my local seats (by seat). */
+  private localViews = new Map<number, V>();
   private lastViewOutcome: Outcome | null = null;
   private hashLog: { t: number; h: number }[] = [];
   private viewsKey = '';
@@ -109,7 +118,8 @@ export class Session<S, I, V = S> {
   /** Connect and send hello. Resolves once the link is up (entries keep streaming in). */
   async join(): Promise<void> {
     await this.connect();
-    this.push({ k: 'hello', g: this.game.id, v: this.game.version, name: this.opts.name, spectate: this.opts.spectate, params: this.opts.params });
+    const locals = this.opts.locals?.length && !this.game.secret ? { locals: this.opts.locals.slice(0, 3) } : {};
+    this.push({ k: 'hello', g: this.game.id, v: this.game.version, name: this.opts.name, spectate: this.opts.spectate, params: this.opts.params, ...locals });
     this.flush();
     if (this.opts.autoPumpMs && !this.timer) this.timer = setInterval(() => this.update(), this.opts.autoPumpMs);
   }
@@ -195,6 +205,31 @@ export class Session<S, I, V = S> {
   get seat(): Seat {
     return playerById(this.model, this.self)?.seat ?? -1;
   }
+  /** Every seat played on this device: mine first, then my local seats in local order ([] when spectating). */
+  get seats(): Seat[] {
+    return this.self ? seatsOf(this.model, this.self) : [];
+  }
+  /** Lobby: replace this device's extra players (names; [] removes them). Returns false outside the lobby or when not seated. */
+  setLocals(names: readonly string[]): boolean {
+    if (this.model.phase !== 'lobby' || this.seat < 0 || this.game.secret) return false;
+    this.opts.locals = names.slice(0, 3);
+    this.push({ k: 'locals', names: names.slice(0, 3).map(String) });
+    this.flush();
+    return true;
+  }
+  /** One local seat (1, 2, …) leaves; the others and my own seat stay. */
+  leaveLocal(j: number): void {
+    if (!Number.isInteger(j) || j < 1) return;
+    this.push({ k: 'leave', l: j });
+    this.flush();
+  }
+  /** authority, non-host: the last view the host sent for one of my seats (`seats[i]`). */
+  viewFor(seat: Seat): V | null {
+    if (seat === this.seat) return this.snapshot.view;
+    const m = this.model;
+    if (m.simulate && m.state !== null) return this.game.view(m.state as S, seat);
+    return this.localViews.get(seat) ?? null;
+  }
   private get isAuthority(): boolean {
     return this.game.mode === 'authority' && this.model.players[0]?.id === this.self && this.self !== '';
   }
@@ -206,7 +241,7 @@ export class Session<S, I, V = S> {
     const own = m.simulate && m.state !== null;
     const outcome = own ? m.outcome : (m.outcome ?? this.lastViewOutcome);
     this.snap = {
-      room: m.room, self: this.self, seat, phase: m.phase, match: m.match,
+      room: m.room, self: this.self, seat, seats: this.seats, phase: m.phase, match: m.match,
       players: m.players.map((p) => ({ ...p })), spectators: m.spectators.size, tick: m.tick,
       state: own ? m.state : null,
       view: own ? this.game.view(m.state as S, seat) : this.lastView,
@@ -220,19 +255,22 @@ export class Session<S, I, V = S> {
    * Send my input. lockstep: one call per tick (realtime) or per turn; returns false when the
    * client is too far ahead (stall) or already committed this turn. fold/authority: a command.
    */
-  input(value: I): boolean {
+  input(value: I, local = 0): boolean {
     const m = this.model;
-    const seat = this.seat;
-    if (seat < 0 || m.phase !== 'playing') return false;
     const g = this.game;
+    if (g.mode === 'lockstep' && !g.secret) return local > 0 ? false : this.inputs([value]); // several seats per tick: inputs([...])
+    const own = this.seat;
+    const seat = local > 0 ? (playerById(m, `${this.self}~${local}`)?.seat ?? -1) : own;
+    if (own < 0 || seat < 0 || m.phase !== 'playing') return false;
     if (g.mode !== 'lockstep') {
       // validate locally when this client holds the state (fold: everyone; authority: the host) — same check every client runs
       if (m.state !== null && m.state !== undefined && g.input(value, seat, m.state as S) === undefined) return false;
       const host = m.players[0]?.id;
       const to = g.mode === 'authority' && this.opts.transport.caps.privateEntries && host && host !== this.self ? host : undefined;
-      this.push({ k: 'cmd', m: m.match, d: value }, to);
+      this.push(local > 0 ? { k: 'cmd', m: m.match, d: value, l: local } : { k: 'cmd', m: m.match, d: value }, to);
       return true;
     }
+    if (local > 0) return false; // secret games have no local seats
     if (g.secret) {
       const t = m.tick;
       // our commitment is already in the log (e.g. sent before a reload): a second one would be ignored by everyone
@@ -244,6 +282,19 @@ export class Session<S, I, V = S> {
       this.push({ k: 'commit', m: m.match, t, h: commitHash([value], salt) });
       return true;
     }
+    return false;
+  }
+
+  /**
+   * lockstep (realtime / turns, not secret): this tick's input for every seat on this device —
+   * `values[0]` mine, `values[j]` local seat j (missing = idle). One entry carries them all. Same stall rule as `input`.
+   */
+  inputs(values: readonly I[]): boolean {
+    const m = this.model;
+    const seat = this.seat;
+    const g = this.game;
+    if (seat < 0 || m.phase !== 'playing' || g.mode !== 'lockstep' || g.secret) return false;
+    const nl = localsOf(m, this.self).length;
     const delay = this.inputDelay;
     // keep a steady lead of `delay` ticks; only re-anchor if we fell behind (idle-filled while away, or a reload)
     let t = this.nextTick;
@@ -255,14 +306,22 @@ export class Session<S, I, V = S> {
       t = Math.max(from, m.tick + delay);
       if (this.batch && this.batch.t + this.batch.d.length <= m.tick) this.batch = null; // ticks already confirmed (e.g. queued during the reload's refold)
       this.flushBatch();
-      if (t > from) this.batch = { t: from, d: new Array(t - from).fill(g.idle) };
+      if (t > from) this.batch = this.idleBatch(from, t - from, nl);
     }
     if (t > m.tick + delay + (this.opts.maxAhead ?? 8)) return false;
     if (this.batch && this.batch.t + this.batch.d.length !== t) this.flushBatch();
-    if (!this.batch) this.batch = { t, d: [] };
-    this.batch.d.push(value);
+    if (!this.batch) this.batch = this.idleBatch(t, 0, nl);
+    this.batch.d.push(values[0] ?? g.idle);
+    if (this.batch.x) for (let j = 1; j <= this.batch.x.length; j++) this.batch.x[j - 1]!.push(values[j] ?? g.idle);
     this.nextTick = t + 1;
     return true;
+  }
+
+  private idleBatch(t: number, n: number, locals: number): { t: number; d: unknown[]; x?: unknown[][] } {
+    const idle = this.game.idle;
+    const b: { t: number; d: unknown[]; x?: unknown[][] } = { t, d: new Array(n).fill(idle) };
+    if (locals > 0) b.x = Array.from({ length: locals }, () => new Array(n).fill(idle));
+    return b;
   }
 
   /** Mark ready in the lobby (starts once all seated players are ready and min seats are met). */
@@ -310,7 +369,8 @@ export class Session<S, I, V = S> {
   }
   private flushBatch(): void {
     if (!this.batch) return;
-    this.outbox.push({ body: { k: 'in', m: this.model.match, t: this.batch.t, d: this.batch.d, n: ++this.sendN } });
+    const b = this.batch;
+    this.outbox.push({ body: b.x ? { k: 'in', m: this.model.match, t: b.t, d: b.d, x: b.x, n: ++this.sendN } : { k: 'in', m: this.model.match, t: b.t, d: b.d, n: ++this.sendN } });
     this.batch = null;
   }
 
@@ -440,12 +500,13 @@ export class Session<S, I, V = S> {
     const delay = this.inputDelay;
     if (g.mode === 'lockstep' && !g.secret && delay > 0 && this.seat >= 0) {
       // the first `delay` ticks have no real input yet: fill them so tick 0 can run
-      this.batch = { t: 0, d: new Array(delay).fill(g.idle) };
+      this.batch = this.idleBatch(0, delay, localsOf(this.model, this.self).length);
       this.nextTick = delay;
     }
     this.reveals.clear();
     this.committed.clear();
     this.lastView = null;
+    this.localViews.clear();
     this.lastViewOutcome = null;
     this.viewsKey = '';
   }
@@ -486,6 +547,8 @@ export class Session<S, I, V = S> {
     const b = e.body as Extract<Body, { k: 'view' }>;
     const host = this.model.players[0]?.id;
     if (e.from !== host || host === this.self) return;
+    const seats = this.seats;
+    if (b.seat >= 0 && b.seat !== this.seat && seats.includes(b.seat)) { this.localViews.set(b.seat, b.d as V); this.lastViewOutcome = b.o ?? null; return; }
     const mine = e.to === this.self || (b.seat === -1 && this.seat < 0) || (b.seat === this.seat && this.seat >= 0);
     if (!mine) return;
     this.lastView = b.d as V;
@@ -501,8 +564,9 @@ export class Session<S, I, V = S> {
     this.viewsKey = key;
     const priv = this.opts.transport.caps.privateEntries;
     for (const p of m.players) {
-      if (p.id === this.self || p.status === 'left') continue;
-      this.push({ k: 'view', m: m.match, s: m.lastSeq, seat: p.seat, d: this.game.view(m.state, p.seat), o: m.outcome }, priv ? p.id : undefined);
+      // my own local seats read the state directly (viewFor); another device's local seats get theirs sent to that device
+      if (p.id === this.self || p.owner === this.self || p.status === 'left') continue;
+      this.push({ k: 'view', m: m.match, s: m.lastSeq, seat: p.seat, d: this.game.view(m.state, p.seat), o: m.outcome }, priv ? (p.owner ?? p.id) : undefined);
     }
     if (m.spectators.size) this.push({ k: 'view', m: m.match, s: m.lastSeq, seat: -1, d: this.game.view(m.state, -1), o: m.outcome });
   }

@@ -25,7 +25,7 @@
 
 ## Что внутри
 
-Лобби и места · таймауты (`presenceMs`, `turnMs`) · реванш · реконнект с `afterSeq` и exactly-once (счётчик отправителя `n`, ретраи безопасны) · `clock`/`clockMs` для таймеров в `fold`/`authority` · хэши состояния и
+Лобби и места · несколько игроков на одном устройстве вместе с удалёнными (`locals`, `inputs([...])`) · таймауты (`presenceMs`, `turnMs`) · реванш · реконнект с `afterSeq` и exactly-once (счётчик отправителя `n`, ретраи безопасны) · `clock`/`clockMs` для таймеров в `fold`/`authority` · хэши состояния и
 `snapshot.desync` · `ctx.rng`/`deriveSeed` · анти-чит (повторная валидация `input()` у всех,
 commit–reveal, приватные `view` в `authority`) · input delay и `confirmed(tick)` для своего цикла.
 
