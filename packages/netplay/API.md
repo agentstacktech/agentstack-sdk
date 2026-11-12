@@ -71,6 +71,7 @@ seats not `1 ≤ min ≤ max ≤ 64`, missing `step` (lockstep) / `apply` (fold,
 | `leave()` / `close()` | — | `leave` = tell the room (lobby seat freed, in-game forfeit); `close` = drop the link |
 | `update()` | — | flush queued inputs, heartbeats, `clock` entries, reconnects |
 | `audience(value)` | `boolean` | an audience command (`game.audience`); `false` = no hook / not playing / a player without `from: 'all'` / rejected locally |
+| `turnLeftMs()` | `number \| null` | lockstep with `turnMs`: ms left on this turn, skew-free (room log time + local time since it was seen); null when not playing / no clock. Use it for turn clocks and buzzers, never `Date.now() − model.tickStartT` |
 | `away(hidden)` | — | the tab went to the background / came back (`bindVisibility(session)` from `/ui` wires it): hidden seats are `away` at once, nobody waits for them, no heartbeats; back = present again. `forfeit` still applies after `presenceMs`; while hidden, polling transports poll no faster than `hiddenPollMs` (3000) and poll at once on return |
 | `onStep(fn)` / `confirmed(tick)` | | lockstep: hook your own render loop |
 | `resync()` | `boolean` | rebuild `model` from `log` (false if `keepLog: false`); fixes a locally corrupted state, not different code |

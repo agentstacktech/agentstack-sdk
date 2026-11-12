@@ -279,6 +279,24 @@ export class Session<S, I, V = S> {
     return this.game.mode === 'authority' && this.model.players[0]?.id === this.self && this.self !== '';
   }
 
+  /**
+   * lockstep with `timeouts.turnMs`: ms left on this turn's clock (null = no clock / not playing). Skew-free: the
+   * room's own time (`now − tickStartT` in log time, the same clock the idle rule uses) plus the local time since
+   * that log time was seen — never `Date.now() − tickStartT`, which mixes the device clock with the server's
+   * (a device a minute off, or a server stamping t = 0, showed 0 s and fired buzzers at once).
+   */
+  turnLeftMs(): number | null {
+    const m = this.model, g = this.game;
+    if (m.phase !== 'playing' || !(g.turnMs > 0)) return null;
+    this.anchorClock();
+    return g.turnMs - Math.max(0, m.now - m.tickStartT) - Math.max(0, this.now() - this.clockAt.at);
+  }
+  private clockAt = { key: '', at: 0 };
+  private anchorClock(): void {
+    const m = this.model, key = `${m.match}:${m.tick}:${m.now}`;
+    if (this.clockAt.key !== key) this.clockAt = { key, at: this.now() };
+  }
+
   get snapshot(): Snapshot<S, V> {
     if (this.snap) return this.snap;
     const m = this.model;
@@ -509,6 +527,7 @@ export class Session<S, I, V = S> {
       if (this.opts.keepLog !== false) this.log.push(e);
     }
     if (m.lastSeq === before) return;
+    if (this.game.turnMs > 0) this.anchorClock();
     this.maybeResync();
     if (!this.hidden) for (const h of this.hashLog) this.push({ k: 'hash', m: m.match, t: h.t, h: h.h }); // a background tab stays quiet
     this.hashLog = [];
