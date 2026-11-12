@@ -65,7 +65,10 @@ export interface MatchBarOptions {
   clock?: (s: Snap) => number | null;
   /** Plain line for a game-specific outcome reason ('ko', 'score'…); undefined = none / the default for room reasons. */
   reason?: (o: Outcome, s: Snap) => string | undefined;
-  /** Show the end panel when the match is over (default true). Turn off if the game has its own result screen. */
+  /**
+   * Show the end panel when the match is over (default true). false = the game keeps its own result screen:
+   * the strip then shows the rematch vote / ask / «not enough players» and New room inline (`end.inline`).
+   */
   endPanel?: boolean;
   onNewRoom?: () => void;
   onMenu?: () => void;
@@ -78,7 +81,7 @@ export interface MatchBarModel {
   players: { name: string; you: boolean; status: string; detail: string }[];
   clock: { text: string; urgent: boolean } | null;
   series: string | null;
-  end: null | { title: string; reason: string; rematch: { label: string; enabled: boolean } | null; note: string };
+  end: null | { title: string; reason: string; rematch: { label: string; enabled: boolean } | null; note: string; inline: boolean };
 }
 
 const fill = (t: string, v: Record<string, string | number>) => t.replace(/\{(\w+)\}/g, (_, k: string) => String(v[k] ?? ''));
@@ -109,7 +112,7 @@ export function matchBar(s: Snap, o: MatchBarOptions = {}): MatchBarModel {
     }
   }
   let end: MatchBarModel['end'] = null;
-  if (over && s.outcome && o.endPanel !== false) {
+  if (over && s.outcome) {
     const out = s.outcome;
     const winner = s.players.find((p) => p.seat === out.winner);
     const won = o.won ?? ((x: Outcome) => x.reason === 'cleared' || x.reason === 'won');
@@ -128,7 +131,7 @@ export function matchBar(s: Snap, o: MatchBarOptions = {}): MatchBarModel {
     const askers = voters.filter((p) => p.id !== s.self && s.rematch.includes(p.seat)).map((p) => p.id);
     const rematch = spectator || !mine ? null : { label: voted ? fill(L.waitingOthers, { n: votes, k: voters.length }) : votes ? fill(L.rematchVotes, { n: votes, k: voters.length }) : L.rematch, enabled: enough && !voted && mine.status === 'on' };
     const note = !enough ? L.cantRematch : askers.length && !voted && !spectator ? fill(L.wantsRematch, { names: named(askers) }) : '';
-    end = { title, reason, rematch, note };
+    end = { title, reason, rematch, note, inline: o.endPanel === false };
   }
   return { spectator, players, clock, series, end };
 }
@@ -144,6 +147,8 @@ font:500 16px/1.35 var(--np-font,system-ui,sans-serif);text-align:center;box-sha
 .np-end button{min-height:48px;min-width:48px;padding:0 18px;border-radius:12px;border:0;font:600 16px var(--np-font,system-ui,sans-serif);cursor:pointer;
 background:#fff2;color:inherit}.np-end button.np-main{background:var(--np-accent,#ffcc4d);color:var(--np-accent-fg,#222)}
 .np-end button:disabled{opacity:.55;cursor:default}.np-end button:focus-visible,.np-chip:focus-visible{outline:3px solid var(--np-accent,#ffcc4d);outline-offset:2px}
+.np-bar button{min-height:44px;padding:0 14px;border-radius:999px;border:0;font:600 15px var(--np-font,system-ui,sans-serif);cursor:pointer;background:var(--np-bg,#000c);color:inherit}
+.np-bar button.np-main{background:var(--np-accent,#ffcc4d);color:var(--np-accent-fg,#222)}.np-bar button:disabled{opacity:.6;cursor:default}
 .np-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}`;
 
 export interface MatchBarUi { readonly el: HTMLElement; readonly model: MatchBarModel; destroy(): void }
@@ -179,11 +184,18 @@ export function mountMatchBar<S, I, V>(session: Session<S, I, V>, o: MatchBarOpt
     }
     if (model.clock) { const c = el('span', 'np-chip' + (model.clock.urgent ? ' np-urgent' : ''), '⏱ ' + model.clock.text); c.dataset.test = 'np-clock'; chips.push(c); }
     if (model.series) { const c = el('span', 'np-chip', model.series); c.dataset.test = 'np-series'; chips.push(c); }
-    bar.replaceChildren(...chips);
-    bar.hidden = o.position === 'bottom' && !!model.end;
-    root.querySelector('.np-end')?.remove();
     const e = model.end;
-    if (e) {
+    if (e?.inline) {
+      // the game shows its own result screen: only the vote and the way out live in the strip
+      if (e.note) chips.push(el('span', 'np-chip', e.note));
+      if (e.rematch) chips.push(button(e.rematch.label, () => session.rematch(), true, !e.rematch.enabled, 'rematch'));
+      if (o.onNewRoom) chips.push(button(o.labels?.newRoom ?? en.newRoom, o.onNewRoom, false, false, 'new'));
+    }
+    bar.replaceChildren(...chips);
+    bar.hidden = o.position === 'bottom' && !!e && !e.inline;
+    if (e?.inline && focusK) (bar.querySelector(`[data-k="${focusK}"]`) as HTMLElement | null)?.focus();
+    root.querySelector('.np-end')?.remove();
+    if (e && !e.inline) {
       const panel = el('section', 'np-end'); panel.dataset.test = 'np-end';
       const h = el('h2', '', e.title); h.id = 'np-end-title'; panel.setAttribute('aria-labelledby', h.id);
       panel.append(h);

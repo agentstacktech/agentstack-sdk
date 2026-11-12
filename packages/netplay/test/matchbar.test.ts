@@ -29,7 +29,7 @@ describe('matchBar (presenter)', () => {
   it('end: win / lose / spectator «Победа: имя», rematch votes, the ask, blocked when someone left, series', () => {
     const over = { phase: 'over' as const, outcome: { winner: 1, reason: 'line' }, results: [{ match: 1, winner: 'a' }, { match: 2, winner: 'b' }, { match: 3, winner: '' }] };
     const lose = matchBar(base({ ...over, rematch: [1] }), ru);
-    expect(lose.end).toEqual({ title: 'Вы проиграли', reason: '', rematch: { label: 'Реванш (1/2)', enabled: true }, note: 'Бруно: хочет реванш' });
+    expect(lose.end).toEqual({ title: 'Вы проиграли', reason: '', rematch: { label: 'Реванш (1/2)', enabled: true }, note: 'Бруно: хочет реванш', inline: false });
     expect(lose.series).toBe('Счёт 1:1 (ничьих 1)');
     const waiting = matchBar(base({ ...over, rematch: [0] }), ru).end!;
     expect(waiting.rematch).toEqual({ label: 'Ждём остальных… (1/2)', enabled: false });
@@ -44,7 +44,7 @@ describe('matchBar (presenter)', () => {
     expect(lm.reason).toBe('Бруно: вышел из игры');
     expect(lm.rematch!.enabled).toBe(false);
     expect(lm.note).toMatch(/новую комнату/);
-    expect(matchBar(base({ ...over }), { endPanel: false }).end).toBeNull();
+    expect(matchBar(base({ ...over, rematch: [1] }), { ...ru, endPanel: false }).end).toMatchObject({ inline: true, rematch: { label: 'Реванш (1/2)', enabled: true }, note: 'Бруно: хочет реванш' });
     expect(matchBar(base({ ...over }), { ...ru, reason: (o) => (o.reason === 'line' ? 'Три в ряд' : undefined) }).end!.reason).toBe('Три в ряд');
   });
 
