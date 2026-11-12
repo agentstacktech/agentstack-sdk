@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanName, localName } from '../src/ui/index.js';
+import { cleanName, localName, type IdChannel } from '../src/ui/index.js';
 
 const mem = () => { const m = new Map<string, string>(); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), m }; };
 
@@ -37,4 +37,45 @@ describe('localName (ui)', () => {
     me.name = '  Саша\u0007  ';
     expect(me.name).toBe('Саша');
   });
+  it('a duplicated tab (copied sessionStorage) gets its own id; a reload or a restored tab keeps its id', () => {
+    // a BroadcastChannel stand-in: every message reaches every other open channel, synchronously
+    const open = new Set<IdChannel>();
+    const channel = (): IdChannel => {
+      const c: IdChannel = { onmessage: null, postMessage: (m) => { for (const o of open) if (o !== c) o.onmessage?.({ data: m }); }, close: () => void open.delete(c) };
+      open.add(c);
+      return c;
+    };
+    const copy = (s: ReturnType<typeof mem>) => { const n = mem(); for (const [k, v] of s.m) n.m.set(k, v); return n; };
+    const local = mem(), tab1 = mem();
+    const a = localName('stones', { local, session: tab1, channel });
+    a.name = 'Аня';
+    const original = a.id; // the game reads the id (joins a room)
+    const dup = copy(tab1); // «Duplicate tab»: same sessionStorage
+    const b = localName('stones', { local, session: dup, channel });
+    expect(b.id).not.toBe(original);
+    expect(dup.m.get('netplay:id:stones')).toBe(b.id); // the copy keeps its new id on its own reloads
+    expect(b.name).toBe('Аня');
+    expect(a.id).toBe(original); // the original never changes
+    // reload of the original: the old page is gone (its channel closed), nobody answers → same id, same seat
+    open.clear();
+    expect(localName('stones', { local, session: tab1, channel }).id).toBe(original);
+    // another game in the same tab is a separate id space
+    expect(localName('wt', { local, session: tab1, channel }).id).not.toBe(original);
+  });
+  it('an id the game already used is never swapped, and ?user= never asks', () => {
+    const sent: unknown[] = [];
+    const ch = (): IdChannel => ({ onmessage: null, postMessage: (m) => void sent.push(m), close: () => {} });
+    const s = mem(); s.m.set('netplay:id:g', 'P-AAAA');
+    let c!: IdChannel;
+    const me = localName('g', { local: mem(), session: s, channel: () => (c = ch()) });
+    expect(me.id).toBe('P-AAAA'); // read → locked
+    c.onmessage?.({ data: { k: 'mine', game: 'g', id: 'P-AAAA', tab: 'other' } });
+    expect(me.id).toBe('P-AAAA');
+    c.onmessage?.({ data: { k: 'who', game: 'g', id: 'P-AAAA', tab: 'other' } });
+    expect(sent.at(-1)).toMatchObject({ k: 'mine', id: 'P-AAAA' }); // and it answers for its id
+    sent.length = 0;
+    localName('g', { params: new URLSearchParams('user=bob'), local: mem(), session: mem(), channel: ch });
+    expect(sent).toEqual([]);
+  });
 });
+

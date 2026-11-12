@@ -5,25 +5,60 @@
  *   const me = localName('tribute');            // { id: 'P-7K2M', name: 'P-7K2M' | 'Саша' }
  *   createSession(game, { transport: hub.transport(me.id), name: me.name, … });
  *   mountLobby(el, lobby, { nameField: me });    // «Your name» field on the first screen
+ *
+ * Duplicated tabs: «Duplicate tab» copies sessionStorage, so the copy would start with the same id and take the
+ * original's seat. On load each tab asks the other live tabs over a BroadcastChannel «who has id X?»; a live tab
+ * that holds X answers within a millisecond and the copy picks a fresh id. A reload or a tab restored after the
+ * browser killed it gets no answer (the old page is gone) and keeps its id — and with it its seat.
+ * The id only changes before the game first reads `me.id` (the lobby reads it on Create / Join), never mid-match.
  */
 export interface LocalName { readonly id: string; name: string }
 type Store = Pick<Storage, 'getItem' | 'setItem'>;
-const safe = (get: () => Store | undefined): Store | undefined => { try { return get(); } catch { return undefined; } };
+/** The part of BroadcastChannel this file uses (tests pass a fake). */
+export interface IdChannel { postMessage(m: unknown): void; onmessage: ((e: { data: unknown }) => void) | null; close(): void }
+const safe = <T>(get: () => T | undefined): T | undefined => { try { return get(); } catch { return undefined; } };
 /** Storage can throw on every call (blocked cookies, private mode, quota) — treat that as «no storage». */
 const read = (s: Store | undefined, k: string): string | null => { try { return s?.getItem(k) ?? null; } catch { return null; } };
 const write = (s: Store | undefined, k: string, v: string): void => { try { s?.setItem(k, v); } catch { /* storage blocked */ } };
 /** Display names: trimmed, control characters removed, at most 24 characters; empty → the id. */
 export const cleanName = (v: string, fallback: string): string => v.replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 24) || fallback;
+const newId = () => 'P-' + Math.random().toString(36).slice(2, 6).toUpperCase().padEnd(4, '0');
+const defaultChannel = (): IdChannel | undefined => (typeof BroadcastChannel === 'function' ? new BroadcastChannel('netplay:id') as unknown as IdChannel : undefined);
 
-export function localName(game: string, o: { params?: URLSearchParams; local?: Store; session?: Store } = {}): LocalName {
+interface Msg { k: 'who' | 'mine'; game: string; id: string; tab: string }
+
+export function localName(game: string, o: { params?: URLSearchParams; local?: Store; session?: Store; channel?: () => IdChannel | undefined } = {}): LocalName {
   const local = o.local ?? safe(() => globalThis.localStorage), session = o.session ?? safe(() => globalThis.sessionStorage);
   const fromUrl = o.params?.get('user');
   const idKey = `netplay:id:${game}`, nameKey = 'netplay:name';
   let id = fromUrl ? fromUrl.slice(0, 24) : read(session, idKey) ?? '';
-  if (!id) { id = 'P-' + Math.random().toString(36).slice(2, 6).toUpperCase(); write(session, idKey, id); }
+  const restored = !!id && !fromUrl;
+  if (!id) { id = newId(); write(session, idKey, id); }
   let name = fromUrl ? id : cleanName(read(local, nameKey) ?? '', id);
+  let used = false; // once the game read the id (a session uses it) it never changes
+  if (!fromUrl) {
+    // ?user= is an explicit QA identity: never renamed. Everyone else answers «mine» for its id and, if the id
+    // came from a copied sessionStorage, asks once whether a live tab already holds it.
+    const ch = safe(o.channel ?? defaultChannel);
+    const tab = Math.random().toString(36).slice(2);
+    if (ch) {
+      ch.onmessage = (e) => {
+        const m = e.data as Msg;
+        if (!m || m.game !== game || m.tab === tab || m.id !== id) return;
+        if (m.k === 'who') safe(() => ch.postMessage({ k: 'mine', game, id, tab } satisfies Msg));
+        else if (m.k === 'mine' && !used) {
+          // a live tab holds this id: this tab is its copy → fresh id (the display name stays)
+          const keepName = name === id ? null : name;
+          id = newId();
+          write(session, idKey, id);
+          name = keepName ?? id;
+        }
+      };
+      if (restored) safe(() => ch.postMessage({ k: 'who', game, id, tab } satisfies Msg));
+    }
+  }
   return {
-    id,
+    get id() { used = true; return id; },
     get name() { return name; },
     set name(v: string) { name = cleanName(v, id); if (!fromUrl) write(local, nameKey, name === id ? '' : name); },
   };
