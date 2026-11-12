@@ -121,6 +121,7 @@ export function mountLobby<S, I, V>(parent: HTMLElement, lobby: LobbyController<
   root.setAttribute('aria-labelledby', titleId);
   root.append(card, live);
   let said = '';
+  let msgSaid = '';
   const say = (text: string) => { if (text && text !== said) { said = text; live.textContent = text; } };
   parent.append(root);
   let joining = false;
@@ -196,7 +197,9 @@ export function mountLobby<S, I, V>(parent: HTMLElement, lobby: LobbyController<
       card.append(el('p', { class: 'np-err', role: 'alert' }, s.error === 'bad-code' ? L.badCode : s.error === 'version' ? L.version : s.error === 'sign-in' ? L.signIn : s.error === 'unavailable' ? L.unavailable : L.offline), btn(L.back, () => lobby.back(), true));
       queueMicrotask(() => (card.querySelector('.np-btn') as HTMLElement | null)?.focus());
     }
-    if (msg) { card.append(el('p', { class: 'np-msg' }, msg)); say(msg); }
+    if (msg) card.append(el('p', { class: 'np-msg' }, msg));
+    if (msg && msg !== msgSaid) say(msg); // announce «copied» once; later renders announce what changed (players)
+    msgSaid = msg;
     if (focusKey) (card.querySelector(`[data-k="${CSS_ESCAPE(focusKey)}"]`) as HTMLElement | null)?.focus();
     if (s.screen === 'playing' && (o.hideOnStart ?? true)) close();
   };
