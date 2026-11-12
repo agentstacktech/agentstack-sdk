@@ -67,6 +67,8 @@ export interface MatchBarOptions {
   endPanel?: boolean;
   onNewRoom?: () => void;
   onMenu?: () => void;
+  /** Where the strip sits (default 'top'); pick the edge your own HUD leaves free. */
+  position?: 'top' | 'bottom';
 }
 
 export interface MatchBarModel {
@@ -130,7 +132,7 @@ export function matchBar(s: Snap, o: MatchBarOptions = {}): MatchBarModel {
 
 const CSS = `.np-bar{position:fixed;left:0;right:0;top:0;z-index:1000;display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center;
 padding:max(6px,env(safe-area-inset-top)) 10px 6px;font:600 14px/1.25 var(--np-font,system-ui,sans-serif);color:var(--np-fg,#fff);pointer-events:none}
-.np-bar>*{pointer-events:auto}.np-chip{background:var(--np-bg,#000c);border-radius:999px;padding:5px 11px;white-space:nowrap}
+.np-bar.np-bottom{top:auto;bottom:0;padding:6px 10px max(6px,env(safe-area-inset-bottom))}.np-bar>*{pointer-events:auto}.np-chip{background:var(--np-bg,#000c);border-radius:999px;padding:5px 11px;white-space:nowrap}
 .np-chip b{font-weight:700}.np-chip i{font-style:normal;color:var(--np-muted,#bbb);font-weight:500}.np-chip.np-me{outline:2px solid var(--np-accent,#ffcc4d)}
 .np-chip.np-urgent{background:#b3261e}.np-end{position:fixed;left:50%;bottom:0;transform:translateX(-50%);z-index:1002;width:min(520px,100%);box-sizing:border-box;
 padding:16px 16px max(16px,env(safe-area-inset-bottom));border-radius:16px 16px 0 0;background:var(--np-bg,#111e);color:var(--np-fg,#fff);
@@ -148,7 +150,7 @@ export function mountMatchBar<S, I, V>(session: Session<S, I, V>, o: MatchBarOpt
   const parent = o.parent ?? document.body, doc = parent.ownerDocument;
   if (!doc.getElementById('np-bar-css')) { const st = doc.createElement('style'); st.id = 'np-bar-css'; st.textContent = CSS; doc.head.append(st); }
   const root = doc.createElement('div'), bar = doc.createElement('div'), sr = doc.createElement('div');
-  bar.className = 'np-bar'; bar.dataset.test = 'np-bar';
+  bar.className = o.position === 'bottom' ? 'np-bar np-bottom' : 'np-bar'; bar.dataset.test = 'np-bar';
   sr.className = 'np-sr'; sr.setAttribute('aria-live', 'polite');
   root.append(bar, sr);
   parent.append(root);
@@ -175,6 +177,7 @@ export function mountMatchBar<S, I, V>(session: Session<S, I, V>, o: MatchBarOpt
     if (model.clock) { const c = el('span', 'np-chip' + (model.clock.urgent ? ' np-urgent' : ''), '⏱ ' + model.clock.text); c.dataset.test = 'np-clock'; chips.push(c); }
     if (model.series) { const c = el('span', 'np-chip', model.series); c.dataset.test = 'np-series'; chips.push(c); }
     bar.replaceChildren(...chips);
+    bar.hidden = o.position === 'bottom' && !!model.end;
     root.querySelector('.np-end')?.remove();
     const e = model.end;
     if (e) {
