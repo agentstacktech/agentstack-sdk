@@ -8,7 +8,9 @@
  *
  * Use it as `fetch` for `hostedMcpRunner` — the contract tests run each game's generated room script this way.
  */
-import { ScriptError, type ScriptRuntime } from './scriptRuntime.js';
+import { loadRoomScript, ScriptError, type ScriptRuntime } from './scriptRuntime.js';
+import { hostedMcpRunner } from '../transports/hosted.js';
+import { stackscriptTransport, type StackscriptRoomOptions } from '../transports/stackscript.js';
 
 export interface FakeHostedOptions {
   projectId: number;
@@ -142,4 +144,23 @@ export function fakeHostedMcp(rt: ScriptRuntime, o: FakeHostedOptions) {
     }) as typeof globalThis.fetch;
   };
   return { fetch: fetch as typeof globalThis.fetch, browser, stats };
+}
+
+/**
+ * One-liner for game contract tests: the room script `source` behind the hosted fake, and a
+ * `transport(user)` = what a signed-in browser tab gets with `net=as` (hostedMcpRunner + stackscriptTransport).
+ */
+export function hostedFixture(
+  source: string,
+  room: { projectId: number; scriptId: string; exportPrefix: string },
+  o: Omit<FakeHostedOptions, 'projectId' | 'scriptId'> = {},
+) {
+  const rt = loadRoomScript(source, (o.now ?? Date.now)());
+  const fake = fakeHostedMcp(rt, { ...o, projectId: room.projectId, scriptId: room.scriptId });
+  return {
+    rt,
+    fake,
+    transport: (user: string, opts: Omit<StackscriptRoomOptions, 'scriptId' | 'exportPrefix'> = {}) =>
+      stackscriptTransport(hostedMcpRunner({ projectId: room.projectId, fetch: fake.browser(user) }), { scriptId: room.scriptId, exportPrefix: room.exportPrefix, ...opts }),
+  };
 }

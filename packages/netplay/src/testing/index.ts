@@ -8,7 +8,7 @@ import { memoryHub, type MemoryHub, type MemoryHubOptions } from '../transports/
 import type { Body, Seat, Snapshot } from '../types.js';
 
 export { loadRoomScript, scriptServer, ScriptError, type ScriptRuntime } from './scriptRuntime.js';
-export { fakeHostedMcp, type FakeHostedOptions, type FakeHostedStats } from './fakeHosted.js';
+export { fakeHostedMcp, hostedFixture, type FakeHostedOptions, type FakeHostedStats } from './fakeHosted.js';
 
 /** Let pending promise callbacks (reconnects, rejected sends) run between virtual frames. */
 export async function microtasks(rounds = 8): Promise<void> {
