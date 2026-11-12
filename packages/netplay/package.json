@@ -1,0 +1,70 @@
+{
+  "name": "@agentstack/netplay",
+  "version": "0.1.0",
+  "description": "AgentStack netplay — game-agnostic deterministic multiplayer: defineGame, room log sessions, pluggable transports, StackScript room generator",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "import": "./dist/testing/index.js",
+      "default": "./dist/testing/index.js"
+    },
+    "./ui": {
+      "types": "./dist/ui/index.d.ts",
+      "import": "./dist/ui/index.js",
+      "default": "./dist/ui/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "README_ru.md",
+    "AGENTS.md",
+    "AI_INDEX.md",
+    "examples",
+    "API.md",
+    "tools/dev-relay.mjs"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "test": "vitest run",
+    "gen:room": "npm run build --silent && node tools/gen-room.mjs",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "dev-relay": "node tools/dev-relay.mjs --lan"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "peerDependencies": {
+    "@agentstack/sdk": ">=0.4.26"
+  },
+  "peerDependenciesMeta": {
+    "@agentstack/sdk": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agentstacktech/agentstack-sdk.git",
+    "directory": "packages/netplay"
+  },
+  "license": "MIT",
+  "homepage": "https://agentstack.tech",
+  "geneticTag": "sdk.netplay.gen1"
+}

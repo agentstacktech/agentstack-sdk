@@ -5,11 +5,12 @@
     "packages/core",
     "packages/react",
     "packages/hooks",
-    "packages/cli"
+    "packages/cli",
+    "packages/netplay"
   ],
   "scripts": {
-    "build": "npm run build -w @agentstack/sdk && npm run build -w @agentstack/react && npm run build -w @agentstack/hooks && npm run build -w @agentstack/cli",
-    "test": "npm run test -w @agentstack/sdk && npm run test -w @agentstack/cli",
+    "build": "npm run build -w @agentstack/sdk && npm run build -w @agentstack/react && npm run build -w @agentstack/hooks && npm run build -w @agentstack/cli && npm run build -w @agentstack/netplay",
+    "test": "npm run test -w @agentstack/sdk && npm run test -w @agentstack/cli && npm run test -w @agentstack/netplay",
     "check:economy-parity": "npm run check:economy-parity -w @agentstack/sdk",
     "check:finance-parity": "npm run check:finance-parity -w @agentstack/sdk",
     "check:commerce-marketplace-parity": "npm run check:commerce-marketplace-parity -w @agentstack/sdk",

@@ -1,0 +1,305 @@
+/**
+ * Optional minimal room-code screen for `createLobby` (`@agentstack/netplay/ui`). Plain DOM, no framework,
+ * mobile-first (48 px targets, 16 px+ inputs, one column, safe-area padding). Opens as a modal <dialog> (top layer, focus trap, Esc = back). Theme with CSS variables on the
+ * container: --np-bg, --np-fg, --np-accent, --np-accent-fg, --np-muted, --np-font.
+ *
+ *   const ui = mountLobby(document.body, lobby, { labels: LOBBY_LABELS.ru, title: 'Дань', onClose: showMenu });
+ *   ui.destroy();
+ */
+import type { LobbyController, LobbyState } from '../lobby.js';
+import { TURN_CHOICES } from '../phase.js';
+
+export interface LobbyLabels {
+  title: string; create: string; createHint: string; join: string; joinHint: string; codePlaceholder: string; joinGo: string;
+  back: string; leave: string; yourCode: string; shareHint: string; copy: string; copied: string; share: string;
+  players: string; you: string; waitingMore: string; start: string; waitingStart: string; ready: string;
+  badCode: string; offline: string; version: string; signIn: string; unavailable: string; close: string;
+  yourName: string;
+  addLocal: string; sameScreen: string; removeLocal: string; /** Someone else's local seat: «на экране {name}». */ withOwner: string;
+  /** `turnChoice`: label, «Off», «{s} s», the hint under the buttons. */ turnTimer: string; turnOff: string; turnSeconds: string; turnHint: string;
+}
+const en: LobbyLabels = {
+  title: 'Play with friends', create: 'Create a room', createHint: 'You get a code to send to friends', join: 'Join with a code',
+  joinHint: 'Type the code a friend sent you', codePlaceholder: 'e.g. K7MQ2X', joinGo: 'Join', back: 'Back', leave: 'Leave room',
+  yourCode: 'Room code', shareHint: 'Send this code or the link to your friends', copy: 'Copy invite link', copied: 'Link copied',
+  share: 'Share…', players: 'Players', you: 'you', waitingMore: 'Waiting for players… ({n} of {min} needed)', start: 'Start the game',
+  waitingStart: 'Waiting for everyone to press Start…', ready: 'ready', badCode: 'That code doesn’t look right. Codes have 6 letters and digits.',
+  offline: 'Can’t reach the game server. Check your connection and try again.', version: 'Your friend has a different version of the game. Both of you should reload the page.',
+  signIn: 'Online play needs an account. Sign in, then try again.', unavailable: 'Online play is not switched on on the server yet. Try again later.',
+  close: 'Close', yourName: 'Your name (friends see it)',
+  addLocal: '+ Player on this device', sameScreen: 'same screen', removeLocal: 'Remove', withOwner: "on {name}'s screen",
+  turnTimer: 'Time per move', turnOff: 'Off', turnSeconds: '{s} s', turnHint: 'Everyone moves at the same time. When time runs out, whoever has not chosen gets the default move.',
+};
+const ru: LobbyLabels = {
+  title: 'Игра с друзьями', create: 'Создать комнату', createHint: 'Вы получите код для друзей', join: 'Войти по коду',
+  joinHint: 'Введите код, который прислал друг', codePlaceholder: 'например K7MQ2X', joinGo: 'Войти', back: 'Назад', leave: 'Выйти из комнаты',
+  yourCode: 'Код комнаты', shareHint: 'Отправьте друзьям этот код или ссылку', copy: 'Скопировать ссылку', copied: 'Ссылка скопирована',
+  share: 'Поделиться…', players: 'Игроки', you: 'вы', waitingMore: 'Ждём игроков… (нужно {min}, сейчас {n})', start: 'Начать игру',
+  waitingStart: 'Ждём, пока все нажмут «Начать»…', ready: 'готов', badCode: 'Код не подходит: в нём 6 букв и цифр.',
+  offline: 'Нет связи с игровым сервером. Проверьте интернет и попробуйте ещё раз.', version: 'У друга другая версия игры. Обновите страницу оба.',
+  signIn: 'Для игры онлайн нужен аккаунт. Войдите и попробуйте ещё раз.', unavailable: 'Онлайн-игра ещё не включена на сервере. Попробуйте позже.',
+  close: 'Закрыть', yourName: 'Ваше имя (его увидят друзья)',
+  addLocal: '+ Игрок на этом устройстве', sameScreen: 'этот экран', removeLocal: 'Убрать', withOwner: 'на экране {name}',
+  turnTimer: 'Время на ход', turnOff: 'Выкл', turnSeconds: '{s} с', turnHint: 'Все ходят одновременно. Если время выйдет, за того, кто не успел, будет сделан ход по умолчанию.',
+};
+const pt: LobbyLabels = {
+  title: 'Jogar com amigos', create: 'Criar sala', createHint: 'Você recebe um código para enviar aos amigos', join: 'Entrar com código',
+  joinHint: 'Digite o código que seu amigo enviou', codePlaceholder: 'ex.: K7MQ2X', joinGo: 'Entrar', back: 'Voltar', leave: 'Sair da sala',
+  yourCode: 'Código da sala', shareHint: 'Envie este código ou o link para seus amigos', copy: 'Copiar link de convite', copied: 'Link copiado',
+  share: 'Compartilhar…', players: 'Jogadores', you: 'você', waitingMore: 'Aguardando jogadores… ({n} de {min})', start: 'Começar o jogo',
+  waitingStart: 'Aguardando todos apertarem Começar…', ready: 'pronto', badCode: 'Esse código não parece certo. Códigos têm 6 letras e números.',
+  offline: 'Sem conexão com o servidor do jogo. Verifique a internet e tente de novo.', version: 'Seu amigo tem outra versão do jogo. Recarreguem a página.',
+  signIn: 'O jogo online precisa de uma conta. Entre e tente de novo.', unavailable: 'O jogo online ainda não está ativado no servidor. Tente mais tarde.',
+  close: 'Fechar', yourName: 'Seu nome (os amigos verão)',
+  addLocal: '+ Jogador neste aparelho', sameScreen: 'mesma tela', removeLocal: 'Remover', withOwner: 'na tela de {name}',
+  turnTimer: 'Tempo por jogada', turnOff: 'Desl.', turnSeconds: '{s} s', turnHint: 'Todos jogam ao mesmo tempo. Quando o tempo acaba, quem não escolheu recebe a jogada padrão.',
+};
+
+/**
+ * Lobby tag after a player's name (pure): « (вы)» for me, « · этот экран» for my local seats,
+ * « · на экране Ana» for a local seat on someone else's device, '' otherwise.
+ */
+export function seatTag(p: { id: string; owner?: string }, self: string | undefined, seated: readonly { id: string; name: string }[], L: Pick<LobbyLabels, 'you' | 'sameScreen' | 'withOwner'>): string {
+  if (p.id === self) return ` (${L.you})`;
+  if (p.owner === undefined) return '';
+  if (p.owner === self) return ` · ${L.sameScreen}`;
+  const host = seated.find((q) => q.id === p.owner);
+  return ` · ${L.withOwner.replace('{name}', host?.name || p.owner)}`;
+}
+export const LOBBY_LABELS = { en, ru, pt } as const;
+
+export interface MountLobbyOptions {
+  labels?: Partial<LobbyLabels>;
+  /** Heading override (e.g. the game name). */
+  title?: string;
+  /** Show a close button on the menu screen. */
+  onClose?: () => void;
+  /** Extra plain-language line on the waiting screen (e.g. «Empty seats are played by bots»). */
+  note?: string;
+  /** Hide the overlay automatically when the match starts. Default true. */
+  hideOnStart?: boolean;
+  /** Show a «Your name» field on the first screen (e.g. `localName('my-game')`); the game's `connect` reads `.name`. */
+  nameField?: { name: string };
+  /**
+   * Waiting screen: let this device add players who share its screen (local seats, `Session.setLocals`).
+   * `name(j)` = the default name of local player j (1, 2, …); `max` = most local players (default 3, capped by free seats).
+   */
+  locals?: { name: (j: number) => string; max?: number };
+  /**
+   * Room settings the creator picks before «Create» (e.g. the turn timer: `TURN_CHOICES`). Kept on the object
+   * like `nameField` (`value` changes on tap); the game's `connect` puts it into `createSession({ params })`.
+   * The waiting screen shows what the room actually uses («Turn timer: 60 s»), read from the room params,
+   * so a friend who joined by code sees the creator's choice.
+   */
+  choices?: LobbyChoice[];
+}
+export interface LobbyChoice {
+  /** Room param key (`params[param]`). */
+  param: string;
+  label: string;
+  options: { value: string | number; label: string }[];
+  value: string | number;
+  /** One plain line under the buttons (e.g. «When time runs out, a default move is made»). */
+  hint?: string;
+}
+/** The turn-timer room choice (`TURN_CHOICES` by default: off / 30 / 60 / 90 s) in the lobby's language. */
+export function turnChoice(L: Pick<LobbyLabels, 'turnTimer' | 'turnOff' | 'turnSeconds' | 'turnHint'>, value: number, o: { param?: string; seconds?: readonly number[]; hint?: boolean } = {}): LobbyChoice {
+  const secs = o.seconds ?? TURN_CHOICES;
+  return {
+    param: o.param ?? 'turnS', label: L.turnTimer, value: secs.includes(value) ? value : secs[0]!,
+    options: secs.map((s) => ({ value: s, label: s ? L.turnSeconds.replace('{s}', String(s)) : L.turnOff })),
+    ...(o.hint === false ? {} : { hint: L.turnHint }),
+  };
+}
+/** «Turn timer: 60 s» for the waiting screen, from the room params (pure; '' when the room has no such param). */
+export function choiceLine(c: Pick<LobbyChoice, 'param' | 'label' | 'options'>, params: Readonly<Record<string, unknown>> | undefined): string {
+  const v = params?.[c.param];
+  const opt = c.options.find((o) => o.value === v);
+  return opt ? `${c.label}: ${opt.label}` : '';
+}
+export interface LobbyUi { readonly el: HTMLElement; show(): void; hide(): void; destroy(): void }
+
+const CSS = `
+.np-lobby{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom));
+ background:var(--np-backdrop,#000b);font:16px/1.4 var(--np-font,system-ui,sans-serif);color:var(--np-fg,#f4ead6);
+ margin:0;border:0;width:100%;height:100%;max-width:none;max-height:none;box-sizing:border-box}
+.np-lobby::backdrop{background:transparent}
+.np-lobby:not([open]){display:none}
+.np-card{width:100%;max-width:420px;max-height:100%;overflow:auto;background:var(--np-bg,#211a14);border:1px solid var(--np-line,transparent);border-radius:var(--np-radius,16px);padding:20px;box-shadow:0 10px 40px #0008;display:flex;flex-direction:column;gap:12px}
+.np-card h2{margin:0 0 4px;font-size:20px}
+.np-hint{margin:-6px 0 0;color:var(--np-muted,#bfae93);font-size:14px}
+.np-btn{min-height:48px;border:0;border-radius:12px;padding:10px 16px;font:inherit;font-weight:600;cursor:pointer;background:#ffffff1a;color:inherit;width:100%}
+.np-btn.np-main{background:var(--np-accent,#e0a33a);color:var(--np-accent-fg,#1b130b)}
+.np-btn:disabled{opacity:.5;cursor:default}
+.np-btn:focus-visible,.np-input:focus-visible{outline:3px solid var(--np-accent,#e0a33a);outline-offset:2px}
+.np-row{display:flex;gap:8px}.np-row>*{flex:1}
+.np-input{min-height:48px;border-radius:12px;border:2px solid #ffffff33;background:#0004;color:inherit;font:inherit;font-size:20px;letter-spacing:.15em;text-align:center;text-transform:uppercase;padding:8px;width:100%;box-sizing:border-box}
+.np-code{font-size:36px;font-weight:800;letter-spacing:.2em;text-align:center;padding:8px;border-radius:12px;background:#0004;user-select:all}
+.np-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.np-list li{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;background:#ffffff0d}
+.np-list li.np-local{border-left:3px solid var(--np-accent,#e0a33a)}
+.np-tag{color:var(--np-muted,#bfae93);font-size:13px}
+.np-mini{min-height:36px;min-width:44px;border:0;border-radius:10px;padding:4px 10px;font:inherit;font-size:14px;cursor:pointer;background:#ffffff1a;color:inherit}
+.np-mini:focus-visible{outline:3px solid var(--np-accent,#e0a33a);outline-offset:2px}
+.np-msg{min-height:1.4em;color:var(--np-muted,#bfae93);font-size:14px;text-align:center}
+.np-err{color:#ff9b8a}
+.np-code span+span{margin-left:.35em}
+.np-name{min-height:48px;border-radius:12px;border:2px solid #ffffff33;background:#0004;color:inherit;font:inherit;font-size:18px;padding:8px 12px;width:100%;box-sizing:border-box}
+.np-name:focus-visible{outline:3px solid var(--np-accent,#e0a33a);outline-offset:2px}
+.np-seg{display:flex;gap:6px;flex-wrap:wrap}.np-seg>button{flex:1 1 60px;min-height:44px;border:2px solid transparent;border-radius:10px;font:inherit;font-weight:600;cursor:pointer;background:#ffffff1a;color:inherit;padding:6px 8px}
+.np-seg>button[aria-pressed="true"]{background:var(--np-accent,#e0a33a);color:var(--np-accent-fg,#1b130b)}
+.np-seg>button:focus-visible{outline:3px solid var(--np-accent,#e0a33a);outline-offset:2px}
+.np-choice{display:flex;flex-direction:column;gap:6px}.np-choice>.np-hint{margin:0}
+.np-sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;padding:0}`;
+
+const CSS_ESCAPE = (v: string): string => v.replace(/["\\]/g, '\\$&');
+
+export function mountLobby<S, I, V>(parent: HTMLElement, lobby: LobbyController<S, I, V>, o: MountLobbyOptions = {}): LobbyUi {
+  const L: LobbyLabels = { ...en, ...o.labels };
+  const doc = parent.ownerDocument;
+  if (!doc.getElementById('np-lobby-css')) {
+    const st = doc.createElement('style');
+    st.id = 'np-lobby-css';
+    st.textContent = CSS;
+    doc.head.append(st);
+  }
+  // a modal <dialog> lives in the browser top layer: it stacks above the game's own modal dialogs, traps focus and gets Esc
+  const root = doc.createElement('dialog');
+  root.className = 'np-lobby';
+  root.setAttribute('aria-modal', 'true');
+  const open = () => { if (root.open) return; if (typeof root.showModal === 'function' && root.isConnected) root.showModal(); else root.setAttribute('open', ''); };
+  const close = () => { if (typeof root.close === 'function') root.close(); else root.removeAttribute('open'); };
+  root.addEventListener('cancel', (e) => {
+    e.preventDefault(); // Esc: back out one step instead of hiding a live room
+    const st = lobby.state;
+    if (st.screen === 'error') lobby.back();
+    else if (st.screen === 'menu' && joining) { joining = false; render(lobby.state); }
+    else if (st.screen === 'menu' && o.onClose) o.onClose();
+  });
+  const card = doc.createElement('div');
+  card.className = 'np-card';
+  // one persistent live region (a re-created node is not reliably announced): code, player count, errors, «copied»
+  const live = doc.createElement('p');
+  live.className = 'np-sr';
+  live.setAttribute('aria-live', 'polite');
+  const titleId = `np-title-${Math.random().toString(36).slice(2, 8)}`;
+  root.setAttribute('aria-labelledby', titleId);
+  root.append(card, live);
+  let said = '';
+  let msgSaid = '';
+  const say = (text: string) => { if (text && text !== said) { said = text; live.textContent = text; } };
+  parent.append(root);
+  let joining = false;
+  open();
+  let msg = '';
+  let lastScreen = '';
+
+  const el = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Record<string, unknown> = {}, ...kids: (Node | string | null)[]) => {
+    const e = doc.createElement(tag);
+    for (const [k, v] of Object.entries(props)) {
+      if (k.startsWith('on') && typeof v === 'function') e.addEventListener(k.slice(2), v as EventListener);
+      else if (v !== undefined && v !== false) e.setAttribute(k, v === true ? '' : String(v));
+    }
+    for (const k of kids) if (k !== null) e.append(k);
+    return e;
+  };
+  // `k` = stable key so focus survives a re-render (a player joining must not throw a keyboard user off «Start»)
+  const btn = (label: string, on: () => void, main = false, disabled = false, k = label) =>
+    el('button', { type: 'button', class: main ? 'np-btn np-main' : 'np-btn', onclick: on, disabled, 'data-k': k }, label);
+  /** «K7M Q2X» on screen, «K 7 M Q 2 X» for screen readers; copying still gives K7MQ2X */
+  const btn2 = (label: string, on: () => void, k: string, aria: string) =>
+    el('button', { type: 'button', class: 'np-mini', onclick: on, 'data-k': k, 'aria-label': aria }, label);
+  const codeEl = (code: string) => el('div', { class: 'np-code', 'aria-label': code.split('').join(' ') }, el('span', {}, code.slice(0, 3)), el('span', {}, code.slice(3)));
+  const fmt = (s: string, v: Record<string, number>) => s.replace(/\{(\w+)\}/g, (_, k: string) => String(v[k] ?? ''));
+
+  const copy = async (link: string) => {
+    try { await navigator.clipboard.writeText(link); msg = L.copied; } catch {
+      const ta = el('textarea', { readonly: true }) as HTMLTextAreaElement;
+      ta.value = link; card.append(ta); ta.select();
+      try { msg = doc.execCommand('copy') ? L.copied : link; } catch { msg = link; }
+      ta.remove();
+    }
+    render(lobby.state);
+  };
+
+  const render = (s: LobbyState) => {
+    if (s.screen !== lastScreen) { msg = ''; lastScreen = s.screen; }
+    const focusKey = card.contains(doc.activeElement) ? (doc.activeElement as HTMLElement).getAttribute('data-k') : null;
+    card.replaceChildren();
+    card.append(el('h2', { id: titleId }, o.title ?? L.title));
+    if (s.screen === 'menu') {
+      if (o.nameField) {
+        const nf = o.nameField;
+        const id = `${titleId}-name`;
+        const input = el('input', { id, class: 'np-name', value: nf.name, autocomplete: 'nickname', maxlength: '24', enterkeyhint: 'done', 'data-k': 'name' }) as HTMLInputElement;
+        input.addEventListener('input', () => { nf.name = input.value; }); // kept on every key: a tap on «Create» right after typing still uses it
+        input.addEventListener('change', () => { input.value = nf.name; });
+        card.append(el('label', { class: 'np-hint', for: id }, L.yourName), input);
+      }
+      if (!joining) {
+        for (const c of o.choices ?? []) {
+          const id = `${titleId}-${c.param}`;
+          card.append(el('div', { class: 'np-choice', role: 'group', 'aria-labelledby': id },
+            el('span', { id, class: 'np-hint' }, c.label),
+            el('div', { class: 'np-seg' }, ...c.options.map((op) => el('button', {
+              type: 'button', 'aria-pressed': String(op.value === c.value), 'data-k': `${c.param}-${op.value}`,
+              onclick: () => { c.value = op.value; render(lobby.state); },
+            }, op.label))),
+            c.hint ? el('p', { class: 'np-hint' }, c.hint) : null));
+        }
+        card.append(btn(L.create, () => lobby.create(), true), el('p', { class: 'np-hint' }, L.createHint),
+          btn(L.join, () => { joining = true; render(lobby.state); }), el('p', { class: 'np-hint' }, L.joinHint));
+        if (o.onClose) card.append(btn(L.close, o.onClose));
+      } else {
+        const input = el('input', { class: 'np-input', 'aria-label': L.join, placeholder: L.codePlaceholder, autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', enterkeyhint: 'go', maxlength: '200' }) as HTMLInputElement;
+        const go = () => { if (input.value.trim()) { joining = false; lobby.join(input.value); } };
+        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+        card.append(el('p', { class: 'np-hint' }, L.joinHint), input, el('div', { class: 'np-row' }, btn(L.back, () => { joining = false; render(lobby.state); }), btn(L.joinGo, go, true)));
+        queueMicrotask(() => input.focus());
+      }
+    } else if (s.screen === 'waiting') {
+      const seated = s.players.filter((p) => p.status !== 'left');
+      card.append(el('p', { class: 'np-hint' }, L.yourCode), codeEl(s.code ?? ''), el('p', { class: 'np-hint' }, L.shareHint));
+      const share = (navigator as Navigator & { share?: (d: ShareData) => Promise<void> }).share;
+      card.append(el('div', { class: 'np-row' }, btn(L.copy, () => void copy(s.link ?? '')), share ? btn(L.share, () => void share.call(navigator, { url: s.link ?? '', title: o.title ?? L.title }).catch(() => undefined)) : null));
+      card.append(el('h2', {}, `${L.players} · ${seated.length}/${s.max}`));
+      const ses = lobby.session;
+      const self = ses?.snapshot.self;
+      const mine = seated.filter((p) => p.owner !== undefined && p.owner === self).sort((a, b) => (a.local ?? 0) - (b.local ?? 0));
+      const setLocals = (names: string[]) => { ses?.setLocals(names); };
+      card.append(el('ul', { class: 'np-list' }, ...seated.map((p) => {
+        const local = p.owner !== undefined && p.owner === self;
+        const tag = seatTag(p, self, seated, L);
+        const right = local ? btn2(L.removeLocal, () => setLocals(mine.filter((q) => q !== p).map((q) => q.name)), `rm-${p.local}`, `${L.removeLocal} ${p.name}`) : p.ready ? `✓ ${L.ready}` : '';
+        return el('li', local || p.owner !== undefined ? { class: 'np-local' } : {}, el('span', {}, p.name, el('span', { class: 'np-tag' }, tag)), right);
+      })));
+      if (o.locals && ses && !s.ready && seated.length < s.max && mine.length < Math.min(3, o.locals.max ?? 3) && !ses.game.secret) {
+        const nl = o.locals;
+        card.append(btn(L.addLocal, () => setLocals([...mine.map((q) => q.name), nl.name(mine.length + 1)]), false, false, 'add-local'));
+      }
+      const params = ses?.model.params;
+      const set = (o.choices ?? []).map((c) => choiceLine(c, params)).filter(Boolean);
+      if (set.length) card.append(el('p', { class: 'np-hint', 'data-k': 'room-set' }, set.join(' · ')));
+      if (o.note) card.append(el('p', { class: 'np-hint' }, o.note));
+      const waitLine = seated.length < s.min ? fmt(L.waitingMore, { n: seated.length, min: s.min }) : s.ready ? L.waitingStart : '';
+      if (waitLine) card.append(el('p', { class: 'np-msg' }, waitLine));
+      card.append(btn(L.start, () => lobby.start(), true, !s.canStart, 'start'), btn(L.leave, () => lobby.cancel(), false, false, 'leave'));
+      say(`${L.yourCode} ${(s.code ?? '').split('').join(' ')}. ${L.players} ${seated.length}/${s.max}. ${waitLine}`);
+    } else if (s.screen === 'error') {
+      card.append(el('p', { class: 'np-err', role: 'alert' }, s.error === 'bad-code' ? L.badCode : s.error === 'version' ? L.version : s.error === 'sign-in' ? L.signIn : s.error === 'unavailable' ? L.unavailable : L.offline), btn(L.back, () => lobby.back(), true));
+      queueMicrotask(() => (card.querySelector('.np-btn') as HTMLElement | null)?.focus());
+    }
+    if (msg) card.append(el('p', { class: 'np-msg' }, msg));
+    if (msg && msg !== msgSaid) say(msg); // announce «copied» once; later renders announce what changed (players)
+    msgSaid = msg;
+    if (focusKey) (card.querySelector(`[data-k="${CSS_ESCAPE(focusKey)}"]`) as HTMLElement | null)?.focus();
+    if (s.screen === 'playing' && (o.hideOnStart ?? true)) close();
+  };
+  const off = lobby.subscribe(render);
+  return {
+    el: root,
+    show() { open(); render(lobby.state); },
+    hide() { close(); },
+    destroy() { off(); close(); root.remove(); },
+  };
+}

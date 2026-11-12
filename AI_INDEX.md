@@ -32,6 +32,7 @@
 | `sdk.react.query.gen1` | [packages/react/AI_INDEX.md](packages/react/AI_INDEX.md) | React hooks, TanStack Query + SDK mutations |
 | `sdk.economy.gen1` | [packages/core/src/economy/AI_INDEX.md](packages/core/src/economy/AI_INDEX.md) | AgentNet economy clients and recipes |
 | `sdk.commerce.assets.gen1` | [packages/core/src/commerce/assets/AI_INDEX.md](packages/core/src/commerce/assets/AI_INDEX.md) | Commerce assets wizard and preset helpers |
+| `sdk.netplay.gen1` | [packages/netplay/AI_INDEX.md](packages/netplay/AI_INDEX.md) | Deterministic multiplayer: `defineGame`, room log reducer, transports (memory/polling/StackScript/WSS), room-script generator |
 | `sdk.rag.gen1` | [packages/core/src/rag/index.ts](packages/core/src/rag/index.ts) | `sdk.rag` / `AgentRag` — `/api/rag/*` types + client |
 | `frontend.commerce.kit.gen1` | [packages/react/src/commerce/AI_INDEX.md](packages/react/src/commerce/AI_INDEX.md) | React commerce primitives and embeds |
 | `sdk.media.gen1` | [packages/core/src/media/AI_INDEX.md](packages/core/src/media/AI_INDEX.md) | Client thumbnails, OPFS cache, resumable upload |
