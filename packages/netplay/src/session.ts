@@ -66,6 +66,8 @@ export class Session<S, I, V = S> {
   private lastSendAt = -Infinity;
   /** sends not yet acknowledged by the transport */
   private sending = 0;
+  private connecting: Promise<void> | null = null;
+  private linkGen = 0;
   private reveals = new Map<number, { d: unknown[]; salt: string }>();
   private committed = new Set<number>();
   private lastView: V | null = null;
@@ -103,23 +105,35 @@ export class Session<S, I, V = S> {
     if (this.opts.autoPumpMs && !this.timer) this.timer = setInterval(() => this.update(), this.opts.autoPumpMs);
   }
 
-  private async connect(): Promise<void> {
+  /** One connect at a time: update() keeps pumping while a slow (HTTP) join is still on the wire. */
+  private connect(): Promise<void> {
+    this.connecting ??= this.openLink().finally(() => { this.connecting = null; });
+    return this.connecting;
+  }
+
+  private async openLink(): Promise<void> {
     this.setConnection(this.link ? 'reconnecting' : 'connecting');
+    const gen = ++this.linkGen;
+    const current = () => gen === this.linkGen; // statuses / entries of a replaced link are ignored
     try {
-      this.link = await this.opts.transport.connect(this.opts.room, {
+      const link = await this.opts.transport.connect(this.opts.room, {
         afterSeq: this.model.lastSeq,
-        onEntries: (es) => this.receive(es),
+        onEntries: (es) => { if (current()) this.receive(es); },
         onStatus: (s, detail) => {
+          if (!current()) return;
           if (s === 'offline' && this.link) { this.link.close(); this.link = null; this.retries += 1; this.retryAt = this.now() + this.retryDelay(); }
           this.setIssue(s === 'online' ? null : isIssue(detail) ? detail : this.issue === 'rate' && s === 'reconnecting' ? null : this.issue);
           this.setConnection(s);
         },
       });
-      this.self = this.link.self;
+      if (!current()) { link.close(); return; }
+      this.link = link;
+      this.self = link.self;
       this.retries = 0;
       this.setIssue(null);
       this.setConnection('online');
     } catch (err) {
+      if (!current()) return;
       this.link = null;
       this.retries += 1;
       this.setIssue(err instanceof NetplayError && isIssue(err.kind) ? err.kind : null);
@@ -243,6 +257,7 @@ export class Session<S, I, V = S> {
   close(): void {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
+    this.linkGen += 1; // a connect still on the wire is dropped when it lands
     this.link?.close();
     this.link = null;
     this.setConnection('idle');

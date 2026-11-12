@@ -170,3 +170,21 @@ describe('request budget for realtime lockstep over hosted HTTP', () => {
     }
   }, 30_000);
 });
+
+describe('slow joins', () => {
+  afterEach(() => vi.useRealTimers());
+  it('update() during a slow HTTP join does not open a second link (no leaked poll loop)', async () => {
+    vi.useFakeTimers();
+    const fake = setup({ latencyMs: 300 });
+    const S = createSession(ticTacToe, { transport: transport(fake.browser('alice')), room: 'slow' });
+    const joining = S.join();
+    for (let i = 0; i < 10; i++) { S.update(); await vi.advanceTimersByTimeAsync(50); }
+    await joining;
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(fake.stats.byExport['tic-tac-toe.room.join']).toBe(1);
+    fake.stats.reset();
+    await vi.advanceTimersByTimeAsync(12_000);
+    expect(fake.stats.byExport['tic-tac-toe.room.poll'] ?? 0).toBeLessThanOrEqual(12); // one loop, ~1.2 s when quiet
+    S.close();
+  });
+});
