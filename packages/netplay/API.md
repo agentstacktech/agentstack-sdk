@@ -216,3 +216,12 @@ Every append rewrites the current log chunk, so the default chunk is 16 entries 
 | `generateRoomScript` alone (build-time) | 6.4 KB | 2.3 KB |
 
 No runtime dependencies; `sideEffects: false`, so unused transports/generator are tree-shaken.
+
+### Pass 5 additions
+
+- `leave()` during a connection drop: what is still queued (the leave, last inputs) goes out over a one-shot link with
+  backoff 0.5 / 1.5 / 4 / 8 / 15 s, so the others see "left" as soon as the network is back instead of waiting
+  `presenceMs`. A session that `join()`s again drops a stale queued leave.
+- `session.rttMs()`: smoothed echo time of our own entries (ms, null until measured).
+- `suggestInputDelay(rttMs, tickMs, { min, max })`: lockstep input delay that covers the trip plus one tick of margin
+  (GGPO-style tuning); apply at match start.

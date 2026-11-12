@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `@agentstack/netplay` pass 5: `leave()` during a connection drop is delivered over a one-shot link with backoff (was: never sent, the opponent waited `presenceMs`); a re-`join()` no longer sends a stale queued leave; `session.rttMs()` + `suggestInputDelay()` for input-delay tuning.
 - `@agentstack/netplay` pass 4: `hostedMcpRunner` sends requests under 8 kB with `keepalive`, so the leave/away of a closing tab or swiped-away phone app still reaches the room.
 - `@agentstack/netplay` pass 4: quiet-room polling — presence beats and hash checks no longer reset the poll to full speed, stackscript `idleMaxMs` 1200 → 2000: both players thinking in a turn game 1.03 → 0.53 req/s per client.
 - `@agentstack/netplay`: secret lockstep — the reveal kept in `secretStore` stays until the room moves past that turn (it was cleared when merely queued: a reveal that could not go out before a reload was lost and the turn waited for the clock).

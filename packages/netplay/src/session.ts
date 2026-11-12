@@ -85,6 +85,11 @@ export class Session<S, I, V = S> {
   private lastSendAt = -Infinity;
   /** sends not yet acknowledged by the transport */
   private sending = 0;
+  /** leave() was called: queued sends go out over a one-shot link (see courier). */
+  private leaving = false;
+  private sentAt = new Map<number, number>();
+  private rtt: number | null = null;
+  private couriering = false;
   private connecting: Promise<void> | null = null;
   private linkGen = 0;
   private reveals = new Map<number, { d: unknown[]; salt: string }>();
@@ -123,6 +128,8 @@ export class Session<S, I, V = S> {
 
   /** Connect and send hello. Resolves once the link is up (entries keep streaming in). */
   async join(): Promise<void> {
+    this.leaving = false; // a session joined again after leave(): no stale leave goes out
+    this.outbox = this.outbox.filter((it) => it.body.k !== 'leave');
     await this.connect();
     const locals = this.opts.locals?.length && !this.game.secret ? { locals: this.opts.locals.slice(0, 3) } : {};
     this.push({ k: 'hello', g: this.game.id, v: this.game.version, name: this.opts.name, spectate: this.opts.spectate, params: this.opts.params, ...locals });
@@ -186,6 +193,12 @@ export class Session<S, I, V = S> {
     fn(this.snapshot);
     return () => this.listeners.delete(fn);
   }
+
+  /**
+   * Smoothed round trip of our own entries (send → room → echo), ms; null until measured. Over HTTP polling this
+   * includes the poll period, i.e. roughly what an opponent's input needs to reach us. See `suggestInputDelay`.
+   */
+  rttMs(): number | null { return this.rtt; }
 
   /** lockstep input delay in ticks (option, or 0 for turn-based, 2 for realtime). */
   get inputDelay(): number {
@@ -415,6 +428,32 @@ export class Session<S, I, V = S> {
     this.push({ k: 'leave' });
     this.flush();
     this.close();
+    this.leaving = true;
+    if (this.outbox.length) this.courier(0); // the link was down: the opponent must not wait out presenceMs (45 s)
+  }
+
+  /**
+   * After `leave()`: what is still queued (the leave itself, last inputs) goes out over a one-shot link, with a short
+   * backoff (0.5 / 1.5 / 4 / 8 / 15 s, ~30 s window). Entries are deduped by `n`, so a resend after an unclear failure is harmless.
+   */
+  private courier(attempt: number): void {
+    if (!this.leaving || this.couriering || !this.outbox.length || attempt > 5) return;
+    this.couriering = true;
+    const items = this.outbox;
+    this.outbox = [];
+    const done = (ok: boolean): void => {
+      this.couriering = false;
+      if (ok || !this.leaving) return;
+      this.outbox.unshift(...items);
+      setTimeout(() => this.courier(attempt + 1), [500, 1500, 4000, 8000, 15_000][attempt] ?? 15_000);
+    };
+    this.opts.transport.connect(this.opts.room, { afterSeq: this.model.lastSeq, onEntries: () => {} }).then(async (link) => {
+      try {
+        if (link.sendMany) await link.sendMany(items);
+        else for (const it of items) await link.send(it.body, it.to);
+        done(true);
+      } catch { done(false); } finally { link.close(); }
+    }, () => done(false));
   }
   close(): void {
     if (this.timer) clearInterval(this.timer);
@@ -472,6 +511,8 @@ export class Session<S, I, V = S> {
     const items = this.outbox;
     this.outbox = [];
     this.lastSendAt = this.now();
+    for (const it of items) { const n = it.body.n; if (typeof n === 'number' && !this.sentAt.has(n)) this.sentAt.set(n, this.lastSendAt); }
+    if (this.sentAt.size > 64) for (const k of [...this.sentAt.keys()].slice(0, this.sentAt.size - 64)) this.sentAt.delete(k);
     if (link.sendMany) {
       // one request for the whole flush; on failure everything is re-sent (dedup by `n`)
       this.sending += 1;
@@ -493,6 +534,7 @@ export class Session<S, I, V = S> {
   /** Re-queue from the failed item (in order) and reconnect; known server reasons get their own wait + status. */
   private sendFailed(link: Link, items: readonly OutItem[], from: number, err: unknown): void {
     this.outbox.unshift(...items.slice(from));
+    if (this.leaving) { this.courier(0); return; } // the leave's own send failed: retry it over a one-shot link
     if (this.link !== link) return;
     link.close();
     this.link = null;
@@ -524,7 +566,16 @@ export class Session<S, I, V = S> {
     const before = m.lastSeq;
     for (const e of es) {
       if (e.seq <= m.lastSeq) continue;
-      if (e.from === this.self && typeof (e.body as Body)?.n === 'number') this.sendN = Math.max(this.sendN, (e.body as Body).n!); // reload: continue our counter
+      if (e.from === this.self && typeof (e.body as Body)?.n === 'number') {
+        const n = (e.body as Body).n!;
+        this.sendN = Math.max(this.sendN, n); // reload: continue our counter
+        const at = this.sentAt.get(n);
+        if (at !== undefined) { // own echo: send → room → back, the time an opponent's input takes to reach us
+          this.sentAt.delete(n);
+          const x = this.now() - at;
+          this.rtt = this.rtt === null ? x : Math.round(this.rtt * 0.8 + x * 0.2);
+        }
+      }
       m.self = this.self;
       if (this.game.mode === 'authority') m.simulate = m.players.length === 0 ? true : m.players[0]!.id === this.self;
       const prevMatch = m.match;
@@ -693,4 +744,17 @@ export function createSession<S, I, V>(game: Game<S, I, V>, opts: SessionOptions
   const s = new Session(game, opts);
   if (game.mode === 'authority') s.model.secretSeed = (opts.secretSeed ?? randomU32)();
   return s;
+}
+
+/**
+ * Input-delay tuning (lockstep / GGPO practice): pick enough ticks of delay that our input reaches the other players
+ * before they simulate its tick, so the sim never stalls waiting for it — and no more, since every tick is felt as lag.
+ * `rttMs` = `session.rttMs()` (our own echo time ≈ what an opponent's input needs to reach us; HTTP polls included),
+ * plus one tick of jitter margin. Use it at match start (`createSession({ inputDelay })` on a rematch / next room);
+ * changing the delay mid-match is legal (the log is the truth) but feels like a hiccup.
+ */
+export function suggestInputDelay(rttMs: number | null, tickMs: number, o: { min?: number; max?: number } = {}): number {
+  const min = o.min ?? 1, max = o.max ?? 8;
+  if (rttMs === null || !(tickMs > 0)) return Math.max(min, Math.min(max, 2));
+  return Math.max(min, Math.min(max, Math.ceil(rttMs / tickMs) + 1));
 }
