@@ -79,12 +79,14 @@ expect(t.snaps()[1]!.state).toEqual(t.snaps()[0]!.state);
 
 ```ts
 import { createLobby } from '@agentstack/netplay';
-import { mountLobby, LOBBY_LABELS } from '@agentstack/netplay/ui'; // optional ready-made screen
+import { mountLobby, LOBBY_LABELS, mountNetStatus, NET_STATUS_LABELS } from '@agentstack/netplay/ui'; // optional ready-made UI
 const lobby = createLobby({ game: 'tic-tac-toe', connect: (room) => createSession(ticTacToe, { transport, room, name, autoPumpMs: 50 }),
-  onStart: (session) => startGame(session) });
+  onStart: (session) => {
+    startGame(session);
+    mountNetStatus(session, { labels: NET_STATUS_LABELS.en }); // «Reconnecting…», «Bob lost connection — waiting»; hidden while all is well
+  } });
 lobby.joinFromUrl();                                    // opened from an invite link (?join=CODE)
 mountLobby(document.body, lobby, { labels: LOBBY_LABELS.en, title: 'Tic-tac-toe' }); // Create a room / Join with a code / Copy invite link
-mountNetStatus(session, { labels: NET_STATUS_LABELS.en }); // «Reconnecting…», «Bob lost connection — waiting», hidden while all is well
 ```
 
 ## What you get
