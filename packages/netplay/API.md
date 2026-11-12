@@ -89,7 +89,8 @@ Ready-made pill: `mountNetStatus(session, { labels?: NET_STATUS_LABELS.ru, paren
 `createLobby({ game, connect(room, code) => Session, onStart?(session, code), baseUrl?, param? = 'join' })` → controller:
 `state: LobbyState`, `subscribe(fn)`, `create()` → code, `join(text)` → boolean, `joinFromUrl(url?)` → code | null, `start()`, `cancel()`, `back()`, `session`.
 `LobbyState = { screen: 'menu'|'waiting'|'playing'|'error', code, link, host, players, min, max, ready, canStart, error: 'bad-code'|'offline'|'version'|null }`.
-A full/running room is not an error: you watch as a spectator (`session.seat === -1`). Optional UI: `mountLobby(el, lobby, { labels: LOBBY_LABELS.ru, title, note?, onClose?, hideOnStart? = true })` → `{ el, show, hide, destroy }` from `@agentstack/netplay/ui`.
+A full/running room is not an error: you watch as a spectator (`session.seat === -1`). Optional UI: `mountLobby(el, lobby, { labels: LOBBY_LABELS.ru, title, note?, onClose?, hideOnStart? = true, nameField? })` → `{ el, show, hide, destroy }` from `@agentstack/netplay/ui`.
+**Names:** `localName(game, { params? })` (`/ui`) → `{ id, name }`: `id` = stable per tab (`P-7K2M`, or `?user=`) — use it as the transport user on memory / dev-relay; `name` = display name the player may change, remembered in `localStorage` (≤ 24 chars, cleaned). Pass `name: me.name` to `createSession` and `nameField: me` to `mountLobby` for a «Your name» field. Never use the display name as an id (two «Саша» would share a seat).
 
 ## Transports & matchmaking
 

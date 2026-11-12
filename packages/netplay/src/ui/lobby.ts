@@ -13,6 +13,7 @@ export interface LobbyLabels {
   back: string; leave: string; yourCode: string; shareHint: string; copy: string; copied: string; share: string;
   players: string; you: string; waitingMore: string; start: string; waitingStart: string; ready: string;
   badCode: string; offline: string; version: string; signIn: string; unavailable: string; close: string;
+  yourName: string;
 }
 const en: LobbyLabels = {
   title: 'Play with friends', create: 'Create a room', createHint: 'You get a code to send to friends', join: 'Join with a code',
@@ -22,7 +23,7 @@ const en: LobbyLabels = {
   waitingStart: 'Waiting for everyone to press Start…', ready: 'ready', badCode: 'That code doesn’t look right. Codes have 6 letters and digits.',
   offline: 'Can’t reach the game server. Check your connection and try again.', version: 'Your friend has a different version of the game. Both of you should reload the page.',
   signIn: 'Online play needs an account. Sign in, then try again.', unavailable: 'Online play is not switched on on the server yet. Try again later.',
-  close: 'Close',
+  close: 'Close', yourName: 'Your name (friends see it)',
 };
 const ru: LobbyLabels = {
   title: 'Игра с друзьями', create: 'Создать комнату', createHint: 'Вы получите код для друзей', join: 'Войти по коду',
@@ -32,7 +33,7 @@ const ru: LobbyLabels = {
   waitingStart: 'Ждём, пока все нажмут «Начать»…', ready: 'готов', badCode: 'Код не подходит: в нём 6 букв и цифр.',
   offline: 'Нет связи с игровым сервером. Проверьте интернет и попробуйте ещё раз.', version: 'У друга другая версия игры. Обновите страницу оба.',
   signIn: 'Для игры онлайн нужен аккаунт. Войдите и попробуйте ещё раз.', unavailable: 'Онлайн-игра ещё не включена на сервере. Попробуйте позже.',
-  close: 'Закрыть',
+  close: 'Закрыть', yourName: 'Ваше имя (его увидят друзья)',
 };
 const pt: LobbyLabels = {
   title: 'Jogar com amigos', create: 'Criar sala', createHint: 'Você recebe um código para enviar aos amigos', join: 'Entrar com código',
@@ -42,7 +43,7 @@ const pt: LobbyLabels = {
   waitingStart: 'Aguardando todos apertarem Começar…', ready: 'pronto', badCode: 'Esse código não parece certo. Códigos têm 6 letras e números.',
   offline: 'Sem conexão com o servidor do jogo. Verifique a internet e tente de novo.', version: 'Seu amigo tem outra versão do jogo. Recarreguem a página.',
   signIn: 'O jogo online precisa de uma conta. Entre e tente de novo.', unavailable: 'O jogo online ainda não está ativado no servidor. Tente mais tarde.',
-  close: 'Fechar',
+  close: 'Fechar', yourName: 'Seu nome (os amigos verão)',
 };
 export const LOBBY_LABELS = { en, ru, pt } as const;
 
@@ -56,6 +57,8 @@ export interface MountLobbyOptions {
   note?: string;
   /** Hide the overlay automatically when the match starts. Default true. */
   hideOnStart?: boolean;
+  /** Show a «Your name» field on the first screen (e.g. `localName('my-game')`); the game's `connect` reads `.name`. */
+  nameField?: { name: string };
 }
 export interface LobbyUi { readonly el: HTMLElement; show(): void; hide(): void; destroy(): void }
 
@@ -80,6 +83,7 @@ const CSS = `
 .np-msg{min-height:1.4em;color:var(--np-muted,#bfae93);font-size:14px;text-align:center}
 .np-err{color:#ff9b8a}
 .np-code span+span{margin-left:.35em}
+.np-input.np-name{font-size:18px;letter-spacing:normal;text-transform:none;text-align:left}
 .np-sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;padding:0}`;
 
 const CSS_ESCAPE = (v: string): string => v.replace(/["\\]/g, '\\$&');
@@ -155,6 +159,14 @@ export function mountLobby<S, I, V>(parent: HTMLElement, lobby: LobbyController<
     card.replaceChildren();
     card.append(el('h2', { id: titleId }, o.title ?? L.title));
     if (s.screen === 'menu') {
+      if (o.nameField) {
+        const nf = o.nameField;
+        const id = `${titleId}-name`;
+        const input = el('input', { id, class: 'np-input np-name', value: nf.name, autocomplete: 'nickname', maxlength: '24', enterkeyhint: 'done', 'data-k': 'name' }) as HTMLInputElement;
+        input.addEventListener('input', () => { nf.name = input.value; }); // kept on every key: a tap on «Create» right after typing still uses it
+        input.addEventListener('change', () => { input.value = nf.name; });
+        card.append(el('label', { class: 'np-hint', for: id }, L.yourName), input);
+      }
       if (!joining) {
         card.append(btn(L.create, () => lobby.create(), true), el('p', { class: 'np-hint' }, L.createHint),
           btn(L.join, () => { joining = true; render(lobby.state); }), el('p', { class: 'np-hint' }, L.joinHint));
