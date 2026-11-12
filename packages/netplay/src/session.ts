@@ -257,10 +257,12 @@ export class Session<S, I, V = S> {
     }
     const g = this.game;
     const ticking = g.clockMs > 0 && this.model.phase === 'playing' && this.seat >= 0 && (g.mode !== 'authority' || this.isAuthority);
-    const beat = Math.max(250, Math.min(g.presenceMs / 4, g.turnMs > 0 ? g.turnMs / 2 : Infinity, ticking ? g.clockMs : Infinity));
     // HTTP transports (every > 0): a realtime input batch waits up to sendEveryMs, and nothing new goes out while our
-    // previous request is on the wire (Nagle) — the next request carries everything queued meanwhile; hash checks ride along
+    // previous request is on the wire (Nagle) — the next request carries everything queued meanwhile; hash checks ride along.
+    // Idle clock beats there are ≥1 s (timers keep 1 s resolution instead of 4 requests a second).
     const every = this.opts.sendEveryMs ?? this.opts.transport.caps.sendEveryMs ?? 0;
+    const clockBeat = ticking ? Math.max(g.clockMs, every > 0 ? 1000 : 0) : Infinity;
+    const beat = Math.max(250, Math.min(g.presenceMs / 4, g.turnMs > 0 ? g.turnMs / 2 : Infinity, clockBeat));
     if (every > 0 && this.sending > 0) return;
     if (this.outbox.some((o) => o.body.k !== 'hash') || ((this.batch || this.outbox.length) && now - this.lastSendAt >= every)) this.flush();
     else if (this.link && this.model.phase !== 'over' && now - this.lastSendAt >= beat) { this.push({ k: 'clock' }); this.flush(); }
