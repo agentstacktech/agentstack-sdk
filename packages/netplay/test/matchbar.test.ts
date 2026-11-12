@@ -27,6 +27,11 @@ describe('matchBar (presenter)', () => {
     expect(matchBar(s, { ...ru, pace: 'race', done: (seat) => seat === 0 }).players.map((p) => p.status)).toEqual(['закончил', 'играет…']);
   });
 
+  it('local seats (same screen) are «you» too, and never «asked for a rematch»', () => {
+    const s = base({ seats: [0, 1], players: [{ id: 'a', seat: 0, name: 'Аня', status: 'on', ready: false, lastT: 0 }, { id: 'a~1', owner: 'a', local: 1, seat: 1, name: 'Бия', status: 'on', ready: false, lastT: 0 }, { id: 'c', seat: 2, name: 'Caio', status: 'on', ready: false, lastT: 0 }] });
+    expect(matchBar(s, ru).players.map((p) => p.you)).toEqual([true, true, false]);
+  });
+
   it('end: win / lose / spectator «Победа: имя», rematch votes, the ask, blocked when someone left, series', () => {
     const over = { phase: 'over' as const, outcome: { winner: 1, reason: 'line' }, results: [{ match: 1, winner: 'a' }, { match: 2, winner: 'b' }, { match: 3, winner: '' }] };
     const lose = matchBar(base({ ...over, rematch: [1] }), ru);

@@ -98,11 +98,12 @@ export function matchBar(s: Snap, o: MatchBarOptions = {}): MatchBarModel {
   const L: MatchBarLabels = { ...en, ...o.labels };
   const spectator = s.seat < 0;
   const over = s.phase === 'over';
+  const ours = (p: { id: string; owner?: string }) => p.id === s.self || (!!p.owner && p.owner === s.self); // local seats are «you» too
   const players = s.players.map((p) => {
     const d = p.status === 'on' && s.phase === 'playing' ? o.done?.(p.seat, s) : undefined;
     const race = o.pace === 'race';
-    const status = p.status === 'left' ? L.left : p.status === 'away' ? L.away : d === true ? (race ? L.finished : L.ready) : d === false && p.id !== s.self ? (race ? L.playing : L.thinking) : '';
-    return { name: p.name || p.id, you: p.id === s.self, status, detail: o.detail?.(p.seat, s) ?? '' };
+    const status = p.status === 'left' ? L.left : p.status === 'away' ? L.away : d === true ? (race ? L.finished : L.ready) : d === false && !ours(p) ? (race ? L.playing : L.thinking) : '';
+    return { name: p.name || p.id, you: ours(p), status, detail: o.detail?.(p.seat, s) ?? '' };
   });
   const ms = s.phase === 'playing' ? (o.clock?.(s) ?? null) : null;
   const clock = ms === null ? null : { text: fill(L.seconds, { s: Math.max(0, Math.ceil(ms / 1000)) }), urgent: ms <= 10_000 };
@@ -135,7 +136,7 @@ export function matchBar(s: Snap, o: MatchBarOptions = {}): MatchBarModel {
     const enough = voters.length >= 2;
     const mine = s.players.find((p) => p.id === s.self);
     const voted = !!mine && s.rematch.includes(mine.seat);
-    const askers = voters.filter((p) => p.id !== s.self && s.rematch.includes(p.seat)).map((p) => p.id);
+    const askers = voters.filter((p) => !ours(p) && s.rematch.includes(p.seat)).map((p) => p.id);
     const rematch = spectator || !mine ? null : { label: voted ? fill(L.waitingOthers, { n: votes, k: voters.length }) : votes ? fill(L.rematchVotes, { n: votes, k: voters.length }) : L.rematch, enabled: enough && !voted && mine.status === 'on' };
     const note = !enough ? L.cantRematch : askers.length && !voted && !spectator ? fill(L.wantsRematch, { names: named(askers) }) : '';
     end = { title, reason, rematch, note, inline: o.endPanel === false };
