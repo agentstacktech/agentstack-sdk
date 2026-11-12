@@ -93,7 +93,8 @@ export class Session<S, I, V = S> {
   /** authority: last views of my local seats (by seat). */
   private localViews = new Map<number, V>();
   private lastViewOutcome: Outcome | null = null;
-  private hashLog: { t: number; h: number }[] = [];
+  /** Hash checkpoints to report, tagged with their match: one receive can fold a match end + a rematch (a reload refolds whole series). */
+  private hashLog: { m: number; t: number; h: number }[] = [];
   private viewsKey = '';
   private timer: ReturnType<typeof setInterval> | null = null;
   private retryAt = 0;
@@ -515,7 +516,7 @@ export class Session<S, I, V = S> {
     this.hashedUpTo = tick;
     if (this.game.mode === 'authority') return;
     const h = this.game.hash(this.model.state);
-    this.hashLog.push({ t: tick, h });
+    this.hashLog.push({ m: this.model.match, t: tick, h });
   }
 
   private receive(es: readonly Entry[]): void {
@@ -535,7 +536,14 @@ export class Session<S, I, V = S> {
     if (m.lastSeq === before) return;
     if (this.game.turnMs > 0) this.anchorClock();
     this.maybeResync();
-    if (!this.hidden) for (const h of this.hashLog) this.push({ k: 'hash', m: m.match, t: h.t, h: h.h }); // a background tab stays quiet
+    // a background tab stays quiet; checkpoints of an earlier match are dropped (they used to go out stamped with the
+    // current match, so a reload after a rematch reported match-1 hashes for match-2 ticks → a false desync for everyone)
+    // A catch-up (reload / reconnect) folds many checkpoints at once: report only the newest two we have not reported
+    // yet — re-sending every checkpoint of a long match burst past the room's per-user rate limit.
+    if (!this.hidden) {
+      const fresh = this.hashLog.filter((h) => h.m === m.match && m.hashes.get(h.t)?.get(this.self) !== h.h >>> 0);
+      for (const h of fresh.slice(-2)) this.push({ k: 'hash', m: h.m, t: h.t, h: h.h });
+    }
     this.hashLog = [];
     this.revealReady();
     if (this.isAuthority) this.sendViews();

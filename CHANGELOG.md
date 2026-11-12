@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `@agentstack/netplay` pass 3 (fuzz: drops, hide/show, rematch, reloads on fold / realtime / secret / authority games): hash checkpoints carry their match (a reload after a rematch reported match-1 hashes as match 2 → a false desync); a catch-up reports only the newest 2 unreported checkpoints (was every one → rate-limit burst, 14 → ≤3 entries in the test); `memoryHub.disconnect` tells the client like a dropped socket (a silent spectator stayed stuck).
 - `@agentstack/netplay`: a move from a background tab (a game that keeps playing while hidden) restores normal polling — it used to stay at `hiddenPollMs` while counted present.
 - `@agentstack/netplay`: `Session.turnLeftMs()` — skew-free turn clock (room log time + local time since it was seen). `Date.now() − tickStartT` mixed the device clock with the server's: a device off by a minute, or a server stamping t = 0, showed 0 s and fired buzzers at once.
 - `@agentstack/netplay`: background tab polls slower — `Link.pace?(ms|null)` (polling transports), `away(true)` slows polling to `SessionOptions.hiddenPollMs` (default 3000 ms), return polls at once (battery, mobile data, room request budget).
