@@ -49,6 +49,8 @@ export interface MountLobbyOptions {
   title?: string;
   /** Show a close button on the menu screen. */
   onClose?: () => void;
+  /** Extra plain-language line on the waiting screen (e.g. «Empty seats are played by bots»). */
+  note?: string;
   /** Hide the overlay automatically when the match starts. Default true. */
   hideOnStart?: boolean;
 }
@@ -141,6 +143,7 @@ export function mountLobby(parent: HTMLElement, lobby: LobbyController<unknown, 
       card.append(el('h2', {}, `${L.players} · ${seated.length}/${s.max}`));
       const self = lobby.session?.snapshot.self;
       card.append(el('ul', { class: 'np-list' }, ...seated.map((p) => el('li', {}, `${p.name}${p.id === self ? ` (${L.you})` : ''}`, p.ready ? `✓ ${L.ready}` : ''))));
+      if (o.note) card.append(el('p', { class: 'np-hint' }, o.note));
       if (seated.length < s.min) card.append(el('p', { class: 'np-msg' }, fmt(L.waitingMore, { n: seated.length, min: s.min })));
       else if (s.ready) card.append(el('p', { class: 'np-msg' }, L.waitingStart));
       card.append(btn(L.start, () => lobby.start(), true, !s.canStart), btn(L.leave, () => lobby.cancel()));
