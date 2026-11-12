@@ -1,6 +1,6 @@
 /**
  * Optional minimal room-code screen for `createLobby` (`@agentstack/netplay/ui`). Plain DOM, no framework,
- * mobile-first (44 px targets, 16 px inputs, one column, safe-area padding). Theme with CSS variables on the
+ * mobile-first (48 px targets, 16 px+ inputs, one column, safe-area padding). Opens as a modal <dialog> (top layer, focus trap, Esc = back). Theme with CSS variables on the
  * container: --np-bg, --np-fg, --np-accent, --np-accent-fg, --np-muted, --np-font.
  *
  *   const ui = mountLobby(document.body, lobby, { labels: LOBBY_LABELS.ru, title: 'Дань', onClose: showMenu });
@@ -58,8 +58,10 @@ export interface LobbyUi { readonly el: HTMLElement; show(): void; hide(): void;
 
 const CSS = `
 .np-lobby{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom));
- background:var(--np-backdrop,#000b);font:16px/1.4 var(--np-font,system-ui,sans-serif);color:var(--np-fg,#f4ead6)}
-.np-lobby[hidden]{display:none}
+ background:var(--np-backdrop,#000b);font:16px/1.4 var(--np-font,system-ui,sans-serif);color:var(--np-fg,#f4ead6);
+ margin:0;border:0;width:100%;height:100%;max-width:none;max-height:none;box-sizing:border-box}
+.np-lobby::backdrop{background:transparent}
+.np-lobby:not([open]){display:none}
 .np-card{width:100%;max-width:420px;max-height:100%;overflow:auto;background:var(--np-bg,#211a14);border-radius:16px;padding:20px;box-shadow:0 10px 40px #0008;display:flex;flex-direction:column;gap:12px}
 .np-card h2{margin:0 0 4px;font-size:20px}
 .np-hint{margin:-6px 0 0;color:var(--np-muted,#bfae93);font-size:14px}
@@ -84,15 +86,25 @@ export function mountLobby(parent: HTMLElement, lobby: LobbyController<unknown, 
     st.textContent = CSS;
     doc.head.append(st);
   }
-  const root = doc.createElement('div');
+  // a modal <dialog> lives in the browser top layer: it stacks above the game's own modal dialogs, traps focus and gets Esc
+  const root = doc.createElement('dialog');
   root.className = 'np-lobby';
-  root.setAttribute('role', 'dialog');
   root.setAttribute('aria-modal', 'true');
+  const open = () => { if (root.open) return; if (typeof root.showModal === 'function' && root.isConnected) root.showModal(); else root.setAttribute('open', ''); };
+  const close = () => { if (typeof root.close === 'function') root.close(); else root.removeAttribute('open'); };
+  root.addEventListener('cancel', (e) => {
+    e.preventDefault(); // Esc: back out one step instead of hiding a live room
+    const st = lobby.state;
+    if (st.screen === 'error') lobby.back();
+    else if (st.screen === 'menu' && joining) { joining = false; render(lobby.state); }
+    else if (st.screen === 'menu' && o.onClose) o.onClose();
+  });
   const card = doc.createElement('div');
   card.className = 'np-card';
   root.append(card);
   parent.append(root);
   let joining = false;
+  open();
   let msg = '';
   let lastScreen = '';
 
@@ -151,13 +163,13 @@ export function mountLobby(parent: HTMLElement, lobby: LobbyController<unknown, 
       card.append(el('p', { class: 'np-err', role: 'alert' }, s.error === 'bad-code' ? L.badCode : s.error === 'version' ? L.version : L.offline), btn(L.back, () => lobby.back(), true));
     }
     if (msg) card.append(el('p', { class: 'np-msg', 'aria-live': 'polite' }, msg));
-    if (s.screen === 'playing' && (o.hideOnStart ?? true)) root.hidden = true;
+    if (s.screen === 'playing' && (o.hideOnStart ?? true)) close();
   };
   const off = lobby.subscribe(render);
   return {
     el: root,
-    show() { root.hidden = false; render(lobby.state); },
-    hide() { root.hidden = true; },
-    destroy() { off(); root.remove(); },
+    show() { open(); render(lobby.state); },
+    hide() { close(); },
+    destroy() { off(); close(); root.remove(); },
   };
 }
