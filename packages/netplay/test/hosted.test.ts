@@ -52,8 +52,8 @@ describe('net=as: hostedMcpRunner + stackscriptTransport against the fake', () =
     expect(A.snapshot.issue).toBeNull();
     fake.stats.reset();
     await vi.advanceTimersByTimeAsync(10_000);
-    // idle-after-game rate: ~2.5 polls/s/client (400 ms), no appends
-    expect(fake.stats.byUser.alice! / 10).toBeLessThan(4);
+    // quiet room after the game: polls stretch to 1.2 s → < 1 request/s/client
+    expect(fake.stats.byUser.alice! / 10).toBeLessThan(1);
     A.leave(); B.leave();
   });
 

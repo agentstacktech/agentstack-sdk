@@ -32,6 +32,8 @@ export interface PollingOptions {
   minPollMs?: number;
   /** Session hint: flush queued inputs at most this often (ms). See TransportCaps.sendEveryMs. */
   sendEveryMs?: number;
+  /** Quiet room: each empty poll stretches the period ×1.5 up to this (ms); new entries or our own send reset it. Default = intervalMs. */
+  idleMaxMs?: number;
 }
 
 /** Same curve as `pollBackoffMs` in @agentstack/sdk stackscript (base·2^n, capped). */
@@ -60,16 +62,18 @@ export function pollingTransport(api: RoomApi, o: PollingOptions = {}): Transpor
       let chain: Promise<unknown> = Promise.resolve();
       // after a failed append nothing later may reach the server first (the session re-sends from the failure, in order)
       let broken = false;
+      let period = interval;
       const deliver = (es: readonly Entry[]): void => {
         const fresh = es.filter((e) => e.seq > cursor);
         if (!fresh.length) return;
+        period = interval;
         cursor = fresh[fresh.length - 1]!.seq;
         opts.onEntries(fresh);
       };
       // a timer poll is skipped while piggybacked reads (appendRead) keep us fresh anyway
       const timed = (): void => {
         const fresh = Date.now() - lastReadAt;
-        if (alive && !errors && !rateHits && fresh < interval) { timer = setTimeout(timed, interval - fresh); return; }
+        if (alive && !errors && !rateHits && fresh < period) { timer = setTimeout(timed, period - fresh); return; }
         void tick();
       };
       const tick = async (): Promise<void> => {
@@ -81,7 +85,9 @@ export function pollingTransport(api: RoomApi, o: PollingOptions = {}): Transpor
           const es = await api.poll(room, cursor);
           errors = 0;
           rateHits = 0;
+          const before = cursor;
           deliver(es);
+          if (cursor === before) period = Math.min(o.idleMaxMs ?? interval, Math.round(period * 1.5));
           opts.onStatus?.('online');
         } catch (err) {
           const kind = err instanceof NetplayError ? err.kind : 'offline';
@@ -105,7 +111,7 @@ export function pollingTransport(api: RoomApi, o: PollingOptions = {}): Transpor
         }
         if (!alive) return;
         if (timer) clearTimeout(timer);
-        const wait = rateWaitMs || (again ? 0 : errors ? backoffMs(errors, interval, cap) : interval);
+        const wait = rateWaitMs || (again ? 0 : errors ? backoffMs(errors, interval, cap) : period);
         rateWaitMs = 0;
         timer = setTimeout(timed, wait);
         again = false;
@@ -117,6 +123,7 @@ export function pollingTransport(api: RoomApi, o: PollingOptions = {}): Transpor
         close() { alive = false; if (timer) clearTimeout(timer); },
       };
       const enqueue = (items: readonly { body: Body; to?: string }[]): Promise<void> => {
+          period = interval; // we are active: look for answers at the normal pace
           if (!alive || broken) return Promise.reject(new Error('polling: link closed'));
           // serialize appends so the server sees them in call order
           const p = chain.then(async () => {
