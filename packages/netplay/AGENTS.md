@@ -38,6 +38,50 @@
 
 See [test/recipe.test.ts](test/recipe.test.ts) — rock-paper-scissors built only from this file.
 
+## A new multiplayer game in 10 minutes (followed step by step, 2026-11-12)
+
+Starting point: [examples/starter.ts](examples/starter.ts) — «21» (add 1–3 in turns, exactly 21 wins) with lobby, board and match bar in 59 lines.
+Tested by doing exactly these steps in an empty folder (`test/starter.test.ts` checks the same game headless).
+
+1. **Project** (Node ≥ 20):
+   ```bash
+   mkdir my-game && cd my-game && npm init -y && npm pkg set type=module
+   npm i -D vite typescript vitest
+   (cd <sdk>/packages/netplay && npm i && npm run build)   # until the package is on npm
+   npm i <sdk>/packages/netplay
+   mkdir src && cp <sdk>/packages/netplay/examples/starter.ts src/game.ts
+   ```
+2. **Imports** in `src/game.ts`: `'../src/index.js'` → `'@agentstack/netplay'`, `'../src/ui/index.js'` → `'@agentstack/netplay/ui'`.
+3. **Page** `index.html`:
+   ```html
+   <!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+   <div id="app"></div>
+   <script type="module">import { startStarter } from './src/game.ts'; startStarter(document.getElementById('app'), 'ru');</script>
+   ```
+4. **Two players + a spectator on one screen** `two.html` (same-origin iframes share the in-page hub; no server):
+   ```html
+   <!doctype html><style>body{margin:0;display:flex;height:100vh}iframe{flex:1;border:1px solid #888}</style>
+   <iframe name="ana" src="/?join=TEST42&user=ana"></iframe><iframe name="bruno" src="/?join=TEST42&user=bruno"></iframe>
+   <script>setTimeout(() => document.body.insertAdjacentHTML('beforeend', '<iframe name="zoe" src="/?join=TEST42&user=zoe"></iframe>'), 3000)</script>
+   ```
+5. **Run**: `npx vite` → open `http://localhost:5173/two.html` (the port vite prints). Both seats fill → the match starts; ana's `+1 +2 +3` are live, the bar says «bruno думает…»/«ana думает…», zoe sees «Вы зритель». Reach 21 → «Победа» / «Вы проиграли», «Реванш (1/2)», then «Счёт 1:0». Alone: open `/` — the lobby shows a room code and an invite link (memory hub = same page only; for two devices see step 8).
+6. **Test** `src/game.test.ts` (`npx vitest run`):
+   ```ts
+   import { expect, it } from 'vitest';
+   import { createTable } from '@agentstack/netplay/testing';
+   import { twentyOne } from './game';
+   it('two players + spectator agree', async () => {
+     const t = await createTable(twentyOne, { players: 2, spectators: 1, latencyMs: 30 });
+     for (const n of [3, 3, 3, 3, 3, 3]) { t.clients[t.snaps()[0]!.state!.turn]!.input(n); await t.run(200); }
+     t.clients[0]!.input(3); await t.run(200);                 // 18 + 3 = 21 → seat 0 wins
+     expect(t.snaps().map((s) => s.outcome?.winner)).toEqual([0, 0, 0]);
+   });
+   ```
+   (`starter.ts` touches `window`/storage only inside `startStarter`/`localTransport`, so the rules import fine in plain Node.)
+7. **Make it yours**: change `S21`, `input` (reject everything illegal), `apply`, `outcome`; bump `version` on every rule change. Pick another `mode` from the table above if your game is realtime or has hidden info.
+8. **Two devices on a LAN** (DEV ONLY): `npm run dev-relay` in the SDK, then in `startStarter(app, 'ru', (u) => devRelayTransport('http://<lan-ip>:8787', u))`.
+9. **Production**: `generateRoomScript(twentyOne, { prefix: 'twentyone' })` → commit it + a test; transport = `stackscriptTransport(...)` (step 12 of the recipe). Publishing the room script needs the project owner's approval.
+
 ## Ports (fit an existing game without rewriting it)
 
 | Existing seam | Adapter idea | Real example |
@@ -84,6 +128,8 @@ Keep the screen a **presenter**: one pure function `snapshot → plain data` (st
 | `src/matchmaking.ts` | quick match / private room codes (`<prefix>.lobby.find`) |
 | `src/generator/roomScript.ts` | StackScript room referee generator |
 | `src/testing/*` | `createTable`, `loadRoomScript`, `scriptServer`, `microtasks` |
+| `src/ui/*` | `localName`, `mountLobby`, `mountMatchBar`, `mountNetStatus` (+ ru/en/pt labels) |
+| `examples/starter.ts` | whole browser game in 59 lines: rules + lobby + board + match bar (start here) |
 
 ## Platform notes (AgentStack, 2026-11)
 

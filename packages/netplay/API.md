@@ -86,7 +86,7 @@ Ready-made pill: `mountNetStatus(session, { labels?: NET_STATUS_LABELS.ru, paren
 `roomCode()` → `'K7MQ2X'` (alphabet without 0/O/1/I/L) · `parseRoomCode(text)` accepts `k7mq 2x`, `K7MQ-2X` or a pasted invite link → code | null ·
 `roomIdFor(game, code)` · `inviteLink(code, base = location.href, param = 'join')` · `codeFromUrl(url)`.
 
-`createLobby({ game, connect(room, code) => Session, onStart?(session, code), baseUrl?, param? = 'join' })` → controller:
+`createLobby({ game: myGame.id, connect(room, code) => Session, onStart?(session, code), baseUrl?, param? = 'join' })` → controller:
 `state: LobbyState`, `subscribe(fn)`, `create()` → code, `join(text)` → boolean, `joinFromUrl(url?)` → code | null, `start()`, `cancel()`, `back()`, `session`.
 `LobbyState = { screen: 'menu'|'waiting'|'playing'|'error', code, link, host, players, min, max, ready, canStart, error: 'bad-code'|'offline'|'version'|null }`.
 A full/running room is not an error: you watch as a spectator (`session.seat === -1`). Optional UI: `mountLobby(el, lobby, { labels: LOBBY_LABELS.ru, title, note?, onClose?, hideOnStart? = true, nameField? })` → `{ el, show, hide, destroy }` from `@agentstack/netplay/ui`.
