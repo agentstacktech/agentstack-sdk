@@ -85,6 +85,12 @@ export interface GameDef<S, I, V = S> {
   apply?(state: S, seat: Seat, input: I, ctx: StepCtx): S | void;
   /** Optional time-driven update (deadlines). Called with the server time before each entry. */
   clock?(state: S, now: number, ctx: StepCtx): S | void;
+  /**
+   * fold / authority games with `clock`: while playing, the authority (or, in fold, every seat)
+   * appends a `clock` entry at least this often so time-driven logic (phase timers, bots) advances
+   * even when nobody acts. Default: the presence heartbeat (`presenceMs / 4`). Min 250.
+   */
+  readonly clockMs?: number;
   /** Finished? Return the outcome, or null while the match runs. */
   outcome?(state: S): Outcome | null;
   /** Projection for one seat (-1 = spectator). Required for `authority`; default identity. */

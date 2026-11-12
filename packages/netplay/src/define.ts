@@ -10,6 +10,7 @@ export interface Game<S, I, V = S> extends GameDef<S, I, V> {
   readonly turnMs: number;
   readonly presenceMs: number;
   readonly onTimeout: 'idle' | 'forfeit';
+  readonly clockMs: number;
 }
 
 const ID = /^[a-z0-9][a-z0-9-]{0,47}$/;
@@ -32,6 +33,7 @@ export function defineGame<S, I, V = S>(def: GameDef<S, I, V>): Game<S, I, V> {
   if (def.mode === 'lockstep' && !def.step) throw new Error('defineGame: lockstep games need step()');
   if (def.mode !== 'lockstep' && !def.apply) throw new Error(`defineGame: ${def.mode} games need apply()`);
   if (def.mode === 'authority' && !def.view) throw new Error('defineGame: authority games need view() (what each seat may see)');
+  if (def.clockMs && (!def.clock || def.mode === 'lockstep')) throw new Error('defineGame: clockMs needs clock() in a fold / authority game');
   if (def.secret && def.mode !== 'lockstep') throw new Error('defineGame: secret (commit–reveal) is a lockstep option');
   const turnBased = def.mode === 'lockstep' && (def.timeouts?.turnMs ?? 0) >= 1000;
   return {
@@ -43,5 +45,6 @@ export function defineGame<S, I, V = S>(def: GameDef<S, I, V>): Game<S, I, V> {
     turnMs: def.timeouts?.turnMs ?? 0,
     presenceMs: def.timeouts?.presenceMs ?? 20_000,
     onTimeout: def.timeouts?.onTimeout ?? 'idle',
+    clockMs: def.clock && def.clockMs ? Math.max(250, def.clockMs) : 0,
   };
 }

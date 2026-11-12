@@ -89,3 +89,20 @@ describe('matchmaking (memory)', () => {
     expect(mm.privateRoom('g').room).toMatch(/^g-p-[a-z0-9]{6}$/);
   });
 });
+
+describe('clockMs', () => {
+  it('validates and drives the authority clock at the requested cadence', async () => {
+    const { createTable } = await import('../src/testing/index.js');
+    const base = { id: 'clk', version: 1, seats: { min: 2, max: 2 }, setup: () => ({ n: 0, last: 0 }), input: () => undefined, apply: () => {} } as const;
+    expect(() => defineGame({ ...base, mode: 'fold', clockMs: 500 })).toThrow(/clockMs/);
+    const g = defineGame<{ n: number; last: number }, never, number>({
+      ...base, mode: 'authority', view: (s) => s.n, clockMs: 500,
+      clock: (s, now) => { if (s.last && now - s.last >= 400) s.n += 1; if (!s.last || now - s.last >= 400) s.last = now; },
+    });
+    const t = await createTable(g, { players: 2 });
+    await t.run(10_000);
+    const n = t.clients[0]!.snapshot.state!.n;
+    expect(n).toBeGreaterThanOrEqual(15); // ~20 beats in 10 s, default heartbeat would give ~2
+    expect(t.clients[1]!.snapshot.view).toBeGreaterThanOrEqual(n - 2);
+  });
+});
