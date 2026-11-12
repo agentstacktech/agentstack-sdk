@@ -1,6 +1,6 @@
 # AGENTS.md — building a multiplayer game with @agentstack/netplay
 
-**Gene:** `sdk.netplay.gen1` · For humans start with [README.md](README.md). This file is the contract for AI agents.
+**Gene:** `sdk.netplay.gen1` · For humans start with [README.md](README.md). This file is the contract for AI agents. Every signature and default: [API.md](API.md) — read it instead of the source.
 
 ## Mental model (read first)
 
@@ -31,7 +31,8 @@
    - e2e: `createTable(game, { players: 2, spectators: 1, latencyMs, jitterMs })` and assert `snaps()[1].state` equals `snaps()[0].state`, outcome agreed, `desync === null`;
    - server: `loadRoomScript(generateRoomScript(game, { prefix }))` + `scriptServer(rt, prefix)` with two sessions.
 8. **Room script**: commit the generated file and a test that it equals the generator output. Publishing it is a platform action that needs the project owner's approval.
-9. **UI**: render from `session.subscribe(snapshot)`; for realtime loops use `onStep()` / `confirmed(tick)`; for an existing engine write a thin adapter (see "Ports" below).
+9. **Lobby**: private rooms = `createLobby({ game, connect, onStart })` (+ optional `mountLobby` from `/ui`); quick match = `createMatchmaker(...)`.
+10. **UI**: render from `session.subscribe(snapshot)`; `input()` only queues — `update()` (or `autoPumpMs`) sends; for realtime loops use `onStep()` / `confirmed(tick)`; for an existing engine write a thin adapter (see "Ports" below).
 
 See [test/recipe.test.ts](test/recipe.test.ts) — rock-paper-scissors built only from this file.
 
@@ -49,7 +50,8 @@ See [test/recipe.test.ts](test/recipe.test.ts) — rock-paper-scissors built onl
 - **Do** keep `input()` cheap — it runs on every client for every entry.
 - **Do** make the authority's `view()` the only place secrets leave the host; add a test that scans the log for leaks.
 - **Do** cap per-entry size (views ≤ the script's `maxBody`); encode big arrays compactly.
-- **Do** use `session.ready()` when `min < max` seats; `createTable` does it for you.
+- **Do** use `session.ready()` when `min < max` seats (a full room starts by itself); `createTable` does it for you and resolves once `playing`.
+- **Do** check `input()`'s boolean: `false` = refused locally (not playing, not your turn per `game.input`, spectator).
 - **Don't** read `Date.now()` / `Math.random()` / DOM inside rules, or mutate state outside `step`/`apply`/`clock`.
 - **Don't** trust `snapshot.view` on non-authority clients for anything but rendering.
 - **Don't** assume join order = connect-call order: seats follow server order (`hello` entries).
