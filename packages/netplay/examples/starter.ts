@@ -4,7 +4,7 @@
  * In your app import from '@agentstack/netplay' and '@agentstack/netplay/ui' (AGENTS.md → «A new game in 10 minutes»).
  */
 import { createLobby, createSession, defineGame, memoryHub, type MemoryHub, type Session, type Transport } from '../src/index.js';
-import { localName, mountLobby, mountMatchBar, LOBBY_LABELS, MATCH_BAR_LABELS } from '../src/ui/index.js';
+import { applyTheme, localName, mountLobby, mountMatchBar, LOBBY_LABELS, MATCH_BAR_LABELS } from '../src/ui/index.js';
 
 // ---- 1. rules: pure, deterministic, hostile input checked ----
 export interface S21 { total: number; turn: number; moves: number[] }
@@ -26,7 +26,9 @@ export function localTransport(user: string): Transport {
 }
 
 // ---- 3. page: lobby → board; the match bar does players / turn / spectator / result / rematch / series ----
+const WORDS = { ru: ['Ваш ход', 'Ходит'], en: ['Your turn', 'Turn:'], pt: ['Sua vez', 'Vez de'] } as const;
 export function startStarter(root: HTMLElement, lang: 'ru' | 'en' | 'pt' = 'en', transport = localTransport) {
+  applyTheme(); // dark page, centred card, big keys; lobby + match bar in the same colours (override with --np-* vars)
   // once per page, early: per-tab id (`?user=` wins — same-origin iframes share sessionStorage) + the name the player picked
   const me = localName(twentyOne.id, { params: new URLSearchParams(location.search) });
   const lobby = createLobby({
@@ -38,21 +40,27 @@ export function startStarter(root: HTMLElement, lang: 'ru' | 'en' | 'pt' = 'en',
   void me.ready.then(() => lobby.joinFromUrl() || lobby.create()); // a duplicated tab swaps its copied id first
 
   function play(session: Session<S21, number>) {
-    const board = Object.assign(document.createElement('main'), { style: 'padding: 56px 12px' }); // below the bar
+    const board = Object.assign(document.createElement('main'), { className: 'np-app' });
+    board.innerHTML = `<section class="np-stage"><p class="np-title">21</p><p class="np-score"></p>
+      <div class="np-meter"><i></i></div><p class="np-sub"></p><div class="np-keys"></div></section>`;
+    const $ = (q: string) => board.querySelector(q) as HTMLElement;
+    const keys = [1, 2, 3].map((n) => Object.assign(document.createElement('button'), { className: 'np-key', textContent: `+${n}`, onclick: () => session.input(n) }));
+    keys.forEach((k) => (k.dataset.test = 'add')); $('.np-keys').append(...keys);
     root.append(board);
     const bar = mountMatchBar(session, {
       labels: MATCH_BAR_LABELS[lang],
-      done: (seat, s) => { const st = s.state as S21 | null; return st ? seat !== st.turn : undefined; }, // on turn = «thinking…», the other = «ready»
+      done: (seat, s) => { const st = s.state as S21 | null; return st ? seat !== st.turn : undefined; }, // on turn = «thinking…»
       onNewRoom: () => { bar.destroy(); board.remove(); session.leave(); lobby.create(); ui.show(); }, // fresh code, lobby again
     });
     session.subscribe((snap) => {
       const s = snap.state; if (!s) return;
-      const mine = snap.phase === 'playing' && snap.seat === s.turn;
-      board.replaceChildren(Object.assign(document.createElement('h1'), { textContent: `${s.total} / 21` }),
-        ...[1, 2, 3].map((n) => Object.assign(document.createElement('button'), {
-          textContent: `+${n}`, disabled: !mine || s.total + n > 21, onclick: () => session.input(n),
-        })));
-      board.querySelectorAll('button').forEach((b) => { b.style.minWidth = b.style.minHeight = '48px'; b.dataset.test = 'add'; });
+      const mine = snap.phase === 'playing' && snap.seat === s.turn, who = snap.players.find((p) => p.seat === s.turn)?.name ?? '';
+      $('.np-score').innerHTML = `${s.total}<small>/21</small>`;
+      ($('.np-meter i')).style.width = `${(s.total / 21) * 100}%`;
+      const turn = Object.assign(document.createElement('span'), { className: mine ? 'np-turn' : '', textContent: mine ? WORDS[lang][0] : `${WORDS[lang][1]} ${who}` });
+      $('.np-sub').replaceChildren(snap.phase === 'playing' ? turn : ''); // names are player input: text, never HTML
+      $('.np-keys').classList.toggle('np-live', mine);
+      keys.forEach((k, n) => (k.disabled = !mine || s.total + n + 1 > 21));
     });
   }
   return lobby;

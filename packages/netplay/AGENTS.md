@@ -40,7 +40,7 @@ See [test/recipe.test.ts](test/recipe.test.ts) — rock-paper-scissors built onl
 
 ## A new multiplayer game in 10 minutes (followed step by step, 2026-11-12)
 
-Starting point: [examples/starter.ts](examples/starter.ts) — «21» (add 1–3 in turns, exactly 21 wins) with lobby, board and match bar in 59 lines.
+Starting point: [examples/starter.ts](examples/starter.ts) — «21» (add 1–3 in turns, exactly 21 wins) with lobby, board and match bar in 67 lines, styled by the default theme (`applyTheme()`).
 Tested by doing exactly these steps in an empty folder (`test/starter.test.ts` checks the same game headless).
 
 1. **Project** (Node ≥ 20):
@@ -52,6 +52,7 @@ Tested by doing exactly these steps in an empty folder (`test/starter.test.ts` c
    mkdir src && cp <sdk>/packages/netplay/examples/starter.ts src/game.ts
    ```
 2. **Imports** in `src/game.ts`: `'../src/index.js'` → `'@agentstack/netplay'`, `'../src/ui/index.js'` → `'@agentstack/netplay/ui'`.
+   **Look**: `applyTheme()` (already the first line of `startStarter`) injects the default theme — dark page, centred card filling the viewport, big 64 px keys, score + turn line, and the lobby / match bar in the same colours. Markup: `.np-app › .np-stage › .np-title / .np-score / .np-meter>i / .np-sub / .np-keys>.np-key` (`.np-keys.np-live` = your move). Re-colour with CSS variables (`:root { --np-accent:#7cf; --np-page:#0a1020 }`), `applyTheme({ scheme: 'auto' })` follows the system light/dark setting. Without it your page is a bare white document — the SDK widgets only style themselves.
 3. **Page** `index.html`:
    ```html
    <!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width">
@@ -60,7 +61,7 @@ Tested by doing exactly these steps in an empty folder (`test/starter.test.ts` c
    ```
 4. **Two players + a spectator on one screen** `two.html` (same-origin iframes share one in-page hub; no server). The **page** creates the hub: if the first iframe created it, reloading that iframe would take every room with it (the hub's code dies with its page):
    ```html
-   <!doctype html><style>body{margin:0;display:flex;height:100vh}iframe{flex:1;border:1px solid #888}</style>
+   <!doctype html><meta charset="utf-8"><style>body{margin:0;display:flex;gap:2px;height:100vh;background:#0b0806}iframe{flex:1;min-width:0;border:0}</style>
    <script type="module">
      import { memoryHub } from '@agentstack/netplay';
      window.__netplayHub = memoryHub({ manual: false, latencyMs: 40 });
@@ -133,7 +134,8 @@ Keep the screen a **presenter**: one pure function `snapshot → plain data` (st
 | `src/generator/roomScript.ts` | StackScript room referee generator |
 | `src/testing/*` | `createTable`, `loadRoomScript`, `scriptServer`, `microtasks` |
 | `src/ui/*` | `localName`, `mountLobby`, `mountMatchBar`, `mountNetStatus` (+ ru/en/pt labels) |
-| `examples/starter.ts` | whole browser game in 59 lines: rules + lobby + board + match bar (start here) |
+| `examples/starter.ts` | whole browser game in 67 lines: rules + lobby + board + match bar + theme (start here) |
+| `src/ui/theme.ts` | `applyTheme()` / `themeCss()`: default look (dark / light / auto), `--np-*` variables |
 
 ## Platform notes (AgentStack, 2026-11)
 

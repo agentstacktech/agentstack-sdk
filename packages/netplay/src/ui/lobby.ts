@@ -68,7 +68,7 @@ const CSS = `
  margin:0;border:0;width:100%;height:100%;max-width:none;max-height:none;box-sizing:border-box}
 .np-lobby::backdrop{background:transparent}
 .np-lobby:not([open]){display:none}
-.np-card{width:100%;max-width:420px;max-height:100%;overflow:auto;background:var(--np-bg,#211a14);border-radius:16px;padding:20px;box-shadow:0 10px 40px #0008;display:flex;flex-direction:column;gap:12px}
+.np-card{width:100%;max-width:420px;max-height:100%;overflow:auto;background:var(--np-bg,#211a14);border:1px solid var(--np-line,transparent);border-radius:var(--np-radius,16px);padding:20px;box-shadow:0 10px 40px #0008;display:flex;flex-direction:column;gap:12px}
 .np-card h2{margin:0 0 4px;font-size:20px}
 .np-hint{margin:-6px 0 0;color:var(--np-muted,#bfae93);font-size:14px}
 .np-btn{min-height:48px;border:0;border-radius:12px;padding:10px 16px;font:inherit;font-weight:600;cursor:pointer;background:#ffffff1a;color:inherit;width:100%}
