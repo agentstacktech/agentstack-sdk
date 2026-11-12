@@ -6,7 +6,7 @@
 import type { Game } from './define.js';
 import { canonicalJson, hashString } from './hash.js';
 import { createRng, deriveSeed, seedFromString } from './rng.js';
-import type { Body, Desync, Entry, Outcome, Phase, PlayerStatus, Seat, StepCtx } from './types.js';
+import type { Body, Desync, Entry, MatchResult, Outcome, Phase, PlayerStatus, Seat, StepCtx } from './types.js';
 
 /** Confirmed lockstep rows kept for `Session.confirmed(tick)`. */
 export const HISTORY = 1024;
@@ -43,6 +43,8 @@ export interface RoomModel<S, I, V = S> {
   outcome: Outcome | null;
   desync: Desync | null;
   rematch: Set<Seat>;
+  /** Finished matches (log-derived), capped at MAX_RESULTS. */
+  results: MatchResult[];
   notice: string | null;
   lastSeq: number;
   /** Highest entry counter `n` seen per sender (duplicate suppression). */
@@ -73,7 +75,7 @@ export function createRoom<S, I, V>(game: Game<S, I, V>, room: string, opts: Roo
     simulate: opts.simulate ?? true,
     secretSeed: opts.secretSeed ?? null,
     params: {}, players: [], spectators: new Set(), phase: 'lobby', match: 0, seed: 0, seats: 0,
-    state: null, tick: 0, now: 0, tickStartT: 0, outcome: null, desync: null, rematch: new Set(), notice: null, lastSeq: 0, lastN: new Map(),
+    state: null, tick: 0, now: 0, tickStartT: 0, outcome: null, desync: null, rematch: new Set(), results: [], notice: null, lastSeq: 0, lastN: new Map(),
     inputs: new Map(), commits: new Map(), hashes: new Map(), onStep: null, closedTick: -1, closedAt: 0, history: new Map(),
     self: '', hostLostAt: null,
   };
@@ -102,7 +104,15 @@ function ctxFor<S, I, V>(m: RoomModel<S, I, V>, tick: number): StepCtx {
   return { tick, now: m.now, seed: m.seed, rng: createRng(deriveSeed(m.seed, tick)), absent: absentSeats(m) };
 }
 
+/** Results kept per room (a long evening of rematches stays bounded). */
+export const MAX_RESULTS = 100;
+
 function setOutcome<S, I, V>(m: RoomModel<S, I, V>, o: Outcome): void {
+  if (m.phase === 'playing') {
+    const winner = o.winner >= 0 ? (m.players.find((p) => p.seat === o.winner)?.id ?? '') : '';
+    m.results.push(o.reason === undefined ? { match: m.match, winner } : { match: m.match, winner, reason: o.reason });
+    if (m.results.length > MAX_RESULTS) m.results.shift();
+  }
   m.outcome = o;
   m.phase = 'over';
   m.rematch.clear();

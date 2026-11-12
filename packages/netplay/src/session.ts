@@ -204,7 +204,7 @@ export class Session<S, I, V = S> {
       players: m.players.map((p) => ({ ...p })), spectators: m.spectators.size, tick: m.tick,
       state: own ? m.state : null,
       view: own ? this.game.view(m.state as S, seat) : this.lastView,
-      outcome, desync: m.desync, rematch: [...m.rematch], notice: m.notice, connection: this.connection, issue: this.issue,
+      outcome, desync: m.desync, rematch: [...m.rematch], results: [...m.results], notice: m.notice, connection: this.connection, issue: this.issue,
       hostWaitMs: m.hostLostAt === null || m.phase !== 'playing' ? null : Math.max(0, m.hostLostAt + this.game.hostGraceMs - m.now),
     };
     return this.snap;

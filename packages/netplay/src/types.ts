@@ -157,6 +157,14 @@ export interface PlayerInfo {
 
 export type Phase = 'lobby' | 'playing' | 'over';
 
+/** One finished match in this room, derived from the room log (same on every client, survives a reload). */
+export interface MatchResult {
+  readonly match: number;
+  /** Winner's player id ('' = draw / no single winner). By id, not seat: seats can change between matches. */
+  readonly winner: string;
+  readonly reason?: string;
+}
+
 export interface Desync {
   readonly tick: number;
   readonly hashes: Readonly<Record<string, number>>;
@@ -182,6 +190,8 @@ export interface Snapshot<S, V = S> {
   readonly desync: Desync | null;
   /** Seats that voted for a rematch in the current `over` phase. */
   readonly rematch: readonly Seat[];
+  /** Finished matches in this room so far, oldest first (series score: see `seriesScore`). */
+  readonly results: readonly MatchResult[];
   /** Last rejection or protocol problem, for UI hints and logs. */
   readonly notice: string | null;
   /** authority: the host is away — ms left (as of the last entry) before the match ends as 'host-lost'; null = host present. */

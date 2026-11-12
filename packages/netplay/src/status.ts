@@ -35,3 +35,10 @@ export function netStatus<S, V>(s: Snapshot<S, V>): NetStatus | null {
   if (s.desync) return { kind: 'desync' };
   return null;
 }
+
+/** Series score in this room from player `id`'s side (default: me), counted by player id so re-seating does not matter. */
+export function seriesScore<S, V>(s: Pick<Snapshot<S, V>, 'results' | 'self'>, id: string = s.self): { mine: number; theirs: number; draws: number; played: number } {
+  let mine = 0, theirs = 0, draws = 0;
+  for (const r of s.results) { if (!r.winner) draws++; else if (r.winner === id) mine++; else theirs++; }
+  return { mine, theirs, draws, played: s.results.length };
+}
