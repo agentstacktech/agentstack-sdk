@@ -1,0 +1,16 @@
+/**
+ * @agentstack/netplay — game-agnostic deterministic multiplayer (gene `sdk.netplay.gen1`).
+ * Start with README.md (5-minute quickstart) and AGENTS.md (guide for AI agents).
+ */
+export { defineGame, type Game } from './define.js';
+export { createSession, Session, type SessionOptions, type Listener } from './session.js';
+export { createRoom, reduceRoom, foldLog, commitHash, absentSeats, type RoomModel, type RoomPlayer, type RoomOptions } from './room.js';
+export { createRng, deriveSeed, seedFromString, mix32, type Rng, type RngState } from './rng.js';
+export { hashState, hashString, canonicalJson } from './hash.js';
+export { memoryHub, type MemoryHub, type MemoryHubOptions } from './transports/memory.js';
+export { pollingTransport, type RoomApi, type PollingOptions } from './transports/polling.js';
+export { stackscriptRoomApi, stackscriptTransport, type ScriptRunner, type StackscriptRoomOptions } from './transports/stackscript.js';
+export { wssTransport, type WssOptions } from './transports/wss.js';
+export { createMatchmaker, memoryMatchmaker, type Matchmaker, type MatchTicket, type QueueApi } from './matchmaking.js';
+export { generateRoomScript, type RoomScriptOptions } from './generator/roomScript.js';
+export type * from './types.js';
