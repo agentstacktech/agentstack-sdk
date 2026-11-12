@@ -74,6 +74,11 @@ export interface MatchBarOptions {
   onMenu?: () => void;
   /** Where the strip sits (default 'top'); pick the edge your own HUD leaves free. */
   position?: 'top' | 'bottom';
+  /**
+   * Show the strip only when it says something your HUD does not (default false = always): you are a spectator,
+   * another player is away or left, or the match is over. For games whose HUD already marks who is ready.
+   */
+  quiet?: boolean;
 }
 
 export interface MatchBarModel {
@@ -82,6 +87,8 @@ export interface MatchBarModel {
   clock: { text: string; urgent: boolean } | null;
   series: string | null;
   end: null | { title: string; reason: string; rematch: { label: string; enabled: boolean } | null; note: string; inline: boolean };
+  /** Another player is away or has left (the `quiet` strip shows then). */
+  alert: boolean;
 }
 
 const fill = (t: string, v: Record<string, string | number>) => t.replace(/\{(\w+)\}/g, (_, k: string) => String(v[k] ?? ''));
@@ -133,7 +140,8 @@ export function matchBar(s: Snap, o: MatchBarOptions = {}): MatchBarModel {
     const note = !enough ? L.cantRematch : askers.length && !voted && !spectator ? fill(L.wantsRematch, { names: named(askers) }) : '';
     end = { title, reason, rematch, note, inline: o.endPanel === false };
   }
-  return { spectator, players, clock, series, end };
+  const alert = s.players.some((p) => p.id !== s.self && p.status !== 'on');
+  return { spectator, players, clock, series, end, alert };
 }
 
 const CSS = `.np-bar{position:fixed;left:0;right:0;top:0;z-index:1000;display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center;
@@ -194,7 +202,7 @@ export function mountMatchBar<S, I, V>(session: Session<S, I, V>, o: MatchBarOpt
       if (o.onNewRoom) chips.push(button(o.labels?.newRoom ?? en.newRoom, o.onNewRoom, false, false, 'new'));
     }
     bar.replaceChildren(...chips);
-    bar.hidden = o.position === 'bottom' && !!e && !e.inline;
+    bar.hidden = (o.position === 'bottom' && !!e && !e.inline) || (!!o.quiet && !model.spectator && !e && !model.alert);
     if (e?.inline && focusK) (bar.querySelector(`[data-k="${focusK}"]`) as HTMLElement | null)?.focus();
     root.querySelector('.np-end')?.remove();
     if (e && !e.inline) {

@@ -22,6 +22,7 @@ describe('matchBar (presenter)', () => {
     expect(matchBar(s, { clock: () => 25_000 }).clock).toEqual({ text: '25 s', urgent: false });
     const away = base({ players: [s.players[0]!, { ...s.players[1]!, status: 'away' }] });
     expect(matchBar(away, { ...ru, done: () => false }).players[1]!.status).toBe('нет связи');
+    expect([m.alert, matchBar(away).alert]).toEqual([false, true]); // `quiet` strips show only on an alert / spectator / end
     expect(matchBar(s, ru).players[1]!.status).toBe(''); // no turns → no thinking/ready
     expect(matchBar(s, { ...ru, pace: 'race', done: (seat) => seat === 0 }).players.map((p) => p.status)).toEqual(['закончил', 'играет…']);
   });
