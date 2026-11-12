@@ -27,6 +27,8 @@ export interface SessionOptions {
   params?: Record<string, unknown>;
   /** lockstep: ticks of input delay. Default 0 for turn-based/secret games, 2 for realtime. */
   inputDelay?: number;
+  /** Background tab (`away(true)`): poll the room no faster than this (ms; polling transports). Default 3000. */
+  hiddenPollMs?: number;
   /** lockstep: how many ticks a client may run ahead of the confirmed tick before input() stalls. */
   maxAhead?: number;
   /**
@@ -83,6 +85,11 @@ export class Session<S, I, V = S> {
   private lastSendAt = -Infinity;
   /** sends not yet acknowledged by the transport */
   private sending = 0;
+  /** leave() was called: queued sends go out over a one-shot link (see courier). */
+  private leaving = false;
+  private sentAt = new Map<number, number>();
+  private rtt: number | null = null;
+  private couriering = false;
   private connecting: Promise<void> | null = null;
   private linkGen = 0;
   private reveals = new Map<number, { d: unknown[]; salt: string }>();
@@ -91,7 +98,8 @@ export class Session<S, I, V = S> {
   /** authority: last views of my local seats (by seat). */
   private localViews = new Map<number, V>();
   private lastViewOutcome: Outcome | null = null;
-  private hashLog: { t: number; h: number }[] = [];
+  /** Hash checkpoints to report, tagged with their match: one receive can fold a match end + a rematch (a reload refolds whole series). */
+  private hashLog: { m: number; t: number; h: number }[] = [];
   private viewsKey = '';
   private timer: ReturnType<typeof setInterval> | null = null;
   private retryAt = 0;
@@ -120,6 +128,8 @@ export class Session<S, I, V = S> {
 
   /** Connect and send hello. Resolves once the link is up (entries keep streaming in). */
   async join(): Promise<void> {
+    this.leaving = false; // a session joined again after leave(): no stale leave goes out
+    this.outbox = this.outbox.filter((it) => it.body.k !== 'leave');
     await this.connect();
     const locals = this.opts.locals?.length && !this.game.secret ? { locals: this.opts.locals.slice(0, 3) } : {};
     this.push({ k: 'hello', g: this.game.id, v: this.game.version, name: this.opts.name, spectate: this.opts.spectate, params: this.opts.params, ...locals });
@@ -150,6 +160,7 @@ export class Session<S, I, V = S> {
       });
       if (!current()) { link.close(); return; }
       this.link = link;
+      if (this.hidden) link.pace?.(this.opts.hiddenPollMs ?? 3000); // reconnected while in the background
       this.self = link.self;
       this.retries = 0;
       this.setIssue(null);
@@ -168,7 +179,7 @@ export class Session<S, I, V = S> {
   /** Reconnect delay: exponential up to 10 s; a guest (`auth`) or a missing script waits 15 s; `rate` honours the server. */
   private retryDelay(retryAfterMs = 0): number {
     const exp = Math.min(10_000, 250 * 2 ** Math.min(this.retries, 6));
-    return this.issue === 'auth' || this.issue === 'not-published' ? Math.max(exp, 15_000) : Math.max(exp, retryAfterMs);
+    return this.issue === 'auth' || this.issue === 'not-published' || this.issue === 'full' ? Math.max(exp, 15_000) : Math.max(exp, retryAfterMs);
   }
   private setIssue(i: NetIssue | null): void {
     if (this.issue === i) return;
@@ -182,6 +193,12 @@ export class Session<S, I, V = S> {
     fn(this.snapshot);
     return () => this.listeners.delete(fn);
   }
+
+  /**
+   * Smoothed round trip of our own entries (send → room → echo), ms; null until measured. Over HTTP polling this
+   * includes the poll period, i.e. roughly what an opponent's input needs to reach us. See `suggestInputDelay`.
+   */
+  rttMs(): number | null { return this.rtt; }
 
   /** lockstep input delay in ticks (option, or 0 for turn-based, 2 for realtime). */
   get inputDelay(): number {
@@ -253,11 +270,15 @@ export class Session<S, I, V = S> {
     if (!hidden) {
       if (!this.hidden) return;
       this.hidden = false;
+      this.link?.pace?.(null);
       this.push({ k: 'clock' });
     } else {
       if (this.hidden || this.seat < 0 || this.model.phase !== 'playing') return;
       this.hidden = true;
+      // inputs still batched (sendEveryMs) go out BEFORE the away entry: any entry after it would mark the seats present again
+      this.flushBatch();
       this.push({ k: 'away' });
+      this.link?.pace?.(this.opts.hiddenPollMs ?? 3000);
     }
     this.flush();
   }
@@ -270,6 +291,24 @@ export class Session<S, I, V = S> {
   }
   private get isAuthority(): boolean {
     return this.game.mode === 'authority' && this.model.players[0]?.id === this.self && this.self !== '';
+  }
+
+  /**
+   * lockstep with `timeouts.turnMs`: ms left on this turn's clock (null = no clock / not playing). Skew-free: the
+   * room's own time (`now − tickStartT` in log time, the same clock the idle rule uses) plus the local time since
+   * that log time was seen — never `Date.now() − tickStartT`, which mixes the device clock with the server's
+   * (a device a minute off, or a server stamping t = 0, showed 0 s and fired buzzers at once).
+   */
+  turnLeftMs(): number | null {
+    const m = this.model, g = this.game;
+    if (m.phase !== 'playing' || !(g.turnMs > 0)) return null;
+    this.anchorClock();
+    return g.turnMs - Math.max(0, m.now - m.tickStartT) - Math.max(0, this.now() - this.clockAt.at);
+  }
+  private clockAt = { key: '', at: 0 };
+  private anchorClock(): void {
+    const m = this.model, key = `${m.match}:${m.tick}:${m.now}`;
+    if (this.clockAt.key !== key) this.clockAt = { key, at: this.now() };
   }
 
   get snapshot(): Snapshot<S, V> {
@@ -324,6 +363,23 @@ export class Session<S, I, V = S> {
   }
 
   /**
+   * fold / authority: the same command for EVERY seat on this device (mine first, then the local seats) in ONE entry
+   * (`{ k: 'cmd', a: 1 }`), e.g. a clock report on a shared table. Per-seat `input(cmd, j)` would cost one entry per
+   * seat against the room's per-user rate limit. Returns false when no seat accepts it.
+   */
+  inputAll(value: I): boolean {
+    const m = this.model;
+    const g = this.game;
+    const own = this.seat;
+    if (g.mode === 'lockstep' || own < 0 || m.phase !== 'playing') return false;
+    if (m.state !== null && m.state !== undefined && !this.seats.some((seat) => g.input(value, seat, m.state as S) !== undefined)) return false;
+    const host = m.players[0]?.id;
+    const to = g.mode === 'authority' && this.opts.transport.caps.privateEntries && host && host !== this.self ? host : undefined;
+    this.push({ k: 'cmd', m: m.match, d: value, a: 1 }, to);
+    return true;
+  }
+
+  /**
    * lockstep (realtime / turns, not secret): this tick's input for every seat on this device —
    * `values[0]` mine, `values[j]` local seat j (missing = idle). One entry carries them all. Same stall rule as `input`.
    */
@@ -352,7 +408,7 @@ export class Session<S, I, V = S> {
     this.batch.d.push(values[0] ?? g.idle);
     if (this.batch.x) for (let j = 1; j <= this.batch.x.length; j++) this.batch.x[j - 1]!.push(values[j] ?? g.idle);
     this.nextTick = t + 1;
-    this.hidden = false; // a move = back
+    this.wake(); // a move = back
     return true;
   }
 
@@ -372,6 +428,32 @@ export class Session<S, I, V = S> {
     this.push({ k: 'leave' });
     this.flush();
     this.close();
+    this.leaving = true;
+    if (this.outbox.length) this.courier(0); // the link was down: the opponent must not wait out presenceMs (45 s)
+  }
+
+  /**
+   * After `leave()`: what is still queued (the leave itself, last inputs) goes out over a one-shot link, with a short
+   * backoff (0.5 / 1.5 / 4 / 8 / 15 s, ~30 s window). Entries are deduped by `n`, so a resend after an unclear failure is harmless.
+   */
+  private courier(attempt: number): void {
+    if (!this.leaving || this.couriering || !this.outbox.length || attempt > 5) return;
+    this.couriering = true;
+    const items = this.outbox;
+    this.outbox = [];
+    const done = (ok: boolean): void => {
+      this.couriering = false;
+      if (ok || !this.leaving) return;
+      this.outbox.unshift(...items);
+      setTimeout(() => this.courier(attempt + 1), [500, 1500, 4000, 8000, 15_000][attempt] ?? 15_000);
+    };
+    this.opts.transport.connect(this.opts.room, { afterSeq: this.model.lastSeq, onEntries: () => {} }).then(async (link) => {
+      try {
+        if (link.sendMany) await link.sendMany(items);
+        else for (const it of items) await link.send(it.body, it.to);
+        done(true);
+      } catch { done(false); } finally { link.close(); }
+    }, () => done(false));
   }
   close(): void {
     if (this.timer) clearInterval(this.timer);
@@ -403,8 +485,14 @@ export class Session<S, I, V = S> {
     else if (this.link && this.model.phase !== 'over' && now - this.lastSendAt >= beat) { this.push({ k: 'clock' }); this.flush(); }
   }
 
+  /** A move from a background tab = back: normal polling again (it used to stay at `hiddenPollMs` while counted present). */
+  private wake(): void {
+    if (!this.hidden) return;
+    this.hidden = false;
+    this.link?.pace?.(null);
+  }
   private push(body: Body, to?: string): void {
-    if (body.k !== 'away' && body.k !== 'hash' && body.k !== 'clock' && body.k !== 'view') this.hidden = false; // a move = back
+    if (body.k !== 'away' && body.k !== 'hash' && body.k !== 'clock' && body.k !== 'view') this.wake(); // a move = back
     const stamped = { ...body, n: ++this.sendN } as Body;
     this.outbox.push(to ? { body: stamped, to } : { body: stamped });
   }
@@ -423,6 +511,8 @@ export class Session<S, I, V = S> {
     const items = this.outbox;
     this.outbox = [];
     this.lastSendAt = this.now();
+    for (const it of items) { const n = it.body.n; if (typeof n === 'number' && !this.sentAt.has(n)) this.sentAt.set(n, this.lastSendAt); }
+    if (this.sentAt.size > 64) for (const k of [...this.sentAt.keys()].slice(0, this.sentAt.size - 64)) this.sentAt.delete(k);
     if (link.sendMany) {
       // one request for the whole flush; on failure everything is re-sent (dedup by `n`)
       this.sending += 1;
@@ -444,6 +534,7 @@ export class Session<S, I, V = S> {
   /** Re-queue from the failed item (in order) and reconnect; known server reasons get their own wait + status. */
   private sendFailed(link: Link, items: readonly OutItem[], from: number, err: unknown): void {
     this.outbox.unshift(...items.slice(from));
+    if (this.leaving) { this.courier(0); return; } // the leave's own send failed: retry it over a one-shot link
     if (this.link !== link) return;
     link.close();
     this.link = null;
@@ -467,7 +558,7 @@ export class Session<S, I, V = S> {
     this.hashedUpTo = tick;
     if (this.game.mode === 'authority') return;
     const h = this.game.hash(this.model.state);
-    this.hashLog.push({ t: tick, h });
+    this.hashLog.push({ m: this.model.match, t: tick, h });
   }
 
   private receive(es: readonly Entry[]): void {
@@ -475,7 +566,16 @@ export class Session<S, I, V = S> {
     const before = m.lastSeq;
     for (const e of es) {
       if (e.seq <= m.lastSeq) continue;
-      if (e.from === this.self && typeof (e.body as Body)?.n === 'number') this.sendN = Math.max(this.sendN, (e.body as Body).n!); // reload: continue our counter
+      if (e.from === this.self && typeof (e.body as Body)?.n === 'number') {
+        const n = (e.body as Body).n!;
+        this.sendN = Math.max(this.sendN, n); // reload: continue our counter
+        const at = this.sentAt.get(n);
+        if (at !== undefined) { // own echo: send → room → back, the time an opponent's input takes to reach us
+          this.sentAt.delete(n);
+          const x = this.now() - at;
+          this.rtt = this.rtt === null ? x : Math.round(this.rtt * 0.8 + x * 0.2);
+        }
+      }
       m.self = this.self;
       if (this.game.mode === 'authority') m.simulate = m.players.length === 0 ? true : m.players[0]!.id === this.self;
       const prevMatch = m.match;
@@ -485,8 +585,16 @@ export class Session<S, I, V = S> {
       if (this.opts.keepLog !== false) this.log.push(e);
     }
     if (m.lastSeq === before) return;
+    if (this.game.turnMs > 0) this.anchorClock();
     this.maybeResync();
-    if (!this.hidden) for (const h of this.hashLog) this.push({ k: 'hash', m: m.match, t: h.t, h: h.h }); // a background tab stays quiet
+    // a background tab stays quiet; checkpoints of an earlier match are dropped (they used to go out stamped with the
+    // current match, so a reload after a rematch reported match-1 hashes for match-2 ticks → a false desync for everyone)
+    // A catch-up (reload / reconnect) folds many checkpoints at once: report only the newest two we have not reported
+    // yet — re-sending every checkpoint of a long match burst past the room's per-user rate limit.
+    if (!this.hidden) {
+      const fresh = this.hashLog.filter((h) => h.m === m.match && m.hashes.get(h.t)?.get(this.self) !== h.h >>> 0);
+      for (const h of fresh.slice(-2)) this.push({ k: 'hash', m: h.m, t: h.t, h: h.h });
+    }
     this.hashLog = [];
     this.revealReady();
     if (this.isAuthority) this.sendViews();
@@ -545,6 +653,7 @@ export class Session<S, I, V = S> {
       this.nextTick = delay;
     }
     this.reveals.clear();
+    this.sentReveals.clear();
     this.committed.clear();
     this.lastView = null;
     this.localViews.clear();
@@ -552,16 +661,21 @@ export class Session<S, I, V = S> {
     this.viewsKey = '';
   }
 
+  /** Ticks whose reveal this tab already queued (so a restore from secretStore does not queue it again). */
+  private sentReveals = new Set<number>();
+  /** Tick of the reveal kept in secretStore (cleared once the room moved past it, not when it was merely queued). */
+  private storedRevealT = -1;
   private get revealKey(): string { return `netplay:reveal:${this.game.id}:${this.opts.room}`; }
   private storeReveal(r: { m: number; t: number; d: unknown[]; salt: string } | null): void {
     const st = this.opts.secretStore;
     if (!st) return;
+    this.storedRevealT = r ? r.t : -1;
     try { if (r) st.setItem(this.revealKey, JSON.stringify(r)); else st.removeItem(this.revealKey); } catch { /* storage full / blocked: reveal from memory only */ }
   }
   /** After a reload: our commit for this tick is in the log but the move is not in memory → take it from `secretStore` if it matches. */
   private restoreReveal(): void {
     const m = this.model, st = this.opts.secretStore, seat = this.seat;
-    if (!st || seat < 0 || m.phase !== 'playing' || this.reveals.has(m.tick)) return;
+    if (!st || seat < 0 || m.phase !== 'playing' || this.reveals.has(m.tick) || this.sentReveals.has(m.tick)) return;
     const c = m.commits.get(m.tick)?.[seat];
     if (c === undefined || m.inputs.get(m.tick)?.[seat] !== undefined) return;
     let r: { m: number; t: number; d: unknown[]; salt: string } | null = null;
@@ -569,18 +683,22 @@ export class Session<S, I, V = S> {
     if (!r || r.m !== m.match || r.t !== m.tick || !Array.isArray(r.d) || commitHash(r.d, String(r.salt)) !== c) return;
     this.committed.add(r.t);
     this.reveals.set(r.t, { d: r.d, salt: String(r.salt) });
+    this.storedRevealT = r.t; // cleared once the room moves past it
   }
 
   private revealReady(): void {
     const m = this.model;
     if (!this.game.secret) return;
+    if (this.storedRevealT >= 0 && this.storedRevealT < m.tick) this.storeReveal(null); // the room resolved it: done
     this.restoreReveal();
     for (const [t, r] of this.reveals) {
       if (t < m.tick) { this.reveals.delete(t); continue; }
       const row = m.commits.get(t) ?? [];
       const absent = m.players.map((p) => p.status !== 'on');
       const all = m.closedTick === t || m.players.every((p) => absent[p.seat] || row[p.seat] !== undefined);
-      if (all) { this.push({ k: 'in', m: m.match, t, d: r.d, salt: r.salt }); this.reveals.delete(t); this.storeReveal(null); }
+      // the stored copy stays until the room moves on: a reveal queued but never sent (link down, then a reload) was lost
+      // and the turn hung until the clock ran out twice
+      if (all) { this.push({ k: 'in', m: m.match, t, d: r.d, salt: r.salt }); this.reveals.delete(t); this.sentReveals.add(t); }
     }
   }
 
@@ -626,4 +744,17 @@ export function createSession<S, I, V>(game: Game<S, I, V>, opts: SessionOptions
   const s = new Session(game, opts);
   if (game.mode === 'authority') s.model.secretSeed = (opts.secretSeed ?? randomU32)();
   return s;
+}
+
+/**
+ * Input-delay tuning (lockstep / GGPO practice): pick enough ticks of delay that our input reaches the other players
+ * before they simulate its tick, so the sim never stalls waiting for it — and no more, since every tick is felt as lag.
+ * `rttMs` = `session.rttMs()` (our own echo time ≈ what an opponent's input needs to reach us; HTTP polls included),
+ * plus one tick of jitter margin. Use it at match start (`createSession({ inputDelay })` on a rematch / next room);
+ * changing the delay mid-match is legal (the log is the truth) but feels like a hiccup.
+ */
+export function suggestInputDelay(rttMs: number | null, tickMs: number, o: { min?: number; max?: number } = {}): number {
+  const min = o.min ?? 1, max = o.max ?? 8;
+  if (rttMs === null || !(tickMs > 0)) return Math.max(min, Math.min(max, 2));
+  return Math.max(min, Math.min(max, Math.ceil(rttMs / tickMs) + 1));
 }

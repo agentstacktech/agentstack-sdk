@@ -71,7 +71,8 @@ seats not `1 ≤ min ≤ max ≤ 64`, missing `step` (lockstep) / `apply` (fold,
 | `leave()` / `close()` | — | `leave` = tell the room (lobby seat freed, in-game forfeit); `close` = drop the link |
 | `update()` | — | flush queued inputs, heartbeats, `clock` entries, reconnects |
 | `audience(value)` | `boolean` | an audience command (`game.audience`); `false` = no hook / not playing / a player without `from: 'all'` / rejected locally |
-| `away(hidden)` | — | the tab went to the background / came back (`bindVisibility(session)` from `/ui` wires it): hidden seats are `away` at once, nobody waits for them, no heartbeats; back = present again. `forfeit` still applies after `presenceMs` |
+| `turnLeftMs()` | `number \| null` | lockstep with `turnMs`: ms left on this turn, skew-free (room log time + local time since it was seen); null when not playing / no clock. Use it for turn clocks and buzzers, never `Date.now() − model.tickStartT` |
+| `away(hidden)` | — | the tab went to the background / came back (`bindVisibility(session)` from `/ui` wires it): hidden seats are `away` at once, nobody waits for them, no heartbeats; back = present again. `forfeit` still applies after `presenceMs`; while hidden, polling transports poll no faster than `hiddenPollMs` (3000) and poll at once on return |
 | `onStep(fn)` / `confirmed(tick)` | | lockstep: hook your own render loop |
 | `resync()` | `boolean` | rebuild `model` from `log` (false if `keepLog: false`); fixes a locally corrupted state, not different code |
 | `seat`, `model`, `log`, `game` | | low-level access |
@@ -97,6 +98,7 @@ One device can hold **several seats**: friends on one screen (shared keyboard, s
 | `snapshot.players[i].owner` / `.local` | a local seat: the member id of its device, and its index there (1, 2, …) |
 | `session.inputs([mine, local1, …])` | lockstep: this tick's input for every seat here, one entry (missing = `idle`) |
 | `session.input(cmd, j)` | fold / authority: a command as local seat `j` (validated as that seat) |
+| `session.inputAll(cmd)` | fold / authority: the same command for every seat here in **one** entry (`a: 1`; e.g. a clock report) — per-seat `input(cmd, j)` costs one entry per seat against the room rate limit |
 | `session.viewFor(seat)` | authority: the view of one of my seats (the host sends each device its local seats' views) |
 | `session.leaveLocal(j)` | only local seat `j` leaves; `leave()` takes the device with all its seats |
 | `mountLobby(…, { locals: { name: (j) => 'Player ' + (j + 1) } })` | waiting screen: «+ Player on this device», «same screen» tags, remove buttons |
@@ -177,10 +179,10 @@ A full/running room is not an error: you watch as a spectator (`session.seat ===
 ### Hosted MCP runner (games without @agentstack/sdk)
 
 `hostedMcpRunner({ projectId, origin? = '', token?, fetch? })` → a `ScriptRunner` that POSTs JSON-RPC `tools/call agentstack.execute { action: 'script.run' }` to `${origin}/s/${projectId}/mcp` with the page's `hosted_app` cookie (`credentials: 'include'`) and, when `token()` returns one, `Authorization: Bearer`. On HTTP 401 with a token it re-mints the cookie once (`POST /api/hosted-apps/{pid}/session`) and retries. Replies are unwrapped from `result.structuredContent` or `result.content[0].text` (`unwrapHostedReply`).
-Failures throw `NetplayError { kind, code, retryAfterMs? }` — `errorKind(code, httpStatus)`: `auth` (401/403, auth_required, unauthorized, session_user_required, relogin_required, room-script `AUTH`), `rate` (429, rate_limit_exceeded, rate_limited, `RATE_LIMIT`, `*quota*`), `not-published` (script_not_found), `offline` (network, 5xx), `server` (anything else).
+Failures throw `NetplayError { kind, code, retryAfterMs? }` — `errorKind(code, httpStatus)`: `auth` (401/403, auth_required, unauthorized, session_user_required, relogin_required, room-script `AUTH`), `rate` (429, rate_limit_exceeded, rate_limited, `RATE_LIMIT`, `*quota*`), `not-published` (script_not_found), `full` (room-script `ROOM_FULL` / `LOG_FULL`: open a new room; netStatus `full`, lobby error `full`, optional labels `full`), `offline` (network, 5xx), `server` (anything else).
 `pollingTransport` reacts: `rate` → waits `max(retry_after_ms, backoff)` without counting it as a dead link (`onStatus('reconnecting', 'rate')`); `auth` / `not-published` → `onStatus('offline', kind)` and closes. The session keeps the reason in `snapshot.issue` (`'auth' | 'rate' | 'not-published' | null`), retries auth / not-published every ≥15 s, and `netStatus()` returns `sign-in` / `busy` / `unavailable` (labels `signIn`, `busy`, `unavailable` in `NET_STATUS_LABELS`; lobby errors `sign-in`, `unavailable`). `minPollMs` (polling option) caps after-send polls.
 
-**Request budget.** `stackscriptTransport` defaults to `sendEveryMs: 100` (a `TransportCaps` hint; session option `sendEveryMs` overrides): realtime lockstep inputs are batched and flushed at most every 100 ms and never while the previous request is still on the wire; hash checks ride along. One flush = one `room.append` call with up to 16 entries (`items`) that also returns everything new since our cursor (`after`) — the timer poll is skipped while those piggybacked reads keep us fresh. In a quiet room the poll period stretches ×1.5 per empty poll up to `idleMaxMs` (1200 ms for stackscript; reset by new entries or our own send), nothing new is sent while a request is on the wire (Nagle), idle clock beats are ≥1 s, and requests time out after 15 s. Measured in `test/hosted.test.ts` (30 Hz lockstep, per client): 50 req/s → 9.8 req/s at 40 ms RTT, 13.4 req/s with stalls → 6.1 req/s with none at 150 ms RTT. The room script counts its `ratePer10s` per entry. `RETRY` (two players appended at the same instant) is repeated by `stackscriptRoomApi` up to 3 times.
+**Request budget.** `stackscriptTransport` defaults to `sendEveryMs: 100` (a `TransportCaps` hint; session option `sendEveryMs` overrides): realtime lockstep inputs are batched and flushed at most every 100 ms and never while the previous request is still on the wire; hash checks ride along. One flush = one `room.append` call with up to 16 entries (`items`) that also returns everything new since our cursor (`after`) — the timer poll is skipped while those piggybacked reads keep us fresh. In a quiet room the poll period stretches ×1.5 per empty poll up to `idleMaxMs` (2000 ms for stackscript; reset by new entries or our own send — presence beats and hash checks do not count, so a room where both players think stays slow: 1.03 → 0.53 req/s per client in `test/quiet-poll.test.ts`), nothing new is sent while a request is on the wire (Nagle), idle clock beats are ≥1 s, and requests time out after 15 s. Measured in `test/hosted.test.ts` (30 Hz lockstep, per client): 50 req/s → 9.8 req/s at 40 ms RTT, 13.4 req/s with stalls → 6.1 req/s with none at 150 ms RTT. The room script counts its `ratePer10s` per entry. `RETRY` (two players appended at the same instant, the room doc's CAS failed, nothing was written) is repeated by `stackscriptRoomApi` up to `conflictRetries` (4) times after a jittered pause `conflictDelayMs(n, conflictBackoffMs = 25, rnd)` = base·2^n·(0.5…1.5), each attempt with a **fresh idempotency key** (`<key>~r<n>`), so a platform that caches replies by key cannot hand the same RETRY back.
 
 ### Dev relay — DEV ONLY (two windows / devices on one LAN, no server)
 
@@ -188,8 +190,10 @@ Failures throw `NetplayError { kind, code, retryAfterMs? }` — `errorKind(code,
 
 ## Room script generator
 
-`generateRoomScript(game, { prefix = id, maxBody = 4000, ratePer10s = 120, maxUsers = max + 8, chunk = 64, pollLimit = 256, lobbyTtlMs = 120000 })` → TypeScript source
-(exports `<prefix>.room.join|append|poll`, `<prefix>.lobby.find`). CLI: `npm run gen:room -- <id> <min> <max> [version] [prefix]`. Publishing = platform action, owner approval.
+`generateRoomScript(game, { prefix = id, maxBody = 4000, ratePer10s = 120, maxUsers = max + 8, chunk = 16, maxLog = 100000, pollLimit = 256, lobbyTtlMs = 120000 })` → TypeScript source
+(exports `<prefix>.room.join|append|poll`, `<prefix>.lobby.find`). CLI: `npm run gen:room -- <id> <min> <max> [version] [prefix]`.
+Every append rewrites the current log chunk, so the default chunk is 16 entries (was 64: ~4× less written per move). `maxLog` caps a room's log (storage bound): past it `room.append` throws `LOG_FULL` (kind `server`) — open a new room. The log is never trimmed in place, because a reload or a late joiner refolds it from seq 1 (seats, params, match start); trimming would need a snapshot entry, which the reducer does not have yet.
+**Platform contract the script relies on:** `script.run` is one transaction — `ctx.dna.cas` is checked at commit together with every `put` (otherwise two simultaneous appends get the same seq and one entry is lost), and `ctx.now_ms` is a real clock (with 0 the per-user rate window never rolls). Publishing = platform action, owner approval.
 
 ## Testing (`@agentstack/netplay/testing`)
 
@@ -212,3 +216,12 @@ Failures throw `NetplayError { kind, code, retryAfterMs? }` — `errorKind(code,
 | `generateRoomScript` alone (build-time) | 6.4 KB | 2.3 KB |
 
 No runtime dependencies; `sideEffects: false`, so unused transports/generator are tree-shaken.
+
+### Pass 5 additions
+
+- `leave()` during a connection drop: what is still queued (the leave, last inputs) goes out over a one-shot link with
+  backoff 0.5 / 1.5 / 4 / 8 / 15 s, so the others see "left" as soon as the network is back instead of waiting
+  `presenceMs`. A session that `join()`s again drops a stale queued leave.
+- `session.rttMs()`: smoothed echo time of our own entries (ms, null until measured).
+- `suggestInputDelay(rttMs, tickMs, { min, max })`: lockstep input delay that covers the trip plus one tick of margin
+  (GGPO-style tuning); apply at match start.

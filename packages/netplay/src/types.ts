@@ -167,7 +167,8 @@ type BodyKind =
   | { k: 'in'; m: number; t: number; d: unknown[]; salt?: string; x?: unknown[][] }
   | { k: 'commit'; m: number; t: number; h: number }
   /** `l`: local seat index (0 / missing = the member's own seat). */
-  | { k: 'cmd'; m: number; d: unknown; l?: number }
+  /** `l`: one local seat of the sender's device; `a: 1`: every seat of that device (own first, then locals) — one entry, e.g. a clock report. */
+  | { k: 'cmd'; m: number; d: unknown; l?: number; a?: 1 }
   | { k: 'hash'; m: number; t: number; h: number }
   | { k: 'view'; m: number; s: number; seat: Seat; d: unknown; o?: Outcome | null }
   | { k: 'clock' }
@@ -244,7 +245,7 @@ export interface Snapshot<S, V = S> {
   readonly hostWaitMs: number | null;
   readonly connection: ConnectionState;
   /** Why the connection is down or slowed: 'auth' (sign in first), 'rate' (server asked to slow down), 'not-published' (room script missing); null = no known reason. */
-  readonly issue: 'auth' | 'rate' | 'not-published' | null;
+  readonly issue: 'auth' | 'rate' | 'not-published' | 'full' | null;
 }
 
 export type ConnectionState = 'idle' | 'connecting' | 'online' | 'reconnecting' | 'offline';
@@ -260,6 +261,8 @@ export interface Link {
   send(body: Body, to?: string): Promise<void>;
   /** Optional: several bodies in one request, same ordering rules (HTTP transports — request budget). */
   sendMany?(items: readonly { body: Body; to?: string }[]): Promise<void>;
+  /** Optional (polling transports): poll no faster than `ms` (background tab: battery, data, request budget); null = normal pace, poll now. */
+  pace?(ms: number | null): void;
   close(): void;
 }
 

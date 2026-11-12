@@ -19,8 +19,13 @@ export interface RoomScriptOptions {
   ratePer10s?: number;
   /** Max distinct users (players + spectators) per room. Default seats.max + 8. */
   maxUsers?: number;
-  /** Entries per DNA chunk. Default 64. */
+  /** Entries per DNA chunk. Every append rewrites the current chunk, so smaller = less written per move. Default 16. */
   chunk?: number;
+  /**
+   * Max entries a room's log may hold (storage cap). Past it `room.append` throws `LOG_FULL`: open a new room.
+   * Entries are never trimmed in place: a reload / late joiner refolds the log from seq 1 (seats, params, the match). Default 100000.
+   */
+  maxLog?: number;
   /** Max entries returned per poll. Default 256. */
   pollLimit?: number;
   /** A quick-match room with no join for this long is abandoned (ms). Default 120000. */
@@ -42,7 +47,8 @@ export function generateRoomScript(game: Pick<Game<unknown, unknown>, 'id' | 'se
     MAXB: n(o.maxBody ?? 4000, 'maxBody'),
     RATE: n(o.ratePer10s ?? 120, 'ratePer10s'),
     MAXU: n(o.maxUsers ?? game.seats.max + 8, 'maxUsers'),
-    CHUNK: n(o.chunk ?? 64, 'chunk'),
+    CHUNK: n(o.chunk ?? 16, 'chunk'),
+    MAXLOG: n(o.maxLog ?? 100000, 'maxLog'),
     LIMIT: n(o.pollLimit ?? 256, 'pollLimit'),
     TTL: n(o.lobbyTtlMs ?? 120000, 'lobbyTtlMs'),
     SMIN: game.seats.min,
@@ -60,6 +66,7 @@ const MAXB = ${C.MAXB};
 const RATE = ${C.RATE};
 const MAXU = ${C.MAXU};
 const CHUNK = ${C.CHUNK};
+const MAXLOG = ${C.MAXLOG};
 const LIMIT = ${C.LIMIT};
 const TTL = ${C.TTL};
 const SMIN = ${C.SMIN};
@@ -146,6 +153,7 @@ export const roomAppend = defineCommand({
     const me = uid(ctx);
     const doc = ctx.dna.get(E_ROOM, i.room);
     if (doc === null || doc.users.indexOf(me) < 0) { throw err("NOT_JOINED", "join the room first"); }
+    if (doc.seq + i.items.length > MAXLOG) { throw err("LOG_FULL", "room log is full, open a new room"); }
     for (let k = 0; k < i.items.length; k++) {
       const it = i.items[k];
       if (it.body.length > MAXB) { throw err("TOO_BIG", "entry too large"); }
@@ -154,7 +162,7 @@ export const roomAppend = defineCommand({
     }
     const rk = i.room + "#" + me;
     const rate = ctx.dna.get(E_RATE, rk);
-    let win = ctx.now_ms - (ctx.now_ms % WINDOW);
+    const win = ctx.now_ms - (ctx.now_ms % WINDOW);
     let used = 0;
     if (rate !== null && rate.win === win) { used = rate.n; }
     if (used + i.items.length > RATE) { throw err("RATE_LIMIT", "too many entries, slow down"); }

@@ -5,11 +5,11 @@
 import { netStatus, type NetStatus } from '../status.js';
 import type { Session } from '../session.js';
 
-export interface NetStatusLabels { offline: string; reconnecting: string; hostAway: string; playerAway: string; desync: string; signIn: string; busy: string; unavailable: string }
+export interface NetStatusLabels { offline: string; reconnecting: string; hostAway: string; playerAway: string; desync: string; signIn: string; busy: string; unavailable: string; full?: string }
 export const NET_STATUS_LABELS = {
-  en: { offline: 'No connection. Trying again…', reconnecting: 'Reconnecting…', hostAway: 'The host lost connection — waiting {s} s', playerAway: '{names} lost connection — waiting', desync: 'Out of sync — fixing it…', signIn: 'Sign in to play online', busy: 'The server asked us to slow down — resuming in a moment…', unavailable: 'Online play is not switched on on the server yet' },
-  ru: { offline: 'Нет связи. Пробуем снова…', reconnecting: 'Переподключаемся…', hostAway: 'Ведущий потерял связь — ждём {s} с', playerAway: '{names}: нет связи — ждём', desync: 'Рассинхрон — исправляем…', signIn: 'Чтобы играть онлайн, войдите в аккаунт', busy: 'Сервер просит подождать — продолжим через пару секунд…', unavailable: 'Онлайн-игра ещё не включена на сервере' },
-  pt: { offline: 'Sem conexão. Tentando de novo…', reconnecting: 'Reconectando…', hostAway: 'O anfitrião perdeu a conexão — aguardando {s} s', playerAway: '{names} perdeu a conexão — aguardando', desync: 'Fora de sincronia — corrigindo…', signIn: 'Entre na sua conta para jogar online', busy: 'O servidor pediu para esperar — continuamos em instantes…', unavailable: 'O jogo online ainda não está ativado no servidor' },
+  en: { offline: 'No connection. Trying again…', reconnecting: 'Reconnecting…', hostAway: 'The host lost connection — waiting {s} s', playerAway: '{names} lost connection — waiting', desync: 'Out of sync — fixing it…', signIn: 'Sign in to play online', busy: 'The server asked us to slow down — resuming in a moment…', unavailable: 'Online play is not switched on on the server yet', full: 'This room is full — open a new one' },
+  ru: { offline: 'Нет связи. Пробуем снова…', reconnecting: 'Переподключаемся…', hostAway: 'Ведущий потерял связь — ждём {s} с', playerAway: '{names}: нет связи — ждём', desync: 'Рассинхрон — исправляем…', signIn: 'Чтобы играть онлайн, войдите в аккаунт', busy: 'Сервер просит подождать — продолжим через пару секунд…', unavailable: 'Онлайн-игра ещё не включена на сервере', full: 'Комната заполнена — откройте новую' },
+  pt: { offline: 'Sem conexão. Tentando de novo…', reconnecting: 'Reconectando…', hostAway: 'O anfitrião perdeu a conexão — aguardando {s} s', playerAway: '{names} perdeu a conexão — aguardando', desync: 'Fora de sincronia — corrigindo…', signIn: 'Entre na sua conta para jogar online', busy: 'O servidor pediu para esperar — continuamos em instantes…', unavailable: 'O jogo online ainda não está ativado no servidor', full: 'Esta sala está cheia — abra uma nova' },
 } as const satisfies Record<string, NetStatusLabels>;
 
 export function describeNetStatus(st: NetStatus, L: NetStatusLabels): string {
@@ -22,6 +22,7 @@ export function describeNetStatus(st: NetStatus, L: NetStatusLabels): string {
     case 'sign-in': return L.signIn;
     case 'busy': return L.busy;
     case 'unavailable': return L.unavailable;
+    case 'full': return L.full ?? NET_STATUS_LABELS.en.full!;
   }
 }
 

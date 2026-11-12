@@ -17,7 +17,7 @@ export interface MemoryHubOptions {
   privateEntries?: boolean;
 }
 
-interface Sub { user: string; room: string; cursor: number; onEntries: ConnectOptions['onEntries']; alive: boolean; lastDue: number }
+interface Sub { user: string; room: string; cursor: number; onEntries: ConnectOptions['onEntries']; onStatus?: ConnectOptions['onStatus']; alive: boolean; lastDue: number }
 interface Job { due: number; order: number; run: () => void }
 
 export interface MemoryHub {
@@ -103,7 +103,7 @@ export function memoryHub(o: MemoryHubOptions = {}): MemoryHub {
         caps: { privateEntries: priv, kind: 'memory' },
         async connect(room, opts): Promise<Link> {
           if (blocked.has(user)) throw new Error('memoryHub: connection refused');
-          const sub: Sub = { user, room, cursor: opts.afterSeq, onEntries: opts.onEntries, alive: true, lastDue: 0 };
+          const sub: Sub = { user, room, cursor: opts.afterSeq, onEntries: opts.onEntries, ...(opts.onStatus ? { onStatus: opts.onStatus } : {}), alive: true, lastDue: 0 };
           let upDue = 0; // uplink FIFO: jitter never reorders one client's own entries
           subs.add(sub);
           deliver(sub); // backlog for late joiners / reconnects
@@ -133,7 +133,8 @@ export function memoryHub(o: MemoryHubOptions = {}): MemoryHub {
     settle(stepMs = 16, maxMs = 120_000) {
       for (let t = 0; t < maxMs && jobs.length; t += stepMs) hub.advance(stepMs);
     },
-    disconnect(user) { for (const s of [...subs]) if (s.user === user) { s.alive = false; subs.delete(s); } },
+    // like a dropped socket (wss onclose): the client is told, so a silent one (a spectator sends nothing) reconnects too
+    disconnect(user) { for (const s of [...subs]) if (s.user === user) { s.alive = false; subs.delete(s); const st = s.onStatus; if (st) schedule(now(), () => st('offline', 'memoryHub: disconnected')); } },
     block(user) { blocked.add(user); hub.disconnect(user); },
     allow(user) { blocked.delete(user); },
     log: (room) => logs.get(room) ?? [],

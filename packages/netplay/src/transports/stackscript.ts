@@ -24,6 +24,19 @@ export interface StackscriptRoomOptions extends PollingOptions {
   exportPrefix: string;
   /** 'live' (default) or a pinned version / 'staging'. */
   version?: string;
+  /** `RETRY` (the room doc changed under our CAS: another player appended at the same moment) is repeated this many times. Default 4. */
+  conflictRetries?: number;
+  /** Base of the jittered backoff between conflict retries (ms): attempt n waits base·2^n · (0.5…1.5). Default 25. */
+  conflictBackoffMs?: number;
+  /** Test hook: wait `ms` (default setTimeout). */
+  sleep?: (ms: number) => Promise<void>;
+  /** Test hook: random in [0, 1) for the jitter (default Math.random). */
+  random?: () => number;
+}
+
+/** Jittered backoff before conflict retry `attempt` (0-based): base·2^attempt scaled by 0.5…1.5, so clashing clients spread out. */
+export function conflictDelayMs(attempt: number, baseMs: number, rnd: number): number {
+  return Math.round(baseMs * 2 ** Math.min(attempt, 5) * (0.5 + rnd));
 }
 
 /** Same unwrap rules as `getStackscriptRunValue` in @agentstack/sdk (value | data.value | the object). */
@@ -51,13 +64,21 @@ const toEntries = (r: Record<string, unknown>): Entry[] =>
   }));
 
 export function stackscriptRoomApi(runner: ScriptRunner, o: StackscriptRoomOptions): RoomApi & QueueApi {
+  const retries = Math.max(0, o.conflictRetries ?? 4);
+  const base = Math.max(0, o.conflictBackoffMs ?? 25);
+  const sleep = o.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const rnd = o.random ?? Math.random;
   const call = async (name: string, input: Record<string, unknown>, key?: string): Promise<Record<string, unknown>> => {
     for (let attempt = 0; ; attempt++) {
       try {
-        return check(await runner.run({ script_id: o.scriptId, export: `${o.exportPrefix}.${name}`, input, version: o.version ?? 'live', ...(key ? { idempotency_key: key } : {}) }), name);
+        // a fresh idempotency key per attempt: RETRY means nothing was committed, and a platform that caches
+        // replies by key must not hand the same RETRY back for the repeat
+        const k = key ? (attempt ? `${key}~r${attempt}` : key) : undefined;
+        return check(await runner.run({ script_id: o.scriptId, export: `${o.exportPrefix}.${name}`, input, version: o.version ?? 'live', ...(k ? { idempotency_key: k } : {}) }), name);
       } catch (err) {
-        // RETRY = the room doc changed under our CAS (another player appended at the same moment): safe to repeat
-        if (!(err instanceof NetplayError && err.code === 'RETRY') || attempt >= 3) throw err;
+        // RETRY = the room doc changed under our CAS (another player appended at the same moment): safe to repeat after a jittered pause
+        if (!(err instanceof NetplayError && err.code === 'RETRY') || attempt >= retries) throw err;
+        await sleep(conflictDelayMs(attempt, base, rnd()));
       }
     }
   };
@@ -91,7 +112,7 @@ export function stackscriptRoomApi(runner: ScriptRunner, o: StackscriptRoomOptio
   };
 }
 
-/** Defaults for the hosted room: inputs batched every 100 ms, entries piggybacked on appends, poll 400 ms stretching to 1.2 s in a quiet room. */
+/** Defaults for the hosted room: inputs batched every 100 ms, entries piggybacked on appends, poll 400 ms stretching to 2 s in a quiet room (presence beats and hash checks do not count as activity). */
 export function stackscriptTransport(runner: ScriptRunner, o: StackscriptRoomOptions): Transport {
-  return pollingTransport(stackscriptRoomApi(runner, o), { sendEveryMs: 100, idleMaxMs: 1200, ...o });
+  return pollingTransport(stackscriptRoomApi(runner, o), { sendEveryMs: 100, idleMaxMs: 2000, ...o });
 }

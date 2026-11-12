@@ -41,6 +41,9 @@ export function backoffMs(attempt: number, baseMs: number, capMs: number): numbe
   return Math.min(capMs, baseMs * 2 ** Math.min(Math.max(attempt, 0), 6));
 }
 
+/** Entries that mean something happened (a move, a join, a vote…), as opposed to presence beats and hash checks. */
+const active = (e: { body: Body }): boolean => { const k = (e.body as { k?: string } | null)?.k; return k !== 'clock' && k !== 'hash'; };
+
 export function pollingTransport(api: RoomApi, o: PollingOptions = {}): Transport {
   const interval = o.intervalMs ?? 400;
   const cap = o.maxBackoffMs ?? 5000;
@@ -63,17 +66,20 @@ export function pollingTransport(api: RoomApi, o: PollingOptions = {}): Transpor
       // after a failed append nothing later may reach the server first (the session re-sends from the failure, in order)
       let broken = false;
       let period = interval;
+      let floor = 0; // background tab: poll no faster than this (Link.pace)
       const deliver = (es: readonly Entry[]): void => {
         const fresh = es.filter((e) => e.seq > cursor);
         if (!fresh.length) return;
-        period = interval;
+        // heartbeats / hash checks are not activity: a room where both players think keeps stretching its poll
+        if (fresh.some(active)) period = interval;
         cursor = fresh[fresh.length - 1]!.seq;
         opts.onEntries(fresh);
       };
       // a timer poll is skipped while piggybacked reads (appendRead) keep us fresh anyway
       const timed = (): void => {
         const fresh = Date.now() - lastReadAt;
-        if (alive && !errors && !rateHits && fresh < period) { timer = setTimeout(timed, period - fresh); return; }
+        const p = Math.max(period, floor);
+        if (alive && !errors && !rateHits && fresh < p) { timer = setTimeout(timed, p - fresh); return; }
         void tick();
       };
       const tick = async (): Promise<void> => {
@@ -91,8 +97,8 @@ export function pollingTransport(api: RoomApi, o: PollingOptions = {}): Transpor
           opts.onStatus?.('online');
         } catch (err) {
           const kind = err instanceof NetplayError ? err.kind : 'offline';
-          if (kind === 'auth' || kind === 'not-published') {
-            // retrying fast cannot help (guest / script missing): report and let the session retry slowly
+          if (kind === 'auth' || kind === 'not-published' || kind === 'full') {
+            // retrying fast cannot help (guest / script missing / room full): report and let the session retry slowly
             opts.onStatus?.('offline', kind);
             link.close();
             return;
@@ -111,7 +117,7 @@ export function pollingTransport(api: RoomApi, o: PollingOptions = {}): Transpor
         }
         if (!alive) return;
         if (timer) clearTimeout(timer);
-        const wait = rateWaitMs || (again ? 0 : errors ? backoffMs(errors, interval, cap) : period);
+        const wait = rateWaitMs || (again ? 0 : errors ? backoffMs(errors, interval, cap) : Math.max(period, floor));
         rateWaitMs = 0;
         timer = setTimeout(timed, wait);
         again = false;
@@ -120,10 +126,15 @@ export function pollingTransport(api: RoomApi, o: PollingOptions = {}): Transpor
         self,
         send(body, to) { return enqueue([to ? { body, to } : { body }]); },
         ...(api.appendRead ? { sendMany: (items: readonly { body: Body; to?: string }[]) => enqueue(items) } : {}),
+        pace(ms) {
+          const was = floor;
+          floor = ms && ms > 0 ? ms : 0;
+          if (!floor && was && alive && !inflight) { if (timer) clearTimeout(timer); void tick(); } // back: catch up at once
+        },
         close() { alive = false; if (timer) clearTimeout(timer); },
       };
       const enqueue = (items: readonly { body: Body; to?: string }[]): Promise<void> => {
-          period = interval; // we are active: look for answers at the normal pace
+          if (items.some((it) => active(it))) period = interval; // we are active: look for answers at the normal pace
           if (!alive || broken) return Promise.reject(new Error('polling: link closed'));
           // serialize appends so the server sees them in call order
           const p = chain.then(async () => {
