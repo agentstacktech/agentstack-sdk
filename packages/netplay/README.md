@@ -78,7 +78,7 @@ same test can go through the real referee.
 - **Lobby & seats** — join order = seat order; `min`/`max` seats; `ready()`; spectators (`spectate: true`).
 - **Timeouts** — `presenceMs` (silent seat → away, `forfeit` ends a 2-seat match), lockstep `turnMs`, heartbeats.
 - **Rematch** — `rematch()` votes; new seed per match (`match` counter in every entry).
-- **Reconnect** — transports resume from the last seq; duplicates are ignored by the reducer.
+- **Reconnect & exactly-once** — transports resume from the last seq; every body carries the sender counter `n`, so a retried append whose first copy landed is applied once.
 - **Desync detection** — state hashes every `hashEvery` ticks (`hash` default: canonical FNV); `snapshot.desync`.
 - **Determinism tools** — `ctx.rng` (sfc32, derived per tick), `deriveSeed`, `seedFromString`, `hashState`.
 - **Anti-cheat** — every client re-runs `input()` validation; `secret` lockstep hides inputs until all committed; `authority` keeps hidden info on one machine and sends private views (needs a transport with private entries).

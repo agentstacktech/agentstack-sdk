@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createSession, generateRoomScript, pollingTransport, stackscriptRoomApi, wssTransport, type Entry, type RoomApi } from '../src/index.js';
+import { createSession, defineGame, generateRoomScript, pollingTransport, stackscriptRoomApi, wssTransport, type Entry, type RoomApi } from '../src/index.js';
 import { loadRoomScript, microtasks, scriptServer, ScriptError } from '../src/testing/index.js';
 import { ticTacToe } from '../examples/tic-tac-toe.js';
 
@@ -158,5 +158,54 @@ describe('wssTransport', () => {
     expect(JSON.parse(sent[1]!)).toEqual({ op: 'append', body: { k: 'ready' }, to: 'u1' });
     FakeWs.last.close();
     expect(states).toContain('offline');
+  });
+});
+
+describe('exactly-once appends over a flaky wire', () => {
+  /** In-memory log API whose append can "lose the response" (stored on the server, error to the client). */
+  function flakyApi() {
+    const log: Entry[] = [];
+    let seq = 0;
+    const plan: ('ok' | 'lost' | 'fail')[] = [];
+    const api: RoomApi & { log: Entry[]; plan: typeof plan } = {
+      privateEntries: true, log, plan,
+      async join() { return { self: 'me' }; },
+      async append(_room, body) {
+        const mode = plan.shift() ?? 'ok';
+        if (mode === 'fail') throw new Error('network');
+        log.push({ seq: ++seq, from: 'me', t: seq * 10, body: JSON.parse(JSON.stringify(body)) });
+        if (mode === 'lost') throw new Error('response lost');
+      },
+      async poll(_room, after) { return log.filter((e) => e.seq > after); },
+    };
+    return api;
+  }
+
+  it('a re-sent command whose first append actually landed is applied once', async () => {
+    const counter = defineGame<{ n: number }, number>({ id: 'cnt', version: 1, seats: { min: 1, max: 2 }, mode: 'fold',
+      setup: () => ({ n: 0 }), input: (r) => (r === 1 ? 1 : undefined), apply: (s) => { s.n += 1; } });
+    const api = flakyApi();
+    let now = 0;
+    const s = createSession(counter, { transport: pollingTransport(api, { intervalMs: 50 }), room: 'r', now: () => now });
+    await s.join(); s.ready();
+    for (let i = 0; i < 20; i++) { await microtasks(); now += 100; s.update(); }
+    expect(s.snapshot.phase).toBe('playing');
+    api.plan.push('lost'); // stored, but the client sees an error and re-sends
+    s.input(1);
+    for (let i = 0; i < 40; i++) { await microtasks(); now += 300; s.update(); await new Promise((r) => setTimeout(r, 1)); }
+    expect(api.log.filter((e) => e.body.k === 'cmd').length).toBe(2); // the wire carried it twice…
+    expect(s.snapshot.state).toEqual({ n: 1 });                       // …the room applied it once
+  });
+
+  it('after a failed append, later appends of that link never overtake it', async () => {
+    const api = flakyApi();
+    const link = await pollingTransport(api, { intervalMs: 1000 }).connect('r', { afterSeq: 0, onEntries: () => {} });
+    api.plan.push('fail');
+    const a = link.send({ k: 'clock', n: 1 });
+    const b = link.send({ k: 'clock', n: 2 });
+    await expect(a).rejects.toThrow();
+    await expect(b).rejects.toThrow();
+    expect(api.log.length).toBe(0);
+    link.close();
   });
 });

@@ -47,6 +47,8 @@ export function pollingTransport(api: RoomApi, o: PollingOptions = {}): Transpor
       let inflight = false;
       let again = false;
       let chain: Promise<unknown> = Promise.resolve();
+      // after a failed append nothing later may reach the server first (the session re-sends from the failure, in order)
+      let broken = false;
       const tick = async (): Promise<void> => {
         if (!alive) return;
         if (inflight) { again = true; return; }
@@ -75,10 +77,13 @@ export function pollingTransport(api: RoomApi, o: PollingOptions = {}): Transpor
       const link: Link = {
         self,
         send(body, to) {
-          if (!alive) return Promise.reject(new Error('polling: link closed'));
+          if (!alive || broken) return Promise.reject(new Error('polling: link closed'));
           // serialize appends so the server sees them in call order
-          const p = chain.then(() => api.append(room, body, to));
-          chain = p.catch(() => {});
+          const p = chain.then(() => {
+            if (broken) throw new Error('polling: earlier append failed');
+            return api.append(room, body, to);
+          });
+          chain = p.catch(() => { broken = true; });
           return p.then(() => { if (o.pollAfterSend ?? true) void tick(); });
         },
         close() { alive = false; if (timer) clearTimeout(timer); },

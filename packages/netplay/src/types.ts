@@ -119,8 +119,13 @@ export interface Entry<B = Body> {
   readonly body: B;
 }
 
-/** Wire bodies. Short keys keep polling payloads small. `m` = match number (rematch counter). */
-export type Body =
+/**
+ * Wire bodies. Short keys keep polling payloads small. `m` = match number (rematch counter).
+ * `n` = the sender's own entry counter (set by Session): the reducer drops an entry whose `n` is not
+ * above the last one seen from that sender, so a re-sent append (lost response, retry) never applies twice.
+ */
+export type Body = BodyKind & { n?: number };
+type BodyKind =
   | { k: 'hello'; g: string; v: number; name?: string; spectate?: boolean; params?: Record<string, unknown> }
   | { k: 'ready' }
   | { k: 'in'; m: number; t: number; d: unknown[]; salt?: string }

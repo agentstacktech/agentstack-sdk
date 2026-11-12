@@ -45,6 +45,8 @@ export interface RoomModel<S, I, V = S> {
   rematch: Set<Seat>;
   notice: string | null;
   lastSeq: number;
+  /** Highest entry counter `n` seen per sender (duplicate suppression). */
+  lastN: Map<string, number>;
   /** lockstep input buffer: tick → per-seat input (undefined = not received). */
   inputs: Map<number, (I | undefined)[]>;
   /** secret lockstep: tick whose commit window closed on the turn timer (-1 = none), and when. */
@@ -67,7 +69,7 @@ export function createRoom<S, I, V>(game: Game<S, I, V>, room: string, opts: Roo
     simulate: opts.simulate ?? true,
     secretSeed: opts.secretSeed ?? null,
     params: {}, players: [], spectators: new Set(), phase: 'lobby', match: 0, seed: 0, seats: 0,
-    state: null, tick: 0, now: 0, tickStartT: 0, outcome: null, desync: null, rematch: new Set(), notice: null, lastSeq: 0,
+    state: null, tick: 0, now: 0, tickStartT: 0, outcome: null, desync: null, rematch: new Set(), notice: null, lastSeq: 0, lastN: new Map(),
     inputs: new Map(), commits: new Map(), hashes: new Map(), onStep: null, closedTick: -1, closedAt: 0, history: new Map(),
   };
 }
@@ -217,6 +219,10 @@ export function reduceRoom<S, I, V>(m: RoomModel<S, I, V>, e: Entry): void {
   sweepTime(m);
   const b = e.body as Body;
   if (!b || typeof b !== 'object' || typeof (b as { k?: unknown }).k !== 'string') { m.notice = `bad entry ${e.seq}`; return; }
+  if (typeof b.n === 'number') {
+    if (b.n <= (m.lastN.get(e.from) ?? 0)) return; // the same append delivered twice (client retry)
+    m.lastN.set(e.from, b.n);
+  }
   switch (b.k) {
     case 'hello': {
       if (b.g !== g.id || b.v !== g.version) { m.notice = `version mismatch from ${e.from}: ${b.g}@${b.v}`; return; }

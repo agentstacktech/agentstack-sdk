@@ -65,10 +65,14 @@ export class Session<S, I, V = S> {
   private retryAt = 0;
   private retries = 0;
   private readonly now: () => number;
+  /** Counter stamped into every outgoing body (`n`); resumes from the log after a reload. */
+  private sendN: number;
 
   constructor(game: Game<S, I, V>, readonly opts: SessionOptions) {
     this.game = game;
     this.now = opts.now ?? (() => Date.now());
+    // time-based start keeps the counter monotonic across reloads even before our old entries arrive
+    this.sendN = Math.max(0, Math.floor(this.now())) * 1000;
     this.model = createRoom(game, opts.room, { simulate: game.mode !== 'authority' });
     this.model.onStep = (tick) => this.handleStep(tick);
     if (game.mode === 'authority' && !opts.transport.caps.privateEntries && !opts.allowPublicViews)
@@ -226,11 +230,12 @@ export class Session<S, I, V = S> {
   }
 
   private push(body: Body, to?: string): void {
-    this.outbox.push(to ? { body, to } : { body });
+    const stamped = { ...body, n: ++this.sendN } as Body;
+    this.outbox.push(to ? { body: stamped, to } : { body: stamped });
   }
   private flushBatch(): void {
     if (!this.batch) return;
-    this.outbox.push({ body: { k: 'in', m: this.model.match, t: this.batch.t, d: this.batch.d } });
+    this.outbox.push({ body: { k: 'in', m: this.model.match, t: this.batch.t, d: this.batch.d, n: ++this.sendN } });
     this.batch = null;
   }
 
@@ -267,6 +272,7 @@ export class Session<S, I, V = S> {
     const before = m.lastSeq;
     for (const e of es) {
       if (e.seq <= m.lastSeq) continue;
+      if (e.from === this.self && typeof (e.body as Body)?.n === 'number') this.sendN = Math.max(this.sendN, (e.body as Body).n!); // reload: continue our counter
       if (this.game.mode === 'authority') m.simulate = m.players.length === 0 ? true : m.players[0]!.id === this.self;
       const prevMatch = m.match;
       if (e.body && (e.body as Body).k === 'view') this.takeView(e);
