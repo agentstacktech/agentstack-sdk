@@ -30,6 +30,10 @@ describe('matchBar (presenter)', () => {
   it('local seats (same screen) are «you» too, and never «asked for a rematch»', () => {
     const s = base({ seats: [0, 1], players: [{ id: 'a', seat: 0, name: 'Аня', status: 'on', ready: false, lastT: 0 }, { id: 'a~1', owner: 'a', local: 1, seat: 1, name: 'Бия', status: 'on', ready: false, lastT: 0 }, { id: 'c', seat: 2, name: 'Caio', status: 'on', ready: false, lastT: 0 }] });
     expect(matchBar(s, ru).players.map((p) => p.you)).toEqual([true, true, false]);
+    // a local seat that left mid-match (leaveLocal) is no longer «you»
+    const gone = base({ seats: [0, 1], players: s.players.map((p) => (p.id === 'a~1' ? { ...p, status: 'left' as const } : p)) });
+    const m = matchBar(gone, ru).players[1]!;
+    expect([m.you, m.status]).toEqual([false, 'вышел']);
   });
 
   it('end: win / lose / spectator «Победа: имя», rematch votes, the ask, blocked when someone left, series', () => {

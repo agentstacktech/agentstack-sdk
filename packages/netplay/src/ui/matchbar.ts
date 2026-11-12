@@ -98,7 +98,8 @@ export function matchBar(s: Snap, o: MatchBarOptions = {}): MatchBarModel {
   const L: MatchBarLabels = { ...en, ...o.labels };
   const spectator = s.seat < 0;
   const over = s.phase === 'over';
-  const ours = (p: { id: string; owner?: string }) => p.id === s.self || (!!p.owner && p.owner === s.self); // local seats are «you» too
+  // local seats are «you» too — until that player leaves mid-match («Бия вышел», not «Бия (вы) вышел»)
+  const ours = (p: { id: string; owner?: string; status?: string }) => p.id === s.self || (!!p.owner && p.owner === s.self && p.status !== 'left');
   const players = s.players.map((p) => {
     const d = p.status === 'on' && s.phase === 'playing' ? o.done?.(p.seat, s) : undefined;
     const race = o.pace === 'race';
