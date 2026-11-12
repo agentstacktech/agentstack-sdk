@@ -602,6 +602,7 @@ export class Session<S, I, V = S> {
       this.nextTick = delay;
     }
     this.reveals.clear();
+    this.sentReveals.clear();
     this.committed.clear();
     this.lastView = null;
     this.localViews.clear();
@@ -609,16 +610,21 @@ export class Session<S, I, V = S> {
     this.viewsKey = '';
   }
 
+  /** Ticks whose reveal this tab already queued (so a restore from secretStore does not queue it again). */
+  private sentReveals = new Set<number>();
+  /** Tick of the reveal kept in secretStore (cleared once the room moved past it, not when it was merely queued). */
+  private storedRevealT = -1;
   private get revealKey(): string { return `netplay:reveal:${this.game.id}:${this.opts.room}`; }
   private storeReveal(r: { m: number; t: number; d: unknown[]; salt: string } | null): void {
     const st = this.opts.secretStore;
     if (!st) return;
+    this.storedRevealT = r ? r.t : -1;
     try { if (r) st.setItem(this.revealKey, JSON.stringify(r)); else st.removeItem(this.revealKey); } catch { /* storage full / blocked: reveal from memory only */ }
   }
   /** After a reload: our commit for this tick is in the log but the move is not in memory → take it from `secretStore` if it matches. */
   private restoreReveal(): void {
     const m = this.model, st = this.opts.secretStore, seat = this.seat;
-    if (!st || seat < 0 || m.phase !== 'playing' || this.reveals.has(m.tick)) return;
+    if (!st || seat < 0 || m.phase !== 'playing' || this.reveals.has(m.tick) || this.sentReveals.has(m.tick)) return;
     const c = m.commits.get(m.tick)?.[seat];
     if (c === undefined || m.inputs.get(m.tick)?.[seat] !== undefined) return;
     let r: { m: number; t: number; d: unknown[]; salt: string } | null = null;
@@ -626,18 +632,22 @@ export class Session<S, I, V = S> {
     if (!r || r.m !== m.match || r.t !== m.tick || !Array.isArray(r.d) || commitHash(r.d, String(r.salt)) !== c) return;
     this.committed.add(r.t);
     this.reveals.set(r.t, { d: r.d, salt: String(r.salt) });
+    this.storedRevealT = r.t; // cleared once the room moves past it
   }
 
   private revealReady(): void {
     const m = this.model;
     if (!this.game.secret) return;
+    if (this.storedRevealT >= 0 && this.storedRevealT < m.tick) this.storeReveal(null); // the room resolved it: done
     this.restoreReveal();
     for (const [t, r] of this.reveals) {
       if (t < m.tick) { this.reveals.delete(t); continue; }
       const row = m.commits.get(t) ?? [];
       const absent = m.players.map((p) => p.status !== 'on');
       const all = m.closedTick === t || m.players.every((p) => absent[p.seat] || row[p.seat] !== undefined);
-      if (all) { this.push({ k: 'in', m: m.match, t, d: r.d, salt: r.salt }); this.reveals.delete(t); this.storeReveal(null); }
+      // the stored copy stays until the room moves on: a reveal queued but never sent (link down, then a reload) was lost
+      // and the turn hung until the clock ran out twice
+      if (all) { this.push({ k: 'in', m: m.match, t, d: r.d, salt: r.salt }); this.reveals.delete(t); this.sentReveals.add(t); }
     }
   }
 

@@ -34,3 +34,34 @@ describe('pass 3 regressions', () => {
     expect(s.snapshot.state).toEqual(t.clients[0]!.snapshot.state);
   });
 });
+
+describe('secret reveal survives a reload while its send was failing', () => {
+  it('reveal queued, link down, reload → the new tab reveals from secretStore at once (was: lost, the turn waited for the clock)', async () => {
+    const { defineGame, memoryHub } = await import('../src/index.js');
+    const { microtasks } = await import('../src/testing/index.js');
+    const g = defineGame<{ r: number[] }, number>({
+      id: 'p3-secret', version: 1, seats: { min: 2, max: 2 }, mode: 'lockstep', secret: true,
+      setup: () => ({ r: [] }), input: (v) => (v === 1 || v === 2 ? v : undefined), idle: 0, step: (s, [a, b]) => { s.r.push(a! * 10 + b!); },
+      timeouts: { turnMs: 60_000 },
+    });
+    const hub = memoryHub({ manual: true, latencyMs: 20 });
+    const m = new Map<string, string>();
+    const store = { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) };
+    let failA = false;
+    const base = hub.transport('a');
+    const flaky = { ...base, connect: async (room: string, o: Parameters<typeof base.connect>[1]) => { const l = await base.connect(room, o); return { ...l, send: (b: never, to?: string) => (failA ? Promise.reject(new Error('down')) : l.send(b, to)) }; } };
+    const A = createSession(g, { transport: flaky, room: 'r', name: 'a', now: () => hub.now, secretStore: store });
+    const B = createSession(g, { transport: hub.transport('b'), room: 'r', name: 'b', now: () => hub.now });
+    const run = async (ms: number, ss = [A, B]) => { for (let e = 0; e < ms; e += 16) { ss.forEach((s) => s.update()); hub.advance(16); await microtasks(); } };
+    await A.join(); await run(32); await B.join(); await run(32); A.ready(); B.ready(); await run(300);
+    expect(A.snapshot.phase).toBe('playing');
+    A.input(1); await run(200);
+    failA = true; // A's sends start failing (entries still arrive)
+    B.input(2); await run(300); // A sees both commits, queues its reveal — it cannot go out
+    A.close(); // reload
+    const A2 = createSession(g, { transport: hub.transport('a'), room: 'r', name: 'a', now: () => hub.now, secretStore: store });
+    await A2.join();
+    await run(2000, [A2, B]);
+    expect(B.snapshot.state!.r).toEqual([12]);
+  });
+});
