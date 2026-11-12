@@ -22,6 +22,8 @@ export interface FakeHostedOptions {
   retryAfterMs?: number;
   /** false = /s/{pid}/mcp only trusts the hosted_app cookie (Bearer only mints it). Default true. */
   mcpAcceptsBearer?: boolean;
+  /** Network round trip per request (ms; half before the script runs, half after). Default 0. */
+  latencyMs?: number;
 }
 
 export interface FakeHostedStats {
@@ -60,7 +62,15 @@ export function fakeHostedMcp(rt: ScriptRuntime, o: FakeHostedOptions) {
     return cookies.get(h.get('cookie') ?? '') ?? null;
   };
 
+  const half = (o.latencyMs ?? 0) / 2;
+  const wire = (): Promise<void> => (half > 0 ? new Promise((r) => setTimeout(r, half)) : Promise.resolve());
   const fetch = async (input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> => {
+    await wire();
+    const r = serve(input, init);
+    await wire();
+    return r;
+  };
+  const serve = (input: RequestInfo | URL, init: RequestInit): Response => {
     const url = new URL(String(input), 'http://fake.local');
     const h = new Headers(init.headers);
     if (init.method !== 'POST') return reply(405, { detail: 'method not allowed' });

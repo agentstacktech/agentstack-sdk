@@ -202,6 +202,8 @@ export interface Link {
    * the transport MUST keep call order (queue internally if the wire is async).
    */
   send(body: Body, to?: string): Promise<void>;
+  /** Optional: several bodies in one request, same ordering rules (HTTP transports — request budget). */
+  sendMany?(items: readonly { body: Body; to?: string }[]): Promise<void>;
   close(): void;
 }
 
@@ -210,6 +212,8 @@ export interface TransportCaps {
   readonly privateEntries: boolean;
   /** Human label for logs: 'memory', 'polling', 'stackscript', 'wss'. */
   readonly kind: string;
+  /** Hint: send queued inputs at most this often (ms) — request budget of HTTP transports. Session option `sendEveryMs` overrides. */
+  readonly sendEveryMs?: number;
 }
 
 /**

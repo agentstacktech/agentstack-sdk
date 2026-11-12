@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createSession, generateRoomScript, hostedMcpRunner, netStatus, NetplayError, stackscriptRoomApi, stackscriptTransport, unwrapHostedReply, errorKind } from '../src/index.js';
+import { createSession, generateRoomScript, hostedMcpRunner, netStatus, NetplayError, pollingTransport, stackscriptRoomApi, stackscriptTransport, unwrapHostedReply, errorKind } from '../src/index.js';
 import { fakeHostedMcp, loadRoomScript } from '../src/testing/index.js';
 import { ticTacToe } from '../examples/tic-tac-toe.js';
+import { tugOfWar } from '../examples/tug-of-war.js';
 
 const PID = 2052;
 const SCRIPT = 'ttt-room';
@@ -107,6 +108,15 @@ describe('net=as: hostedMcpRunner + stackscriptTransport against the fake', () =
     S.leave();
   });
 
+  it('RETRY (room CAS race) is repeated transparently, other script errors are not', async () => {
+    let n = 0;
+    const runner = { async run() { n++; return n === 1 ? { ok: true, data: { value: { error: 'RETRY' } } } : { ok: true, data: { value: { self: 'me', seq: 0 } } }; } };
+    expect(await stackscriptRoomApi(runner, { scriptId: 's', exportPrefix: 'p' }).join('r')).toEqual({ self: 'me' });
+    expect(n).toBe(2);
+    const full = { async run() { return { ok: true, data: { value: { error: 'ROOM_FULL' } } }; } };
+    await expect(stackscriptRoomApi(full, { scriptId: 's', exportPrefix: 'p' }).join('r')).rejects.toMatchObject({ kind: 'server', code: 'ROOM_FULL' });
+  });
+
   it('a replayed idempotency key does not append twice', async () => {
     const fake = setup();
     const f = fake.browser('alice');
@@ -117,4 +127,46 @@ describe('net=as: hostedMcpRunner + stackscriptTransport against the fake', () =
     await runner.run(p); await runner.run(p);
     expect(await api.poll('r', 0)).toHaveLength(1);
   });
+});
+
+describe('request budget for realtime lockstep over hosted HTTP', () => {
+  afterEach(() => vi.useRealTimers());
+  const play = async (mode: 'legacy' | 'batched', rtt: number) => {
+    vi.useFakeTimers();
+    const rt = loadRoomScript(generateRoomScript(tugOfWar, { ratePer10s: 400 }));
+    const fake = fakeHostedMcp(rt, { projectId: PID, scriptId: 'tug', latencyMs: rtt });
+    const mk = (u: string) => {
+      const runner = hostedMcpRunner({ projectId: PID, fetch: fake.browser(u) });
+      const o = { scriptId: 'tug', exportPrefix: 'tug-of-war' };
+      // legacy = round-4 behaviour: append every frame + a poll after each append
+      const tr = mode === 'legacy' ? pollingTransport({ ...stackscriptRoomApi(runner, o), appendRead: undefined }, {}) : stackscriptTransport(runner, o);
+      return createSession(tugOfWar, { transport: tr, room: 'rt', inputDelay: 12, maxAhead: 30 });
+    };
+    const A = mk('a'); const B = mk('b');
+    const joined = Promise.all([A.join(), B.join()]);
+    await vi.advanceTimersByTimeAsync(500); await joined;
+    A.ready(); B.ready();
+    let frames = 0; let ran = 0;
+    const loop = setInterval(() => { frames++; for (const s of [A, B]) { if (s.input(0)) ran++; /* idle rope: the match never ends, the whole window is steady play */ s.update(); } }, 33);
+    await vi.advanceTimersByTimeAsync(2000);
+    fake.stats.reset(); frames = 0; ran = 0;
+    await vi.advanceTimersByTimeAsync(10_000);
+    clearInterval(loop);
+    const res = { reqPerSec: fake.stats.byUser.a! / 10, appendCallsPer10s: fake.stats.byExport['tug-of-war.room.append']! / 2, flow: ran / (frames * 2), rateRejected: fake.stats.rejected.rate, desync: A.snapshot.desync ?? B.snapshot.desync };
+    A.leave(); B.leave();
+    return res;
+  };
+  it('batching every 100 ms + piggybacked reads cut requests ~5× and keep the room under its rate', async () => {
+    const r: Record<string, Awaited<ReturnType<typeof play>>> = {};
+    for (const rtt of [40, 150]) for (const m of ['legacy', 'batched'] as const) r[`${m}@${rtt}ms`] = await play(m, rtt);
+    // eslint-disable-next-line no-console
+    console.log('tug-of-war, 30 Hz lockstep, per client:', r);
+    expect(r['batched@40ms']!.reqPerSec).toBeLessThan(r['legacy@40ms']!.reqPerSec / 3);
+    for (const k of ['batched@40ms', 'batched@150ms']) {
+      expect(r[k]!.reqPerSec).toBeLessThanOrEqual(10.5);
+      expect(r[k]!.appendCallsPer10s).toBeLessThan(400);
+      expect(r[k]!.flow).toBeGreaterThan(0.95); // an input accepted every frame: no stall
+      expect(r[k]!.desync).toBeNull();
+    }
+  }, 30_000);
 });

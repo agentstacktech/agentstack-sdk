@@ -43,9 +43,24 @@ function check(v: unknown, what: string): Record<string, unknown> {
   return r;
 }
 
+const toEntries = (r: Record<string, unknown>): Entry[] =>
+  (Array.isArray(r.entries) ? (r.entries as Record<string, unknown>[]) : []).map((e): Entry => ({
+    seq: Number(e.seq), from: String(e.from), t: Number(e.t),
+    body: (typeof e.body === 'string' ? JSON.parse(e.body) : e.body) as Body,
+    ...(e.to ? { to: String(e.to) } : {}),
+  }));
+
 export function stackscriptRoomApi(runner: ScriptRunner, o: StackscriptRoomOptions): RoomApi & QueueApi {
-  const call = async (name: string, input: Record<string, unknown>, key?: string): Promise<Record<string, unknown>> =>
-    check(await runner.run({ script_id: o.scriptId, export: `${o.exportPrefix}.${name}`, input, version: o.version ?? 'live', ...(key ? { idempotency_key: key } : {}) }), name);
+  const call = async (name: string, input: Record<string, unknown>, key?: string): Promise<Record<string, unknown>> => {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return check(await runner.run({ script_id: o.scriptId, export: `${o.exportPrefix}.${name}`, input, version: o.version ?? 'live', ...(key ? { idempotency_key: key } : {}) }), name);
+      } catch (err) {
+        // RETRY = the room doc changed under our CAS (another player appended at the same moment): safe to repeat
+        if (!(err instanceof NetplayError && err.code === 'RETRY') || attempt >= 3) throw err;
+      }
+    }
+  };
   let self = '';
   let n = 0;
   const nonce = Math.floor(Math.random() * 1e9).toString(36);
@@ -61,14 +76,13 @@ export function stackscriptRoomApi(runner: ScriptRunner, o: StackscriptRoomOptio
     async append(room, body, to) {
       await call('room.append', { room, body: JSON.stringify(body), to: to ?? '' }, `${room}:${self}:${nonce}:${++n}`);
     },
+    // up to 16 entries + read in one call (generated scripts accept `items` and `after`)
+    async appendRead(room, items, afterSeq) {
+      const list = items.map((it) => ({ body: JSON.stringify(it.body), to: it.to ?? '' }));
+      return toEntries(await call('room.append', { room, items: list, after: afterSeq }, `${room}:${self}:${nonce}:${++n}`));
+    },
     async poll(room, afterSeq) {
-      const r = await call('room.poll', { room, after: afterSeq });
-      const raw = Array.isArray(r.entries) ? (r.entries as Record<string, unknown>[]) : [];
-      return raw.map((e): Entry => ({
-        seq: Number(e.seq), from: String(e.from), t: Number(e.t),
-        body: (typeof e.body === 'string' ? JSON.parse(e.body) : e.body) as Body,
-        ...(e.to ? { to: String(e.to) } : {}),
-      }));
+      return toEntries(await call('room.poll', { room, after: afterSeq }));
     },
     async find(game, seats) {
       const r = await call('lobby.find', { game, seats });
@@ -77,6 +91,7 @@ export function stackscriptRoomApi(runner: ScriptRunner, o: StackscriptRoomOptio
   };
 }
 
+/** Defaults for the hosted room: inputs batched every 100 ms, entries piggybacked on appends, fallback poll 400 ms. */
 export function stackscriptTransport(runner: ScriptRunner, o: StackscriptRoomOptions): Transport {
-  return pollingTransport(stackscriptRoomApi(runner, o), o);
+  return pollingTransport(stackscriptRoomApi(runner, o), { sendEveryMs: 100, ...o });
 }

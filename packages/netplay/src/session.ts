@@ -5,6 +5,7 @@
 import { isIssue, NetplayError, type NetIssue } from './errors.js';
 import type { Game } from './define.js';
 import { commitHash, createRoom, playerById, reduceRoom, type RoomModel } from './room.js';
+type OutItem = { body: Body; to?: string };
 import type { Body, ConnectionState, Entry, Link, Outcome, Seat, Snapshot, Transport } from './types.js';
 
 export interface SessionOptions {
@@ -32,6 +33,8 @@ export interface SessionOptions {
   keepLog?: boolean;
   /** Call update() on this interval (ms). 0 = you call update() yourself (game loop / tests). */
   autoPumpMs?: number;
+  /** Send queued lockstep inputs at most this often (ms); default = transport hint (`stackscriptTransport`: 100), else every update(). */
+  sendEveryMs?: number;
   /** Refold from the log when a desync shows our hash outside the majority (needs keepLog). Default true. */
   autoResync?: boolean;
 }
@@ -57,10 +60,12 @@ export class Session<S, I, V = S> {
   private readonly listeners = new Set<Listener<S, V>>();
   private readonly stepListeners = new Set<(state: S | null, tick: number) => void>();
   private snap: Snapshot<S, V> | null = null;
-  private outbox: { body: Body; to?: string }[] = [];
+  private outbox: OutItem[] = [];
   private batch: { t: number; d: unknown[] } | null = null;
   private nextTick = 0;
   private lastSendAt = -Infinity;
+  /** sends not yet acknowledged by the transport */
+  private sending = 0;
   private reveals = new Map<number, { d: unknown[]; salt: string }>();
   private committed = new Set<number>();
   private lastView: V | null = null;
@@ -253,7 +258,12 @@ export class Session<S, I, V = S> {
     const g = this.game;
     const ticking = g.clockMs > 0 && this.model.phase === 'playing' && this.seat >= 0 && (g.mode !== 'authority' || this.isAuthority);
     const beat = Math.max(250, Math.min(g.presenceMs / 4, g.turnMs > 0 ? g.turnMs / 2 : Infinity, ticking ? g.clockMs : Infinity));
-    if (this.batch || this.outbox.length) this.flush();
+    // HTTP transports: a realtime input batch waits up to sendEveryMs (one request carries several ticks)
+    const every = this.opts.sendEveryMs ?? this.opts.transport.caps.sendEveryMs ?? 0;
+    // …and never while our previous send is still on the wire (Nagle-style): the next request carries everything since
+    const due = now - this.lastSendAt >= every && (every === 0 || this.sending === 0);
+    // hash checks are not urgent: they ride along with the next input batch
+    if (this.outbox.some((o) => o.body.k !== 'hash') || ((this.batch || this.outbox.length) && due)) this.flush();
     else if (this.link && this.model.phase !== 'over' && now - this.lastSendAt >= beat) { this.push({ k: 'clock' }); this.flush(); }
   }
 
@@ -275,28 +285,41 @@ export class Session<S, I, V = S> {
     const items = this.outbox;
     this.outbox = [];
     this.lastSendAt = this.now();
+    if (link.sendMany) {
+      // one request for the whole flush; on failure everything is re-sent (dedup by `n`)
+      this.sending += 1;
+      link.sendMany(items).then(() => { this.sending -= 1; }, (err: unknown) => { this.sending -= 1; this.sendFailed(link, items, 0, err); });
+      return;
+    }
     let failed = false;
     items.forEach((it, i) => {
-      link.send(it.body, it.to).catch((err: unknown) => {
+      this.sending += 1;
+      link.send(it.body, it.to).then(() => { this.sending -= 1; }, (err: unknown) => {
+        this.sending -= 1;
         if (failed) return;
         failed = true;
-        this.outbox.unshift(...items.slice(i));
-        if (this.link !== link) return;
-        link.close();
-        this.link = null;
-        const e = err instanceof NetplayError ? err : null;
-        if (e && isIssue(e.kind)) {
-          // rate: wait what the server asked (≥1 s); auth / not-published: slow retries (15 s) + plain status
-          this.retries += 1;
-          this.setIssue(e.kind);
-          this.retryAt = this.now() + (e.kind === 'rate' ? Math.max(1000, e.retryAfterMs ?? 0) : this.retryDelay());
-          this.setConnection(e.kind === 'rate' ? 'reconnecting' : 'offline');
-        } else {
-          this.retryAt = this.now();
-          this.setConnection('reconnecting');
-        }
+        this.sendFailed(link, items, i, err);
       });
     });
+  }
+
+  /** Re-queue from the failed item (in order) and reconnect; known server reasons get their own wait + status. */
+  private sendFailed(link: Link, items: readonly OutItem[], from: number, err: unknown): void {
+    this.outbox.unshift(...items.slice(from));
+    if (this.link !== link) return;
+    link.close();
+    this.link = null;
+    const e = err instanceof NetplayError ? err : null;
+    if (e && isIssue(e.kind)) {
+      // rate: wait what the server asked (≥1 s); auth / not-published: slow retries (15 s) + plain status
+      this.retries += 1;
+      this.setIssue(e.kind);
+      this.retryAt = this.now() + (e.kind === 'rate' ? Math.max(1000, e.retryAfterMs ?? 0) : this.retryDelay());
+      this.setConnection(e.kind === 'rate' ? 'reconnecting' : 'offline');
+    } else {
+      this.retryAt = this.now();
+      this.setConnection('reconnecting');
+    }
   }
 
   private handleStep(tick: number): void {

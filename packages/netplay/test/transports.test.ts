@@ -43,6 +43,21 @@ describe('generateRoomScript', () => {
     rt.now += 10_000;
     expect(rt.call('a', `${P}.room.append`, { room: 'r1', body: '{"k":"clock"}' })).toEqual({ seq: 6 });
   });
+  it('batched append: up to 16 entries per call, across chunks, rate counted per entry, optional piggybacked read', () => {
+    const rt = loadRoomScript(generateRoomScript(ticTacToe, { chunk: 4, ratePer10s: 20 }));
+    rt.call('alice', 'tic-tac-toe.room.join', { room: 'b' });
+    const items = (n: number) => Array.from({ length: n }, (_, k) => ({ body: JSON.stringify({ k: 'clock', n: k }), to: '' }));
+    const r = rt.call('alice', 'tic-tac-toe.room.append', { room: 'b', items: items(6), after: 0 }) as { seq: number; entries: unknown[] };
+    expect(r.seq).toBe(6);
+    expect(r.entries).toHaveLength(6);
+    expect((rt.call('alice', 'tic-tac-toe.room.append', { room: 'b', items: items(1) }) as { entries?: unknown }).entries).toBeUndefined();
+    expect(() => rt.call('alice', 'tic-tac-toe.room.append', { room: 'b', items: items(17) })).toThrow(/BAD_BODY/);
+    expect(() => rt.call('alice', 'tic-tac-toe.room.append', { room: 'b', items: [{ body: 'x' }] })).toThrow(/BAD_BODY/);
+    expect(() => rt.call('alice', 'tic-tac-toe.room.append', { room: 'b', items: items(14) })).toThrow(/RATE_LIMIT/); // 7 used + 14 > 20
+    rt.call('alice', 'tic-tac-toe.room.append', { room: 'b', items: items(13) });
+    const all = (rt.call('alice', 'tic-tac-toe.room.poll', { room: 'b', after: 0 }) as { entries: { seq: number }[] }).entries;
+    expect(all.map((e) => e.seq)).toEqual(Array.from({ length: 20 }, (_, k) => k + 1));
+  });
   it('polls across DNA chunks and caps the page size', () => {
     const rt = loadRoomScript(generateRoomScript(ticTacToe, { chunk: 4, pollLimit: 7, ratePer10s: 1000 }));
     const P = 'tic-tac-toe';
