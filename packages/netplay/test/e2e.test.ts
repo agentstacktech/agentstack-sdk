@@ -208,6 +208,47 @@ describe('lockstep secret turns: rock-paper-scissors (commit–reveal)', () => {
   });
 });
 
+describe('secret lockstep: reload after committing', () => {
+  type RPS = { last: [number, number] | null };
+  const rps = defineGame<RPS, number>({
+    id: 'rps2', version: 1, seats: { min: 2, max: 2 }, mode: 'lockstep', secret: true,
+    setup: () => ({ last: null }), input: (raw) => (raw === 0 || raw === 1 || raw === 2 ? raw : undefined), idle: -1 as number,
+    step: (s, [a, b]) => { s.last = [a!, b!]; }, timeouts: { turnMs: 5000 },
+  });
+  const store = () => { const m = new Map<string, string>(); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k), m }; };
+  async function setup(withStore: boolean) {
+    const hub = memoryHub({ manual: true, latencyMs: 20 });
+    const st = store();
+    const mk = (u: string) => createSession(rps, { transport: hub.transport(u), room: 'r', name: u, now: () => hub.now, secretStore: withStore && u === 'a' ? st : undefined });
+    const A = mk('a'); await A.join(); hub.advance(20); await microtasks();
+    const B = mk('b'); await B.join();
+    const run = async (cs: { update(): void }[], ms: number) => { for (let i = 0; i < ms; i += 50) { cs.forEach((c) => c.update()); hub.advance(50); await microtasks(); } };
+    await run([A, B], 300);
+    expect(A.input(2)).toBe(true);
+    await run([A, B], 200);
+    A.close();
+    const A2 = mk('a'); await A2.join();
+    await run([A2, B], 300);
+    return { A2, B, run, st };
+  }
+  it('with secretStore the reloaded tab reveals the move it committed before the reload', async () => {
+    const { A2, B, run, st } = await setup(true);
+    expect(A2.input(0)).toBe(false); // already committed this turn (seen in the log)
+    B.input(1);
+    await run([A2, B], 400);
+    expect(B.snapshot.state!.last).toEqual([2, 1]);
+    expect(A2.snapshot.state).toEqual(B.snapshot.state);
+    expect(st.m.size).toBe(0); // cleared once revealed
+  });
+  it('without a store the reloaded tab cannot reveal: it does not double-commit, and the turn clock plays it idle', async () => {
+    const { A2, B, run } = await setup(false);
+    expect(A2.input(0)).toBe(false);
+    B.input(1);
+    await run([A2, B], 12_000);
+    expect(B.snapshot.state!.last).toEqual([-1, 1]);
+  });
+});
+
 describe('lockstep without secret: invalid input = idle for that tick', () => {
   const pick = defineGame<{ sum: number[] }, number>({
     id: 'pick', version: 1, seats: { min: 2, max: 2 }, mode: 'lockstep',

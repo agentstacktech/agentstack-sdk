@@ -54,6 +54,7 @@ seats not `1 ≤ min ≤ max ≤ 64`, missing `step` (lockstep) / `apply` (fold,
 | `inputDelay` / `maxAhead` | 2 (0 if `secret` or `turnMs`) / 8 | lockstep latency tuning |
 | `now` | `Date.now` | inject virtual time in tests |
 | `secretSeed`, `salt` | crypto | authority seed / commit salts (persist `secretSeed` if the host must survive a reload) |
+| `secretStore` | none | secret lockstep: a `Storage` (`sessionStorage`) that keeps the pending move + salt, so a tab reloaded after committing still reveals it. Without it that turn plays `idle`; `input()` returns `false` while our commit for the turn is already in the log |
 | `allowPublicViews` | `false` | authority over a transport without private entries |
 | `keepLog` | `true` | keep `session.log` for replays and desync recovery |
 | `autoResync` | `true` | on a desync where our hash is not the majority, re-fold from the log (≤ 3 per match); the next agreeing checkpoint clears `desync` for all |

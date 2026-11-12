@@ -14,7 +14,7 @@
 | Your game | Mode | Notes |
 |-----------|------|-------|
 | Realtime, everyone acts every frame (shooter, co-op action) | `lockstep` | `idle` input for silent seats; `hashEvery` ~10–60; tune `inputDelay` |
-| Simultaneous secret turns (RPS, formations, beats) | `lockstep` + `secret: true` + `timeouts.turnMs` | inputs revealed only when all committed; `idle` = "no move" |
+| Simultaneous secret turns (RPS, formations, beats) | `lockstep` + `secret: true` + `timeouts.turnMs` | inputs revealed only when all committed; `idle` = "no move"; pass `secretStore: sessionStorage` so a reload after locking still reveals |
 | Each player on their own board / race / async turns, open info | `fold` | `apply(state, seat, cmd)` in log order; replays verify scores |
 | Hidden hands, fog of war, private dice | `authority` | seat 0 simulates; `view(state, seat)` must strip secrets; needs a transport with private entries; add `clock` + `clockMs` for timers/bots; persist `secretSeed` per room so a reloading host resumes; show `snapshot.hostWaitMs` ("host reconnecting…"); `timeouts.hostGraceMs` then ends as `host-lost`, the rest can rematch with a new host |
 

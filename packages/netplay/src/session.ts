@@ -25,6 +25,9 @@ export interface SessionOptions {
   now?: () => number;
   /** Salt source for commit–reveal. Default: crypto random. */
   salt?: () => string;
+  /** secret lockstep: keep the pending reveal (move + salt) here so a page reload can still reveal a move it committed
+   *  before the reload. `sessionStorage` fits as is. Default: none (a reload after committing plays idle that turn). */
+  secretStore?: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
   /** Secret seed source for an authority. Default: crypto random. */
   secretSeed?: () => number;
   /** Allow `authority` views over a transport without private entries (views become visible to all). */
@@ -226,10 +229,12 @@ export class Session<S, I, V = S> {
     }
     if (g.secret) {
       const t = m.tick;
-      if (this.committed.has(t)) return false;
+      // our commitment is already in the log (e.g. sent before a reload): a second one would be ignored by everyone
+      if (this.committed.has(t) || m.commits.get(t)?.[seat] !== undefined) return false;
       const salt = (this.opts.salt ?? (() => randomU32().toString(36) + randomU32().toString(36)))();
       this.committed.add(t);
       this.reveals.set(t, { d: [value], salt });
+      this.storeReveal({ m: m.match, t, d: [value], salt });
       this.push({ k: 'commit', m: m.match, t, h: commitHash([value], salt) });
       return true;
     }
@@ -429,15 +434,35 @@ export class Session<S, I, V = S> {
     this.viewsKey = '';
   }
 
+  private get revealKey(): string { return `netplay:reveal:${this.game.id}:${this.opts.room}`; }
+  private storeReveal(r: { m: number; t: number; d: unknown[]; salt: string } | null): void {
+    const st = this.opts.secretStore;
+    if (!st) return;
+    try { if (r) st.setItem(this.revealKey, JSON.stringify(r)); else st.removeItem(this.revealKey); } catch { /* storage full / blocked: reveal from memory only */ }
+  }
+  /** After a reload: our commit for this tick is in the log but the move is not in memory → take it from `secretStore` if it matches. */
+  private restoreReveal(): void {
+    const m = this.model, st = this.opts.secretStore, seat = this.seat;
+    if (!st || seat < 0 || m.phase !== 'playing' || this.reveals.has(m.tick)) return;
+    const c = m.commits.get(m.tick)?.[seat];
+    if (c === undefined || m.inputs.get(m.tick)?.[seat] !== undefined) return;
+    let r: { m: number; t: number; d: unknown[]; salt: string } | null = null;
+    try { r = JSON.parse(st.getItem(this.revealKey) ?? 'null'); } catch { r = null; }
+    if (!r || r.m !== m.match || r.t !== m.tick || !Array.isArray(r.d) || commitHash(r.d, String(r.salt)) !== c) return;
+    this.committed.add(r.t);
+    this.reveals.set(r.t, { d: r.d, salt: String(r.salt) });
+  }
+
   private revealReady(): void {
     const m = this.model;
     if (!this.game.secret) return;
+    this.restoreReveal();
     for (const [t, r] of this.reveals) {
       if (t < m.tick) { this.reveals.delete(t); continue; }
       const row = m.commits.get(t) ?? [];
       const absent = m.players.map((p) => p.status !== 'on');
       const all = m.closedTick === t || m.players.every((p) => absent[p.seat] || row[p.seat] !== undefined);
-      if (all) { this.push({ k: 'in', m: m.match, t, d: r.d, salt: r.salt }); this.reveals.delete(t); }
+      if (all) { this.push({ k: 'in', m: m.match, t, d: r.d, salt: r.salt }); this.reveals.delete(t); this.storeReveal(null); }
     }
   }
 
