@@ -77,7 +77,7 @@ const CSS = `
 .np-msg{min-height:1.4em;color:var(--np-muted,#bfae93);font-size:14px;text-align:center}
 .np-err{color:#ff9b8a}`;
 
-export function mountLobby(parent: HTMLElement, lobby: LobbyController<unknown, unknown, unknown>, o: MountLobbyOptions = {}): LobbyUi {
+export function mountLobby<S, I, V>(parent: HTMLElement, lobby: LobbyController<S, I, V>, o: MountLobbyOptions = {}): LobbyUi {
   const L: LobbyLabels = { ...en, ...o.labels };
   const doc = parent.ownerDocument;
   if (!doc.getElementById('np-lobby-css')) {

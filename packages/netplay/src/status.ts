@@ -15,7 +15,7 @@ export type NetStatus =
   | { kind: 'desync' };
 
 /** null = all good (or not playing). Priority: own connection > host > others > desync. */
-export function netStatus(s: Snapshot<unknown, unknown>): NetStatus | null {
+export function netStatus<S, V>(s: Snapshot<S, V>): NetStatus | null {
   if (s.phase === 'over') return null;
   if (s.connection === 'offline') return { kind: 'offline' };
   if (s.connection === 'reconnecting' || s.connection === 'connecting') return s.phase === 'playing' ? { kind: 'reconnecting' } : null;

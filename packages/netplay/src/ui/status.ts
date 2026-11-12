@@ -22,7 +22,7 @@ export function describeNetStatus(st: NetStatus, L: NetStatusLabels): string {
   }
 }
 
-export function mountNetStatus(session: Session<unknown, unknown, unknown>, o: { labels?: Partial<NetStatusLabels>; parent?: HTMLElement } = {}): { el: HTMLElement; destroy(): void } {
+export function mountNetStatus<S, I, V>(session: Session<S, I, V>, o: { labels?: Partial<NetStatusLabels>; parent?: HTMLElement } = {}): { el: HTMLElement; destroy(): void } {
   const L: NetStatusLabels = { ...NET_STATUS_LABELS.en, ...o.labels };
   const parent = o.parent ?? document.body;
   const el = parent.ownerDocument.createElement('div');
