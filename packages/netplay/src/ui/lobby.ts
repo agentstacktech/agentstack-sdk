@@ -14,7 +14,7 @@ export interface LobbyLabels {
   players: string; you: string; waitingMore: string; start: string; waitingStart: string; ready: string;
   badCode: string; offline: string; version: string; signIn: string; unavailable: string; close: string;
   yourName: string;
-  addLocal: string; sameScreen: string; removeLocal: string;
+  addLocal: string; sameScreen: string; removeLocal: string; /** Someone else's local seat: «на экране {name}». */ withOwner: string;
 }
 const en: LobbyLabels = {
   title: 'Play with friends', create: 'Create a room', createHint: 'You get a code to send to friends', join: 'Join with a code',
@@ -25,7 +25,7 @@ const en: LobbyLabels = {
   offline: 'Can’t reach the game server. Check your connection and try again.', version: 'Your friend has a different version of the game. Both of you should reload the page.',
   signIn: 'Online play needs an account. Sign in, then try again.', unavailable: 'Online play is not switched on on the server yet. Try again later.',
   close: 'Close', yourName: 'Your name (friends see it)',
-  addLocal: '+ Player on this device', sameScreen: 'same screen', removeLocal: 'Remove',
+  addLocal: '+ Player on this device', sameScreen: 'same screen', removeLocal: 'Remove', withOwner: "on {name}'s screen",
 };
 const ru: LobbyLabels = {
   title: 'Игра с друзьями', create: 'Создать комнату', createHint: 'Вы получите код для друзей', join: 'Войти по коду',
@@ -36,7 +36,7 @@ const ru: LobbyLabels = {
   offline: 'Нет связи с игровым сервером. Проверьте интернет и попробуйте ещё раз.', version: 'У друга другая версия игры. Обновите страницу оба.',
   signIn: 'Для игры онлайн нужен аккаунт. Войдите и попробуйте ещё раз.', unavailable: 'Онлайн-игра ещё не включена на сервере. Попробуйте позже.',
   close: 'Закрыть', yourName: 'Ваше имя (его увидят друзья)',
-  addLocal: '+ Игрок на этом устройстве', sameScreen: 'этот экран', removeLocal: 'Убрать',
+  addLocal: '+ Игрок на этом устройстве', sameScreen: 'этот экран', removeLocal: 'Убрать', withOwner: 'на экране {name}',
 };
 const pt: LobbyLabels = {
   title: 'Jogar com amigos', create: 'Criar sala', createHint: 'Você recebe um código para enviar aos amigos', join: 'Entrar com código',
@@ -47,8 +47,20 @@ const pt: LobbyLabels = {
   offline: 'Sem conexão com o servidor do jogo. Verifique a internet e tente de novo.', version: 'Seu amigo tem outra versão do jogo. Recarreguem a página.',
   signIn: 'O jogo online precisa de uma conta. Entre e tente de novo.', unavailable: 'O jogo online ainda não está ativado no servidor. Tente mais tarde.',
   close: 'Fechar', yourName: 'Seu nome (os amigos verão)',
-  addLocal: '+ Jogador neste aparelho', sameScreen: 'mesma tela', removeLocal: 'Remover',
+  addLocal: '+ Jogador neste aparelho', sameScreen: 'mesma tela', removeLocal: 'Remover', withOwner: 'na tela de {name}',
 };
+
+/**
+ * Lobby tag after a player's name (pure): « (вы)» for me, « · этот экран» for my local seats,
+ * « · на экране Ana» for a local seat on someone else's device, '' otherwise.
+ */
+export function seatTag(p: { id: string; owner?: string }, self: string | undefined, seated: readonly { id: string; name: string }[], L: Pick<LobbyLabels, 'you' | 'sameScreen' | 'withOwner'>): string {
+  if (p.id === self) return ` (${L.you})`;
+  if (p.owner === undefined) return '';
+  if (p.owner === self) return ` · ${L.sameScreen}`;
+  const host = seated.find((q) => q.id === p.owner);
+  return ` · ${L.withOwner.replace('{name}', host?.name || p.owner)}`;
+}
 export const LOBBY_LABELS = { en, ru, pt } as const;
 
 export interface MountLobbyOptions {
@@ -207,7 +219,7 @@ export function mountLobby<S, I, V>(parent: HTMLElement, lobby: LobbyController<
       const setLocals = (names: string[]) => { ses?.setLocals(names); };
       card.append(el('ul', { class: 'np-list' }, ...seated.map((p) => {
         const local = p.owner !== undefined && p.owner === self;
-        const tag = p.id === self ? ` (${L.you})` : p.owner !== undefined ? ` · ${L.sameScreen}` : '';
+        const tag = seatTag(p, self, seated, L);
         const right = local ? btn2(L.removeLocal, () => setLocals(mine.filter((q) => q !== p).map((q) => q.name)), `rm-${p.local}`, `${L.removeLocal} ${p.name}`) : p.ready ? `✓ ${L.ready}` : '';
         return el('li', local || p.owner !== undefined ? { class: 'np-local' } : {}, el('span', {}, p.name, el('span', { class: 'np-tag' }, tag)), right);
       })));

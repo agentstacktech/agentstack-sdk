@@ -206,3 +206,15 @@ describe('local seats over the generated room script (hosted fake, unchanged ser
     } finally { vi.useRealTimers(); }
   });
 });
+
+describe('lobby tags for local seats', () => {
+  it('«вы», «этот экран» on my device, «на экране Ana» on the other devices', async () => {
+    const { seatTag, LOBBY_LABELS } = await import('../src/ui/index.js');
+    const L = LOBBY_LABELS.ru;
+    const seated = [{ id: 'a', name: 'Ana' }, { id: 'a~1', name: 'Bia', owner: 'a' }, { id: 'b', name: 'Bruno' }];
+    expect(seated.map((p) => seatTag(p, 'a', seated, L))).toEqual([' (вы)', ' · этот экран', '']);
+    expect(seated.map((p) => seatTag(p, 'b', seated, L))).toEqual(['', ' · на экране Ana', ' (вы)']);
+    expect(seatTag(seated[1]!, undefined, seated, LOBBY_LABELS.en)).toBe(" · on Ana's screen");
+    expect(seatTag(seated[1]!, 'b', seated, LOBBY_LABELS.pt)).toBe(' · na tela de Ana');
+  });
+});

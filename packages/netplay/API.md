@@ -96,6 +96,8 @@ One device can hold **several seats**: friends on one screen (shared keyboard, s
 | `session.viewFor(seat)` | authority: the view of one of my seats (the host sends each device its local seats' views) |
 | `session.leaveLocal(j)` | only local seat `j` leaves; `leave()` takes the device with all its seats |
 | `mountLobby(…, { locals: { name: (j) => 'Player ' + (j + 1) } })` | waiting screen: «+ Player on this device», «same screen» tags, remove buttons |
+| `seatTag(p, self, seated, labels)` | the lobby tag (pure): « (you)», « · same screen» on my device, « · on Ana's screen» on the others (`labels.withOwner`) |
+| `matchBar(…)` | local seats of this device count as `you` (no «thinking…», never «asked for a rematch») |
 
 Rules: local seats share their device's presence (they go away and come back together); one `ready()` / `rematch()` from the device counts for all its seats; a device that omits a local seat's batch plays `idle` there (it cannot stall the room). **Not for `secret` games** (`locals` is ignored): one screen would show every hidden move — use a pass-the-device flow instead.
 
