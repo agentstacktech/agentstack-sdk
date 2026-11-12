@@ -49,6 +49,7 @@ export class Session<S, I, V = S> {
   private self = '';
   private connection: ConnectionState = 'idle';
   private readonly listeners = new Set<Listener<S, V>>();
+  private readonly stepListeners = new Set<(state: S | null, tick: number) => void>();
   private snap: Snapshot<S, V> | null = null;
   private outbox: { body: Body; to?: string }[] = [];
   private batch: { t: number; d: unknown[] } | null = null;
@@ -69,7 +70,7 @@ export class Session<S, I, V = S> {
     this.game = game;
     this.now = opts.now ?? (() => Date.now());
     this.model = createRoom(game, opts.room, { simulate: game.mode !== 'authority' });
-    this.model.onStep = (tick) => this.onStep(tick);
+    this.model.onStep = (tick) => this.handleStep(tick);
     if (game.mode === 'authority' && !opts.transport.caps.privateEntries && !opts.allowPublicViews)
       throw new Error(`netplay: "${game.id}" hides information but transport "${opts.transport.caps.kind}" has no private entries; use a private transport or allowPublicViews`);
   }
@@ -115,6 +116,23 @@ export class Session<S, I, V = S> {
   /** lockstep input delay in ticks (option, or 0 for turn-based, 2 for realtime). */
   get inputDelay(): number {
     return this.opts.inputDelay ?? (this.game.turnMs > 0 || this.game.secret ? 0 : 2);
+  }
+
+  /**
+   * Run `fn` after every confirmed lockstep tick / applied command (before the batch's snapshot).
+   * Use it for per-step effects (sounds, particles) — the snapshot may skip intermediate ticks.
+   */
+  onStep(fn: (state: S | null, tick: number) => void): () => void {
+    this.stepListeners.add(fn);
+    return () => this.stepListeners.delete(fn);
+  }
+
+  /**
+   * lockstep: the confirmed inputs of `tick` (every seat, idle-filled), or null if not confirmed
+   * yet. For games that keep their own fixed-step loop (`step(world, session.confirmed(t))`).
+   */
+  confirmed(tick: number): readonly I[] | null {
+    return this.model.history.get(tick) ?? null;
   }
 
   get seat(): Seat {
@@ -234,7 +252,8 @@ export class Session<S, I, V = S> {
     });
   }
 
-  private onStep(tick: number): void {
+  private handleStep(tick: number): void {
+    for (const fn of this.stepListeners) fn(this.model.state, tick);
     const every = this.game.hashEvery;
     if (!every || tick % every !== 0 || this.seat < 0 || !this.model.state) return;
     if (this.game.mode === 'authority') return;

@@ -211,3 +211,19 @@ describe('authority: hidden hands (high card)', () => {
     expect(() => createSession(highCard, { transport: hub.transport('a'), room: 'r', allowPublicViews: true })).not.toThrow();
   });
 });
+
+describe('session hooks for games with their own loop', () => {
+  it('confirmed(tick) returns idle-filled rows; onStep fires per tick', async () => {
+    const t = await createTable(tugOfWar, { players: 2 });
+    const ticks: number[] = [];
+    t.clients[0]!.onStep((_s, tick) => ticks.push(tick));
+    await t.run(200, (c, i) => c.input(i === 0 ? 1 : 0));
+    const a = t.clients[0]!, b = t.clients[1]!;
+    expect(a.confirmed(0)).toEqual([0, 0]); // delay prefill
+    expect(a.confirmed(5)).toEqual([1, 0]);
+    expect(b.confirmed(5)).toEqual(a.confirmed(5));
+    expect(a.confirmed(10_000)).toBeNull();
+    expect(ticks.slice(0, 3)).toEqual([1, 2, 3]);
+    expect(ticks.at(-1)).toBe(a.snapshot.tick);
+  });
+});

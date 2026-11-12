@@ -15,7 +15,7 @@ describe('generateRoomScript', () => {
   });
   it('exposes join/append/poll/find and metadata', () => {
     const rt = loadRoomScript(src);
-    expect(rt.exports.sort()).toEqual(['tic-tac-toe.lobby.find', 'tic-tac-toe.room.append', 'tic-tac-toe.room.join', 'tic-tac-toe.room.poll']);
+    expect([...rt.exports].sort()).toEqual(['tic-tac-toe.lobby.find', 'tic-tac-toe.room.append', 'tic-tac-toe.room.join', 'tic-tac-toe.room.poll']);
     expect(rt.meta).toMatchObject({ game: 'tic-tac-toe', version: 1, gene: 'sdk.netplay.room.gen1' });
   });
   it('enforces auth, membership, body checks, privacy, rate limit, room size', () => {

@@ -8,6 +8,9 @@ import { canonicalJson, hashString } from './hash.js';
 import { createRng, deriveSeed, seedFromString } from './rng.js';
 import type { Body, Desync, Entry, Outcome, Phase, PlayerStatus, Seat, StepCtx } from './types.js';
 
+/** Confirmed lockstep rows kept for `Session.confirmed(tick)`. */
+export const HISTORY = 1024;
+
 export interface RoomPlayer {
   id: string;
   seat: Seat;
@@ -47,6 +50,8 @@ export interface RoomModel<S, I, V = S> {
   /** secret lockstep: tick whose commit window closed on the turn timer (-1 = none), and when. */
   closedTick: number;
   closedAt: number;
+  /** lockstep: recently confirmed input rows (tick → inputs), for clients that step their own loop. */
+  history: Map<number, I[]>;
   commits: Map<number, (number | undefined)[]>;
   hashes: Map<number, Map<string, number>>;
 }
@@ -63,7 +68,7 @@ export function createRoom<S, I, V>(game: Game<S, I, V>, room: string, opts: Roo
     secretSeed: opts.secretSeed ?? null,
     params: {}, players: [], spectators: new Set(), phase: 'lobby', match: 0, seed: 0, seats: 0,
     state: null, tick: 0, now: 0, tickStartT: 0, outcome: null, desync: null, rematch: new Set(), notice: null, lastSeq: 0,
-    inputs: new Map(), commits: new Map(), hashes: new Map(), onStep: null, closedTick: -1, closedAt: 0,
+    inputs: new Map(), commits: new Map(), hashes: new Map(), onStep: null, closedTick: -1, closedAt: 0, history: new Map(),
   };
 }
 
@@ -114,6 +119,7 @@ function startMatch<S, I, V>(m: RoomModel<S, I, V>): void {
   m.commits.clear();
   m.hashes.clear();
   m.closedTick = -1;
+  m.history.clear();
   for (const p of m.players) p.ready = false;
   m.state = m.simulate ? g.setup({ seed: m.seed, seats: m.seats, rng: createRng(deriveSeed(m.seed, -1)), params: m.params }) : null;
 }
@@ -150,6 +156,8 @@ function stepLockstep<S, I, V>(m: RoomModel<S, I, V>, fill: 'none' | 'uncommitte
     if (v === undefined && !fillable) return false;
     row.push(v === undefined ? g.idle : v);
   }
+  m.history.set(m.tick, row);
+  if (m.history.size > HISTORY) m.history.delete(m.history.keys().next().value as number);
   const next = g.step(m.state, row, ctxFor(m, m.tick));
   if (next !== undefined) m.state = next;
   m.inputs.delete(m.tick);
