@@ -150,7 +150,8 @@ const CSS = `.np-bar{position:fixed;left:0;right:0;top:0;z-index:1000;display:fl
 padding:max(6px,env(safe-area-inset-top)) 10px 6px;font:600 14px/1.25 var(--np-font,system-ui,sans-serif);color:var(--np-fg,#fff);pointer-events:none}
 .np-bar.np-bottom{top:auto;bottom:0;padding:6px 10px max(6px,env(safe-area-inset-bottom))}.np-bar>*{pointer-events:auto}.np-chip{background:var(--np-bg,#000c);border-radius:999px;padding:5px 11px;white-space:nowrap}
 .np-chip b{font-weight:700}.np-chip i{font-style:normal;color:var(--np-muted,#bbb);font-weight:500}.np-chip.np-me{outline:2px solid var(--np-accent,#ffcc4d)}
-.np-chip.np-urgent{background:#b3261e}.np-end{position:fixed;left:50%;bottom:0;transform:translateX(-50%);z-index:1002;width:min(520px,100%);box-sizing:border-box;
+.np-chip.np-urgent{background:#b3261e}.np-bar.np-ended{left:50%;right:auto;transform:translateX(-50%);width:min(560px,100%);box-sizing:border-box;
+background:var(--np-bg,#111e);border-radius:16px 16px 0 0;box-shadow:0 -4px 24px #0008;padding-top:10px}.np-bar.np-ended:not(.np-bottom){border-radius:0 0 16px 16px;box-shadow:0 4px 24px #0008}.np-end{position:fixed;left:50%;bottom:0;transform:translateX(-50%);z-index:1002;width:min(520px,100%);box-sizing:border-box;
 padding:16px 16px max(16px,env(safe-area-inset-bottom));border-radius:16px 16px 0 0;background:var(--np-bg,#111e);color:var(--np-fg,#fff);
 font:500 16px/1.35 var(--np-font,system-ui,sans-serif);text-align:center;box-shadow:0 -4px 24px #0008}
 .np-end h2{margin:0 0 4px;font-size:22px}.np-end p{margin:4px 0}.np-end .np-row{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:12px}
@@ -204,6 +205,8 @@ export function mountMatchBar<S, I, V>(session: Session<S, I, V>, o: MatchBarOpt
       if (o.onNewRoom) chips.push(button(o.labels?.newRoom ?? en.newRoom, o.onNewRoom, false, false, 'new'));
     }
     bar.replaceChildren(...chips);
+    // the inline end wraps to 2–3 lines over the game: give it one solid panel so it stays readable over any board
+    bar.classList.toggle('np-ended', !!e?.inline);
     bar.hidden = (o.position === 'bottom' && !!e && !e.inline) || (!!o.quiet && !model.spectator && !e && !model.alert);
     if (e?.inline && focusK) (bar.querySelector(`[data-k="${focusK}"]`) as HTMLElement | null)?.focus();
     root.querySelector('.np-end')?.remove();
