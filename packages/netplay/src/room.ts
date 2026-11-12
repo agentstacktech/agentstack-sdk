@@ -56,6 +56,8 @@ export interface RoomModel<S, I, V = S> {
   closedAt: number;
   /** lockstep: recently confirmed input rows (tick → inputs), for clients that step their own loop. */
   history: Map<number, I[]>;
+  /** Keep the whole match's rows in `history` (SessionOptions.keepHistory). */
+  keepHistory: boolean;
   commits: Map<number, (number | undefined)[]>;
   hashes: Map<number, Map<string, number>>;
   /** This client's user id (authority games: who simulates after a rematch re-seats players). '' = unknown. */
@@ -67,6 +69,7 @@ export interface RoomModel<S, I, V = S> {
 export interface RoomOptions {
   simulate?: boolean;
   secretSeed?: number | null;
+  keepHistory?: boolean;
 }
 
 export function createRoom<S, I, V>(game: Game<S, I, V>, room: string, opts: RoomOptions = {}): RoomModel<S, I, V> {
@@ -77,7 +80,7 @@ export function createRoom<S, I, V>(game: Game<S, I, V>, room: string, opts: Roo
     params: {}, players: [], spectators: new Set(), phase: 'lobby', match: 0, seed: 0, seats: 0,
     state: null, tick: 0, now: 0, tickStartT: 0, outcome: null, desync: null, rematch: new Set(), results: [], notice: null, lastSeq: 0, lastN: new Map(),
     inputs: new Map(), commits: new Map(), hashes: new Map(), onStep: null, closedTick: -1, closedAt: 0, history: new Map(),
-    self: '', hostLostAt: null,
+    self: '', hostLostAt: null, keepHistory: opts.keepHistory ?? false,
   };
 }
 
@@ -180,7 +183,7 @@ function stepLockstep<S, I, V>(m: RoomModel<S, I, V>, fill: 'none' | 'uncommitte
     row.push(v === undefined ? g.idle : v);
   }
   m.history.set(m.tick, row);
-  if (m.history.size > HISTORY) m.history.delete(m.history.keys().next().value as number);
+  if (!m.keepHistory && m.history.size > HISTORY) m.history.delete(m.history.keys().next().value as number);
   const next = g.step(m.state, row, ctxFor(m, m.tick));
   if (next !== undefined) m.state = next;
   m.inputs.delete(m.tick);

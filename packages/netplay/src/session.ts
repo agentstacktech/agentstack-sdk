@@ -21,6 +21,12 @@ export interface SessionOptions {
   inputDelay?: number;
   /** lockstep: how many ticks a client may run ahead of the confirmed tick before input() stalls. */
   maxAhead?: number;
+  /**
+   * lockstep: keep every confirmed row of the current match for `confirmed(t)` (default: the last HISTORY = 1024).
+   * Turn it on when the game runs its own fixed-step loop: after a reload or a late join, its fresh world can
+   * catch up from tick 0 (`while (row = confirmed(w.tick)) step(w, row)`). Cleared at every match start.
+   */
+  keepHistory?: boolean;
   /** Wall clock for heartbeats (tests inject a virtual clock). */
   now?: () => number;
   /** Salt source for commit–reveal. Default: crypto random. */
@@ -94,7 +100,7 @@ export class Session<S, I, V = S> {
     this.now = opts.now ?? (() => Date.now());
     // time-based start keeps the counter monotonic across reloads even before our old entries arrive
     this.sendN = Math.max(0, Math.floor(this.now())) * 1000;
-    this.model = createRoom(game, opts.room, { simulate: game.mode !== 'authority' });
+    this.model = createRoom(game, opts.room, { simulate: game.mode !== 'authority', keepHistory: opts.keepHistory });
     this.model.onStep = (tick) => this.handleStep(tick);
     if (game.mode === 'authority' && !opts.transport.caps.privateEntries && !opts.allowPublicViews)
       throw new Error(`netplay: "${game.id}" hides information but transport "${opts.transport.caps.kind}" has no private entries; use a private transport or allowPublicViews`);
@@ -388,7 +394,7 @@ export class Session<S, I, V = S> {
   resync(): boolean {
     if (this.opts.keepLog === false) return false;
     const old = this.model;
-    const m = createRoom(this.game, this.opts.room, { simulate: this.game.mode !== 'authority', secretSeed: old.secretSeed });
+    const m = createRoom(this.game, this.opts.room, { simulate: this.game.mode !== 'authority', secretSeed: old.secretSeed, keepHistory: this.opts.keepHistory });
     for (const e of this.log) {
       m.self = this.self;
       if (this.game.mode === 'authority') m.simulate = m.players.length === 0 ? true : m.players[0]!.id === this.self;
