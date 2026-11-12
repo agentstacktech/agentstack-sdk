@@ -5,6 +5,7 @@
  */
 import type { Game } from './define.js';
 import { canonicalJson, hashString } from './hash.js';
+import { normalizeOutcome } from './outcome.js';
 import { createRng, deriveSeed, seedFromString } from './rng.js';
 import type { Body, Desync, Entry, MatchResult, Outcome, Phase, PlayerStatus, Seat, StepCtx } from './types.js';
 
@@ -22,6 +23,8 @@ export interface RoomPlayer {
   owner?: string;
   /** Local seat index on that device (1, 2, …). */
   local?: number;
+  /** `away` by the device's own word (`{ k: 'away' }`, tab hidden), not by silence. */
+  hidden?: boolean;
 }
 
 export interface RoomModel<S, I, V = S> {
@@ -129,10 +132,10 @@ export function absentSeats<S, I, V>(m: RoomModel<S, I, V>): boolean[] {
   return a;
 }
 
-/** Commit hash for commit–reveal (lockstep `secret`). */
 /** Inputs / commits further ahead than this are ignored (bounds the buffers a hostile client can fill). */
 export const MAX_AHEAD_TICKS = 4096;
 
+/** Commit hash for commit–reveal (lockstep `secret`). */
 export function commitHash(inputs: readonly unknown[], salt: string): number {
   return hashString(canonicalJson(inputs) + '#' + salt);
 }
@@ -144,10 +147,14 @@ function ctxFor<S, I, V>(m: RoomModel<S, I, V>, tick: number): StepCtx {
 /** Results kept per room (a long evening of rematches stays bounded). */
 export const MAX_RESULTS = 100;
 
-function setOutcome<S, I, V>(m: RoomModel<S, I, V>, o: Outcome): void {
+function setOutcome<S, I, V>(m: RoomModel<S, I, V>, raw: Outcome): void {
+  const o = normalizeOutcome(raw, m.seats || m.players.length);
   if (m.phase === 'playing') {
-    const winner = o.winner >= 0 ? (m.players.find((p) => p.seat === o.winner)?.id ?? '') : '';
-    m.results.push(o.reason === undefined ? { match: m.match, winner } : { match: m.match, winner, reason: o.reason });
+    const idOf = (seat: Seat) => m.players.find((p) => p.seat === seat)?.id ?? '';
+    const r: MatchResult = { match: m.match, winner: o.winner >= 0 ? idOf(o.winner) : '' };
+    // several winners (a team, a shared win): keep them all by id; a single winner keeps the old shape
+    const ids = o.winners && o.winners.length > 1 ? o.winners.map(idOf).filter(Boolean) : null;
+    m.results.push({ ...r, ...(ids && ids.length > 1 ? { winners: ids } : {}), ...(o.reason === undefined ? {} : { reason: o.reason }) });
     if (m.results.length > MAX_RESULTS) m.results.shift();
   }
   m.outcome = o;
@@ -237,8 +244,10 @@ function drainLockstep<S, I, V>(m: RoomModel<S, I, V>): void {
 function sweepTime<S, I, V>(m: RoomModel<S, I, V>): void {
   const g = m.game;
   for (const p of m.players) {
-    if (p.status === 'on' && m.now - p.lastT > g.presenceMs) {
+    // a hidden tab is `away` at once (nobody waits for it) but is held to the same timeout as a silent one
+    if ((p.status === 'on' || (p.status === 'away' && p.hidden)) && m.now - p.lastT > g.presenceMs) {
       p.status = 'away';
+      p.hidden = false;
       if (m.phase === 'playing' && g.onTimeout === 'forfeit') forfeit(m, p.seat, 'timeout');
     }
   }
@@ -300,7 +309,7 @@ export function reduceRoom<S, I, V>(m: RoomModel<S, I, V>, e: Entry): void {
     for (const q of m.players) {
       if (q !== p && q.owner !== e.from) continue;
       q.lastT = m.now;
-      if (q.status === 'away') { q.status = 'on'; if (q.seat === 0) m.hostLostAt = null; }
+      if (q.status === 'away') { q.status = 'on'; q.hidden = false; if (q.seat === 0) m.hostLostAt = null; }
     }
   }
   sweepTime(m);
@@ -426,6 +435,27 @@ export function reduceRoom<S, I, V>(m: RoomModel<S, I, V>, e: Entry): void {
     case 'view': {
       // non-authority clients learn the end of an authority match from the authority's views
       if (!m.simulate && m.phase === 'playing' && b.m === m.match && e.from === m.players[0]?.id && b.o) setOutcome(m, b.o);
+      return;
+    }
+    case 'away': {
+      // the device went to the background: its seats stop holding up lockstep ticks / phases right away
+      if (!p || m.phase !== 'playing') return;
+      for (const q of [p, ...localsOf(m, e.from)]) if (q.status === 'on') { q.status = 'away'; q.hidden = true; }
+      if (g.mode === 'lockstep') drainLockstep(m);
+      if (g.mode === 'authority' && m.players[0]?.status === 'away') m.hostLostAt ??= m.now; // the host grace clock starts now
+      return;
+    }
+    case 'aud': {
+      const a = g.audience;
+      if (!a || m.phase !== 'playing' || b.m !== m.match || !m.simulate || !m.state) return;
+      const seat = p ? p.seat : m.spectators.has(e.from) ? -1 : null;
+      if (seat === null || (p && (a.from !== 'all' || p.status === 'left'))) return;
+      const who = { id: e.from, seat };
+      const v = a.input(b.d, who, m.state);
+      if (v === undefined) { m.notice = `rejected audience command from ${e.from}`; return; }
+      const next = a.apply(m.state, who, v, ctxFor(m, m.tick));
+      if (next !== undefined) m.state = next;
+      checkOutcome(m);
       return;
     }
     case 'clock': return;

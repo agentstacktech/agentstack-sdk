@@ -25,12 +25,23 @@ export type Mode = 'lockstep' | 'fold' | 'authority';
 export type TimeoutPolicy = 'idle' | 'forfeit';
 
 export interface Outcome {
-  /** Winning seat, or -1 for a draw / no single winner. */
+  /** Winning seat, or -1 for a draw / no single winner. With `winners`: the first of them (or -1 when it is empty). */
   winner: Seat;
+  /**
+   * Several winners at once: a team (2 on 2), a shared co-op win, joint first place. Takes precedence over `winner`
+   * when set; [] = nobody won. Read it with `outcomeWinners(o)`, which also covers the single-`winner` form.
+   */
+  winners?: Seat[];
   /** Optional finishing order (seat per place) for 3+ players. */
   ranks?: Seat[];
   /** Short machine reason: 'ko', 'score', 'forfeit', 'timeout', 'left', … */
   reason?: string;
+}
+
+/** The sender of an audience command: room member id and seat (-1 = spectator). */
+export interface Audience {
+  readonly id: string;
+  readonly seat: Seat;
 }
 
 export interface SetupCtx {
@@ -93,6 +104,21 @@ export interface GameDef<S, I, V = S> {
   readonly clockMs?: number;
   /** Finished? Return the outcome, or null while the match runs. */
   outcome?(state: S): Outcome | null;
+  /**
+   * Audience commands (bets, cheers, votes): sent by anyone in the room, spectators included, with
+   * `session.audience(value)`, kept apart from player commands (`input` / `apply`). Validated and applied by every
+   * client that holds the state (fold / lockstep: everyone; authority: the host) at the entry's place in the log,
+   * so all clients agree. They never move the tick, never wait for anybody and never block a seat.
+   * lockstep games with their own fixed-step loop (`confirmed(t)`) must read the audience part from `session.model.state`.
+   */
+  readonly audience?: {
+    /** Validate an untrusted audience command. `who.seat` is -1 for a spectator. Return `undefined` to reject. */
+    input(raw: unknown, who: Audience, state: S): unknown;
+    /** Apply a validated audience command. Mutate `state` or return a new one. */
+    apply(state: S, who: Audience, input: unknown, ctx: StepCtx): S | void;
+    /** Who may send: 'spectators' (default) or 'all' (players too). */
+    readonly from?: 'spectators' | 'all';
+  };
   /** Projection for one seat (-1 = spectator). Required for `authority`; default identity. */
   view?(state: S, seat: Seat): V;
   /** State hash for desync detection. Default: FNV-1a over a canonical serialization. */
@@ -145,6 +171,10 @@ type BodyKind =
   | { k: 'hash'; m: number; t: number; h: number }
   | { k: 'view'; m: number; s: number; seat: Seat; d: unknown; o?: Outcome | null }
   | { k: 'clock' }
+  /** Audience command (`GameDef.audience`), from a spectator or (with `from: 'all'`) a player. */
+  | { k: 'aud'; m: number; d: unknown }
+  /** This member's tab went to the background: do not wait for its seats (any later entry brings them back). */
+  | { k: 'away' }
   | { k: 'rematch'; m: number }
   /** `l`: only that local seat leaves; missing = the member and all its local seats. */
   | { k: 'leave'; l?: number };
@@ -163,6 +193,8 @@ export interface PlayerInfo {
   readonly owner?: string;
   /** Local seat index on its device (1, 2, …); 0 = the member's own seat. */
   readonly local?: number;
+  /** `away` because the device said so (tab in the background, `session.away(true)`), not because it went silent. */
+  readonly hidden?: boolean;
 }
 
 export type Phase = 'lobby' | 'playing' | 'over';
@@ -172,6 +204,8 @@ export interface MatchResult {
   readonly match: number;
   /** Winner's player id ('' = draw / no single winner). By id, not seat: seats can change between matches. */
   readonly winner: string;
+  /** Every winner's player id, present only when the outcome had several (`Outcome.winners`); `winner` is the first. */
+  readonly winners?: readonly string[];
   readonly reason?: string;
 }
 

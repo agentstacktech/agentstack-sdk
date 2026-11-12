@@ -5,8 +5,9 @@
 import { isIssue, NetplayError, type NetIssue } from './errors.js';
 import type { Game } from './define.js';
 import { commitHash, createRoom, localsOf, playerById, reduceRoom, seatsOf, type RoomModel } from './room.js';
-type OutItem = { body: Body; to?: string };
 import type { Body, ConnectionState, Entry, Link, Outcome, Seat, Snapshot, Transport } from './types.js';
+
+type OutItem = { body: Body; to?: string };
 
 export interface SessionOptions {
   transport: Transport;
@@ -103,6 +104,8 @@ export class Session<S, I, V = S> {
   private resyncCount = 0;
   /** Counter stamped into every outgoing body (`n`); resumes from the log after a reload. */
   private sendN: number;
+  /** `away(true)` was called: no heartbeats / hash reports until `away(false)` or a real input. */
+  private hidden = false;
 
   constructor(game: Game<S, I, V>, readonly opts: SessionOptions) {
     this.game = game;
@@ -223,6 +226,41 @@ export class Session<S, I, V = S> {
     this.push({ k: 'leave', l: j });
     this.flush();
   }
+  /**
+   * Audience command (`GameDef.audience`: a bet, a cheer, a vote) — from a spectator, or from a player when the game
+   * allows `from: 'all'`. Separate from `input()`: no seat, no tick, never waits. Returns false when the game has no
+   * audience, the match is not running, or (when this client holds the state) the game rejects it.
+   */
+  audience(value: unknown): boolean {
+    const m = this.model, a = this.game.audience;
+    if (!a || m.phase !== 'playing' || !this.self) return false;
+    const seat = this.seat;
+    if (seat >= 0 ? a.from !== 'all' : !m.spectators.has(this.self)) return false;
+    if (m.simulate && m.state !== null && a.input(value, { id: this.self, seat }, m.state as S) === undefined) return false;
+    const host = m.players[0]?.id;
+    const to = this.game.mode === 'authority' && this.opts.transport.caps.privateEntries && host && host !== this.self ? host : undefined;
+    this.push({ k: 'aud', m: m.match, d: value }, to);
+    this.flush();
+    return true;
+  }
+  /**
+   * The page went to the background (`true`) or came back (`false`) — wire it to `visibilitychange`
+   * (`bindVisibility(session)` in `/ui` does). Hidden: the room stops waiting for this device's seats at once
+   * (instead of after `presenceMs` of silence) and no heartbeats go out; back: one heartbeat marks the seats present
+   * again and lockstep `inputs()` re-anchors past the ticks played meanwhile. The `forfeit` timeout still applies.
+   */
+  away(hidden: boolean): void {
+    if (!hidden) {
+      if (!this.hidden) return;
+      this.hidden = false;
+      this.push({ k: 'clock' });
+    } else {
+      if (this.hidden || this.seat < 0 || this.model.phase !== 'playing') return;
+      this.hidden = true;
+      this.push({ k: 'away' });
+    }
+    this.flush();
+  }
   /** authority, non-host: the last view the host sent for one of my seats (`seats[i]`). */
   viewFor(seat: Seat): V | null {
     if (seat === this.seat) return this.snapshot.view;
@@ -314,6 +352,7 @@ export class Session<S, I, V = S> {
     this.batch.d.push(values[0] ?? g.idle);
     if (this.batch.x) for (let j = 1; j <= this.batch.x.length; j++) this.batch.x[j - 1]!.push(values[j] ?? g.idle);
     this.nextTick = t + 1;
+    this.hidden = false; // a move = back
     return true;
   }
 
@@ -359,11 +398,13 @@ export class Session<S, I, V = S> {
     const clockBeat = ticking ? Math.max(g.clockMs, every > 0 ? 1000 : 0) : Infinity;
     const beat = Math.max(250, Math.min(g.presenceMs / 4, g.turnMs > 0 ? g.turnMs / 2 : Infinity, clockBeat));
     if (every > 0 && this.sending > 0) return;
+    if (this.hidden && !this.batch && this.outbox.every((o) => o.body.k === 'hash' || o.body.k === 'clock')) return; // background tab: stay quiet
     if (this.outbox.some((o) => o.body.k !== 'hash') || ((this.batch || this.outbox.length) && now - this.lastSendAt >= every)) this.flush();
     else if (this.link && this.model.phase !== 'over' && now - this.lastSendAt >= beat) { this.push({ k: 'clock' }); this.flush(); }
   }
 
   private push(body: Body, to?: string): void {
+    if (body.k !== 'away' && body.k !== 'hash' && body.k !== 'clock' && body.k !== 'view') this.hidden = false; // a move = back
     const stamped = { ...body, n: ++this.sendN } as Body;
     this.outbox.push(to ? { body: stamped, to } : { body: stamped });
   }
@@ -445,7 +486,7 @@ export class Session<S, I, V = S> {
     }
     if (m.lastSeq === before) return;
     this.maybeResync();
-    for (const h of this.hashLog) this.push({ k: 'hash', m: m.match, t: h.t, h: h.h });
+    if (!this.hidden) for (const h of this.hashLog) this.push({ k: 'hash', m: m.match, t: h.t, h: h.h }); // a background tab stays quiet
     this.hashLog = [];
     this.revealReady();
     if (this.isAuthority) this.sendViews();

@@ -11,6 +11,7 @@
  *
  * Headless: `matchBar(session.snapshot, options)` returns exactly what is painted (unit-test that).
  */
+import { isWinner, outcomeWinners, resultWinners } from '../outcome.js';
 import { seriesScore } from '../status.js';
 import type { Session } from '../session.js';
 import type { Outcome, Snapshot } from '../types.js';
@@ -21,6 +22,10 @@ export interface MatchBarLabels {
   rematch: string; rematchVotes: string; waitingOthers: string; wantsRematch: string; cantRematch: string;
   newRoom: string; menu: string; series: string; draws: string; coopSeries: string; seconds: string;
   reasonLeft: string; reasonAway: string; reasonHost: string;
+  /** Several winners, seen by a spectator: «Winners: {names}» (optional; older label sets fall back to `winner`). */
+  winners?: string;
+  /** A player whose tab is in the background (`PlayerInfo.hidden`); optional, falls back to `away`. */
+  stepped?: string;
 }
 const en: MatchBarLabels = {
   you: 'you', thinking: 'thinking…', ready: 'ready', playing: 'playing…', finished: 'finished', away: 'no connection', left: 'left', watching: 'You are watching',
@@ -29,6 +34,7 @@ const en: MatchBarLabels = {
   cantRematch: 'Not enough players for a rematch — start a new room', newRoom: 'New room', menu: 'Menu',
   series: 'Series {mine}:{theirs}', draws: 'draws {d}', coopSeries: 'Cleared {w} of {n}', seconds: '{s} s',
   reasonLeft: '{names} left the game', reasonAway: '{names} lost connection', reasonHost: 'The host lost connection',
+  winners: 'Winners: {names}', stepped: 'stepped away',
 };
 const ru: MatchBarLabels = {
   you: 'вы', thinking: 'думает…', ready: 'готов', playing: 'играет…', finished: 'закончил', away: 'нет связи', left: 'вышел', watching: 'Вы зритель',
@@ -37,6 +43,7 @@ const ru: MatchBarLabels = {
   cantRematch: 'Для реванша не хватает игроков — создайте новую комнату', newRoom: 'Новая комната', menu: 'Меню',
   series: 'Счёт {mine}:{theirs}', draws: 'ничьих {d}', coopSeries: 'Пройдено {w} из {n}', seconds: '{s} с',
   reasonLeft: '{names}: вышел из игры', reasonAway: '{names}: нет связи', reasonHost: 'Ведущий потерял связь',
+  winners: 'Победили: {names}', stepped: 'отошёл',
 };
 const pt: MatchBarLabels = {
   you: 'você', thinking: 'pensando…', ready: 'pronto', playing: 'jogando…', finished: 'terminou', away: 'sem conexão', left: 'saiu', watching: 'Você está assistindo',
@@ -45,6 +52,7 @@ const pt: MatchBarLabels = {
   cantRematch: 'Faltam jogadores para a revanche — crie uma nova sala', newRoom: 'Nova sala', menu: 'Menu',
   series: 'Placar {mine}:{theirs}', draws: 'empates {d}', coopSeries: 'Vencidas {w} de {n}', seconds: '{s} s',
   reasonLeft: '{names} saiu do jogo', reasonAway: '{names} perdeu a conexão', reasonHost: 'O anfitrião perdeu a conexão',
+  winners: 'Venceram: {names}', stepped: 'ausente',
 };
 export const MATCH_BAR_LABELS = { en, ru, pt } as const;
 
@@ -63,6 +71,14 @@ export interface MatchBarOptions {
   detail?: (seat: number, s: Snap) => string | undefined;
   /** ms left on the turn / beat clock; null = no clock. */
   clock?: (s: Snap) => number | null;
+  /**
+   * Teams: the team of a seat (any small integer; undefined = no team). Teammates are listed together, each chip
+   * carries the team name, the series is counted per team, and a team win (`Outcome.winners`) is «You won!» for
+   * every member. Pair it with `teamName`.
+   */
+  team?: (seat: number, s: Snap) => number | undefined;
+  /** Short team name / sign for a team number, e.g. `(t) => (t ? '☾ Луна' : '☀ Солнце')`. Default «1», «2», … */
+  teamName?: (team: number) => string;
   /** Plain line for a game-specific outcome reason ('ko', 'score'…); undefined = none / the default for room reasons. */
   reason?: (o: Outcome, s: Snap) => string | undefined;
   /**
@@ -83,7 +99,8 @@ export interface MatchBarOptions {
 
 export interface MatchBarModel {
   spectator: boolean;
-  players: { name: string; you: boolean; status: string; detail: string }[];
+  /** In seat order, or grouped by team when `team` is set. `team` = the team name ('' = no team). */
+  players: { name: string; you: boolean; status: string; detail: string; team?: string }[];
   clock: { text: string; urgent: boolean } | null;
   series: string | null;
   end: null | { title: string; reason: string; rematch: { label: string; enabled: boolean } | null; note: string; inline: boolean };
@@ -100,11 +117,15 @@ export function matchBar(s: Snap, o: MatchBarOptions = {}): MatchBarModel {
   const over = s.phase === 'over';
   // local seats are «you» too — until that player leaves mid-match («Бия вышел», not «Бия (вы) вышел»)
   const ours = (p: { id: string; owner?: string; status?: string }) => p.id === s.self || (!!p.owner && p.owner === s.self && p.status !== 'left');
-  const players = s.players.map((p) => {
+  const teamOf = (seat: number) => (o.team ? o.team(seat, s) : undefined);
+  const teamLabel = (t: number) => o.teamName?.(t) ?? String(t + 1);
+  const listed = o.team ? [...s.players].sort((a, b) => (teamOf(a.seat) ?? 1e9) - (teamOf(b.seat) ?? 1e9) || a.seat - b.seat) : s.players;
+  const players = listed.map((p) => {
     const d = p.status === 'on' && s.phase === 'playing' ? o.done?.(p.seat, s) : undefined;
     const race = o.pace === 'race';
-    const status = p.status === 'left' ? L.left : p.status === 'away' ? L.away : d === true ? (race ? L.finished : L.ready) : d === false && !ours(p) ? (race ? L.playing : L.thinking) : '';
-    return { name: p.name || p.id, you: ours(p), status, detail: o.detail?.(p.seat, s) ?? '' };
+    const status = p.status === 'left' ? L.left : p.status === 'away' ? (p.hidden ? (L.stepped ?? L.away) : L.away) : d === true ? (race ? L.finished : L.ready) : d === false && !ours(p) ? (race ? L.playing : L.thinking) : '';
+    const t = teamOf(p.seat);
+    return { name: p.name || p.id, you: ours(p), status, detail: o.detail?.(p.seat, s) ?? '', ...(t === undefined ? {} : { team: teamLabel(t) }) };
   });
   const ms = s.phase === 'playing' ? (o.clock?.(s) ?? null) : null;
   const clock = ms === null ? null : { text: fill(L.seconds, { s: Math.max(0, Math.ceil(ms / 1000)) }), urgent: ms <= 10_000 };
@@ -112,21 +133,36 @@ export function matchBar(s: Snap, o: MatchBarOptions = {}): MatchBarModel {
   let series: string | null = null;
   if (s.results.length) {
     if (o.kind === 'coop') series = fill(L.coopSeries, { w: s.results.filter((r) => r.reason === 'cleared' || r.reason === 'won').length, n: s.results.length });
-    else if (!spectator && s.players.length === 2) {
+    else if (o.team) {
+      // per team, by who is on it now (ids, so re-seating between matches does not matter)
+      const teams = [...new Set(s.players.map((p) => teamOf(p.seat)).filter((t): t is number => t !== undefined))].sort((a, b) => a - b);
+      const won = (t: number) => s.results.filter((r) => resultWinners(r).some((id) => { const q = s.players.find((p) => p.id === id); return !!q && teamOf(q.seat) === t; })).length;
+      series = teams.map((t) => `${teamLabel(t)} ${won(t)}`).join(' · ');
+    } else if (!spectator && s.players.length === 2) {
       const sc = seriesScore(s);
       series = fill(L.series, sc) + (sc.draws ? ` (${fill(L.draws, { d: sc.draws })})` : '');
     } else {
-      const wins = s.players.map((p) => `${p.name || p.id} ${s.results.filter((r) => r.winner === p.id).length}`);
+      const wins = s.players.map((p) => `${p.name || p.id} ${s.results.filter((r) => resultWinners(r).includes(p.id)).length}`);
       series = wins.join(' · ');
     }
   }
   let end: MatchBarModel['end'] = null;
   if (over && s.outcome) {
     const out = s.outcome;
-    const winner = s.players.find((p) => p.seat === out.winner);
+    const ws = outcomeWinners(out);
     const won = o.won ?? ((x: Outcome) => x.reason === 'cleared' || x.reason === 'won');
+    // the title for whoever watches: one winner by name, a whole team by its name, else the names
+    const wp = ws.map((k) => s.players.find((p) => p.seat === k)).filter((p): p is NonNullable<typeof p> => !!p);
+    const wTeams = new Set(ws.map((k) => teamOf(k)));
+    const watched = ws.length > 1 && wTeams.size === 1 && !wTeams.has(undefined) ? fill(L.winner, { name: teamLabel([...wTeams][0]!) })
+      : ws.length > 1 ? fill(L.winners ?? L.winner, { names: named(wp.map((p) => p.id)), name: named(wp.map((p) => p.id)) })
+        : fill(L.winner, { name: wp[0]?.name || wp[0]?.id || '?' });
+    // this device's seats (mine + local seats): all of them won → «You won!», none → «You lost»; a same-screen
+    // match that some of them won and some lost names the winner, like a spectator sees it
+    const seats = s.seats.length ? s.seats : [s.seat];
+    const myWins = seats.filter((k) => isWinner(out, k)).length;
     const title = o.kind === 'coop' ? (won(out) ? L.cleared : L.failed)
-      : out.winner < 0 ? L.draw : spectator ? fill(L.winner, { name: winner?.name || winner?.id || '?' }) : out.winner === s.seat ? L.win : L.lose;
+      : !ws.length ? L.draw : spectator || (myWins > 0 && myWins < seats.length) ? watched : myWins ? L.win : L.lose;
     const gone = s.players.filter((p) => p.id !== s.self && p.status !== 'on');
     const room = out.reason === 'left' && gone.some((p) => p.status === 'left') ? fill(L.reasonLeft, { names: named(gone.filter((p) => p.status === 'left').map((p) => p.id)) })
       : (out.reason === 'timeout' || out.reason === 'forfeit') && gone.length ? fill(L.reasonAway, { names: named(gone.map((p) => p.id)) })
@@ -160,7 +196,11 @@ background:#fff2;color:inherit}.np-end button.np-main{background:var(--np-accent
 .np-end button:disabled{opacity:.55;cursor:default}.np-end button:focus-visible,.np-chip:focus-visible{outline:3px solid var(--np-accent,#ffcc4d);outline-offset:2px}
 .np-bar button{min-height:44px;padding:0 14px;border-radius:999px;border:0;font:600 15px var(--np-font,system-ui,sans-serif);cursor:pointer;background:var(--np-bg,#000c);color:inherit}
 .np-bar button.np-main{background:var(--np-accent,#ffcc4d);color:var(--np-accent-fg,#222)}.np-bar button:disabled{opacity:.6;cursor:default}
+.np-chip .np-team{font-style:normal;font-weight:700;color:var(--np-accent,#ffcc4d);margin-right:4px}
+.np-bar[hidden],.np-end[hidden]{display:none!important}
 .np-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}`;
+/** The match bar's stylesheet (injected once as <style id="np-bar-css">); exported for audits and custom shells. */
+export const MATCH_BAR_CSS = CSS;
 
 export interface MatchBarUi { readonly el: HTMLElement; readonly model: MatchBarModel; destroy(): void }
 
@@ -188,6 +228,7 @@ export function mountMatchBar<S, I, V>(session: Session<S, I, V>, o: MatchBarOpt
     if (model.spectator) chips.push(el('span', 'np-chip', (o.labels?.watching ?? en.watching)));
     for (const p of model.players) {
       const c = el('span', 'np-chip' + (p.you ? ' np-me' : ''));
+      if (p.team) c.append(el('i', 'np-team', p.team));
       c.append(el('b', '', p.name + (p.you ? ` (${o.labels?.you ?? en.you})` : '')));
       if (p.detail) c.append(' ' + p.detail);
       if (p.status) c.append(' ', el('i', '', p.status));
