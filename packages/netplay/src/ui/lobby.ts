@@ -83,7 +83,8 @@ const CSS = `
 .np-msg{min-height:1.4em;color:var(--np-muted,#bfae93);font-size:14px;text-align:center}
 .np-err{color:#ff9b8a}
 .np-code span+span{margin-left:.35em}
-.np-input.np-name{font-size:18px;letter-spacing:normal;text-transform:none;text-align:left}
+.np-name{min-height:48px;border-radius:12px;border:2px solid #ffffff33;background:#0004;color:inherit;font:inherit;font-size:18px;padding:8px 12px;width:100%;box-sizing:border-box}
+.np-name:focus-visible{outline:3px solid var(--np-accent,#e0a33a);outline-offset:2px}
 .np-sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;padding:0}`;
 
 const CSS_ESCAPE = (v: string): string => v.replace(/["\\]/g, '\\$&');
@@ -162,7 +163,7 @@ export function mountLobby<S, I, V>(parent: HTMLElement, lobby: LobbyController<
       if (o.nameField) {
         const nf = o.nameField;
         const id = `${titleId}-name`;
-        const input = el('input', { id, class: 'np-input np-name', value: nf.name, autocomplete: 'nickname', maxlength: '24', enterkeyhint: 'done', 'data-k': 'name' }) as HTMLInputElement;
+        const input = el('input', { id, class: 'np-name', value: nf.name, autocomplete: 'nickname', maxlength: '24', enterkeyhint: 'done', 'data-k': 'name' }) as HTMLInputElement;
         input.addEventListener('input', () => { nf.name = input.value; }); // kept on every key: a tap on «Create» right after typing still uses it
         input.addEventListener('change', () => { input.value = nf.name; });
         card.append(el('label', { class: 'np-hint', for: id }, L.yourName), input);
