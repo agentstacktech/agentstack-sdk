@@ -39,6 +39,7 @@ seats not `1 ≤ min ≤ max ≤ 64`, missing `step` (lockstep) / `apply` (fold,
 `seedFromString(s)`, `mix32(x)`, `hashState(v)`, `hashString(s)`, `canonicalJson(v)`.
 
 **Errors:** `defineGame` throws `defineGame: …` for a bad id/version/seats, a missing `step`/`apply`/`view` for the mode, `clockMs` without `clock`, `secret` outside lockstep, any negative/NaN number (`hashEvery`, `clockMs`, `timeouts.*`) and an unknown `onTimeout`. Runtime rejections never throw: they land in `snapshot.notice`.
+**Rejected lockstep inputs = `idle`.** An invalid `in` (fails `input()`), or a committed seat whose reveal does not match its commit, plays `idle` for that tick on every client, so a hacked client can only hurt itself, never stall the others. Malformed commits (non-integer `t`, non-number `h`) are ignored and do not take the seat's slot; entries more than `MAX_AHEAD_TICKS` (4096) ahead are dropped.
 
 ## `createSession(game, options): Session`
 

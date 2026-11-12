@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createSession, defineGame, hashState, memoryHub } from '../src/index.js';
+import { commitHash, createSession, defineGame, hashState, memoryHub } from '../src/index.js';
 import { createTable, microtasks, sendRaw } from '../src/testing/index.js';
 import { ticTacToe } from '../examples/tic-tac-toe.js';
 import { tugOfWar } from '../examples/tug-of-war.js';
@@ -175,7 +175,58 @@ describe('lockstep secret turns: rock-paper-scissors (commit–reveal)', () => {
     await link.send({ k: 'in', m: 1, t: 0, d: [1], salt: 'nope' });
     await t.run(300);
     expect(t.clients[0]!.snapshot.notice).toMatch(/reveal mismatch/);
-    expect(t.clients[0]!.snapshot.tick).toBe(0);
+    // the forger committed, then revealed something else: it plays idle this turn and nobody waits out the clock
+    expect(t.clients[0]!.snapshot.tick).toBe(1);
+    expect(t.clients[0]!.snapshot.state!.last).toEqual([0, -1]);
+    expect(t.clients[1]!.snapshot.state).toEqual(t.clients[0]!.snapshot.state);
+  });
+
+  it('malformed commitments are ignored and do not take the seat\'s slot; the real commit still counts', async () => {
+    const t = await createTable(rps, { players: 2 });
+    await t.run(200);
+    await sendRaw(t, 1, { k: 'commit', t: 0, h: 'x' });
+    await sendRaw(t, 1, { k: 'commit', t: 0.5, h: 1 });
+    await sendRaw(t, 1, { k: 'commit', t: 1e9, h: 1 });
+    await t.run(100);
+    expect(t.clients[0]!.snapshot.notice).toMatch(/bad commit/);
+    t.clients[0]!.input(0); t.clients[1]!.input(1);
+    await t.run(400);
+    expect(t.clients[0]!.snapshot.state!.last).toEqual([0, 1]); // resolved at once, not by the 5 s clock
+    expect(t.clients[1]!.snapshot.state).toEqual(t.clients[0]!.snapshot.state);
+  });
+
+  it('a correctly committed but invalid move plays idle at once (a hacked client cannot stall the turn)', async () => {
+    const t = await createTable(rps, { players: 2 });
+    await t.run(200);
+    t.clients[0]!.input(2);
+    await t.run(100);
+    await sendRaw(t, 1, { k: 'commit', t: 0, h: commitHash([7], 's') });
+    await t.run(100);
+    await sendRaw(t, 1, { k: 'in', t: 0, d: [7], salt: 's' });
+    await t.run(300);
+    for (const c of t.clients) { expect(c.snapshot.tick).toBe(1); expect(c.snapshot.state!.last).toEqual([2, -1]); }
+  });
+});
+
+describe('lockstep without secret: invalid input = idle for that tick', () => {
+  const pick = defineGame<{ sum: number[] }, number>({
+    id: 'pick', version: 1, seats: { min: 2, max: 2 }, mode: 'lockstep',
+    setup: () => ({ sum: [] }), input: (raw) => (raw === 1 || raw === 2 ? raw : undefined), idle: 0,
+    step: (s, ins) => { s.sum.push(ins.reduce<number>((a, v) => a + (v ?? 0), 0)); },
+    hashEvery: 1,
+  });
+  it('a hacked out-of-range input does not block the tick and every client agrees', async () => {
+    const t = await createTable(pick, { players: 2 });
+    await t.run(100);
+    t.clients[0]!.input(2);
+    await t.run(50);
+    const at = [...t.clients[0]!.model.inputs].find(([, row]) => row[0] === 2)![0]; // the tick u1's move landed on (after input delay)
+    await sendRaw(t, 1, { k: 'in', t: at, d: [99] });
+    await sendRaw(t, 1, { k: 'in', t: 10_000, d: [1] }); // far ahead: ignored, nothing buffered
+    await t.run(300);
+    for (const c of t.clients) { expect(c.snapshot.tick).toBeGreaterThan(at); expect(c.snapshot.state!.sum[at]).toBe(2); }
+    expect(t.clients[0]!.model.inputs.has(10_000)).toBe(false);
+    expect(t.clients[0]!.snapshot.notice).toMatch(/rejected input|too far ahead/);
   });
 });
 

@@ -91,6 +91,9 @@ export function absentSeats<S, I, V>(m: RoomModel<S, I, V>): boolean[] {
 }
 
 /** Commit hash for commit–reveal (lockstep `secret`). */
+/** Inputs / commits further ahead than this are ignored (bounds the buffers a hostile client can fill). */
+export const MAX_AHEAD_TICKS = 4096;
+
 export function commitHash(inputs: readonly unknown[], salt: string): number {
   return hashString(canonicalJson(inputs) + '#' + salt);
 }
@@ -267,7 +270,10 @@ export function reduceRoom<S, I, V>(m: RoomModel<S, I, V>, e: Entry): void {
       return;
     }
     case 'commit': {
-      if (!p || m.phase !== 'playing' || b.m !== m.match || b.t < m.tick || p.status === 'left') return;
+      if (!p || m.phase !== 'playing' || b.m !== m.match || p.status === 'left') return;
+      // a malformed commitment must not take the seat's slot (first commit wins): ignore it, the real one still counts
+      if (!Number.isInteger(b.t) || typeof b.h !== 'number' || !Number.isFinite(b.h) || b.t > m.tick + MAX_AHEAD_TICKS) { m.notice = `bad commit from seat ${p.seat}`; return; }
+      if (b.t < m.tick) return;
       if (b.t === m.closedTick) { m.notice = `late commit seat ${p.seat} tick ${b.t}`; return; }
       const row = m.commits.get(b.t) ?? [];
       if (row[p.seat] === undefined) row[p.seat] = b.h >>> 0;
@@ -279,14 +285,22 @@ export function reduceRoom<S, I, V>(m: RoomModel<S, I, V>, e: Entry): void {
       if (!Array.isArray(b.d) || !Number.isInteger(b.t)) { m.notice = `bad input from seat ${p.seat}`; return; }
       if (g.secret) {
         const c = m.commits.get(b.t)?.[p.seat];
-        if (b.d.length !== 1 || c === undefined || commitHash(b.d, String(b.salt ?? '')) !== c) { m.notice = `reveal mismatch seat ${p.seat} tick ${b.t}`; return; }
+        if (c === undefined) { m.notice = `reveal without commit seat ${p.seat} tick ${b.t}`; return; }
+        if (b.d.length !== 1 || commitHash(b.d, String(b.salt ?? '')) !== c || g.input(b.d[0], p.seat, m.state) === undefined) {
+          // a committed seat that reveals something else (or an invalid move) plays idle this tick, so the others don't wait out the clock
+          m.notice = `reveal mismatch seat ${p.seat} tick ${b.t}`;
+          if (b.t >= m.tick) { const row = m.inputs.get(b.t) ?? []; if (row[p.seat] === undefined) row[p.seat] = g.idle; m.inputs.set(b.t, row); drainLockstep(m); }
+          return;
+        }
       }
+      if (b.t > m.tick + MAX_AHEAD_TICKS) { m.notice = `input too far ahead seat ${p.seat}`; return; }
       for (let i = 0; i < b.d.length; i++) {
         const t = b.t + i;
         if (t < m.tick) continue; // late (already filled with idle)
         const v = g.input(b.d[i], p.seat, m.state);
-        if (v === undefined) { m.notice = `rejected input seat ${p.seat} tick ${t}`; continue; }
         const row = m.inputs.get(t) ?? [];
+        // invalid input = idle for that tick (deterministic on every client): a hacked client cannot stall the others
+        if (v === undefined) { m.notice = `rejected input seat ${p.seat} tick ${t}`; if (row[p.seat] === undefined) { row[p.seat] = g.idle; m.inputs.set(t, row); } continue; }
         if (row[p.seat] === undefined) row[p.seat] = v; // first write wins, no rewrites
         m.inputs.set(t, row);
       }

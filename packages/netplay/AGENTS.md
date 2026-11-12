@@ -27,7 +27,7 @@
 5. **Time**: `ctx.now` is server time of the entry. Timers in `authority`/`fold` go in `clock(state, now)`.
 6. **`hash`**: default canonical hash is fine for plain data; provide a fast custom one for big/class states.
 7. **Tests** (always all three):
-   - unit: rules + `input` rejection cases; a hacked client via `sendRaw(table, i, body)` must be rejected by everyone;
+   - unit: rules + `input` rejection cases; a hacked client via `sendRaw(table, i, body)` must be rejected by everyone (lockstep: its move becomes `idle` for that tick, the others don't wait);
    - e2e: `createTable(game, { players: 2, spectators: 1, latencyMs, jitterMs })` and assert `snaps()[1].state` equals `snaps()[0].state`, outcome agreed, `desync === null`;
    - server: `loadRoomScript(generateRoomScript(game, { prefix }))` + `scriptServer(rt, prefix)` with two sessions.
 8. **Room script**: commit the generated file and a test that it equals the generator output. Publishing it is a platform action that needs the project owner's approval.
