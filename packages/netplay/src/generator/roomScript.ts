@@ -162,7 +162,7 @@ export const roomAppend = defineCommand({
     }
     const rk = i.room + "#" + me;
     const rate = ctx.dna.get(E_RATE, rk);
-    let win = ctx.now_ms - (ctx.now_ms % WINDOW);
+    const win = ctx.now_ms - (ctx.now_ms % WINDOW);
     let used = 0;
     if (rate !== null && rate.win === win) { used = rate.n; }
     if (used + i.items.length > RATE) { throw err("RATE_LIMIT", "too many entries, slow down"); }

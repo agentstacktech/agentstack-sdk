@@ -74,3 +74,17 @@ describe('generated room: log cap and chunk size', () => {
     expect((big.call('a', 'tic-tac-toe.room.poll', { room: 'r', after: 0 }) as { entries: unknown[] }).entries).toHaveLength(40);
   });
 });
+
+describe('full rooms: a plain reason instead of «no connection»', () => {
+  it('ROOM_FULL / LOG_FULL → issue full → netStatus full + lobby error full (ru/en/pt texts)', async () => {
+    const { errorKind, netStatus } = await import('../src/index.js');
+    const { describeNetStatus, NET_STATUS_LABELS, LOBBY_LABELS } = await import('../src/ui/index.js');
+    expect(errorKind('ROOM_FULL')).toBe('full');
+    expect(errorKind('LOG_FULL')).toBe('full');
+    const st = netStatus({ issue: 'full', phase: 'lobby', connection: 'offline', players: [], self: 'a', hostWaitMs: null, desync: null } as never);
+    expect(st).toEqual({ kind: 'full' });
+    expect(describeNetStatus(st!, NET_STATUS_LABELS.ru)).toBe('Комната заполнена — откройте новую');
+    expect(describeNetStatus(st!, { ...NET_STATUS_LABELS.en, full: undefined })).toBe(NET_STATUS_LABELS.en.full);
+    expect(LOBBY_LABELS.pt.full).toMatch(/cheia/);
+  });
+});

@@ -32,7 +32,8 @@ describe('hosted MCP envelope (recorded platform shapes)', () => {
     expect(errorKind('x', 429)).toBe('rate');
     expect(errorKind('script_not_found')).toBe('not-published');
     expect(errorKind('x', 503)).toBe('offline');
-    expect(errorKind('ROOM_FULL')).toBe('server');
+    expect(errorKind('ROOM_FULL')).toBe('full');
+    expect(errorKind('NOT_JOINED')).toBe('server');
   });
 });
 
@@ -114,7 +115,7 @@ describe('net=as: hostedMcpRunner + stackscriptTransport against the fake', () =
     expect(await stackscriptRoomApi(runner, { scriptId: 's', exportPrefix: 'p' }).join('r')).toEqual({ self: 'me' });
     expect(n).toBe(2);
     const full = { async run() { return { ok: true, data: { value: { error: 'ROOM_FULL' } } }; } };
-    await expect(stackscriptRoomApi(full, { scriptId: 's', exportPrefix: 'p' }).join('r')).rejects.toMatchObject({ kind: 'server', code: 'ROOM_FULL' });
+    await expect(stackscriptRoomApi(full, { scriptId: 's', exportPrefix: 'p' }).join('r')).rejects.toMatchObject({ kind: 'full', code: 'ROOM_FULL' });
   });
 
   it('a replayed idempotency key does not append twice', async () => {

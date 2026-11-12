@@ -12,6 +12,8 @@ export type NetStatus =
   | { kind: 'busy' }
   /** The room script is not published on this project (yet). */
   | { kind: 'unavailable' }
+  /** The room is full (members) or its log hit the cap: open a new room. */
+  | { kind: 'full' }
   | { kind: 'offline' }
   | { kind: 'reconnecting' }
   /** authority: the host is away; `seconds` left before the match is called off. */
@@ -25,6 +27,7 @@ export type NetStatus =
 export function netStatus<S, V>(s: Snapshot<S, V>): NetStatus | null {
   if (s.issue === 'auth') return { kind: 'sign-in' };
   if (s.issue === 'not-published') return { kind: 'unavailable' };
+  if (s.issue === 'full') return { kind: 'full' };
   if (s.phase === 'over') return null;
   if (s.issue === 'rate') return { kind: 'busy' };
   if (s.connection === 'offline') return { kind: 'offline' };

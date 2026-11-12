@@ -91,8 +91,8 @@ export function pollingTransport(api: RoomApi, o: PollingOptions = {}): Transpor
           opts.onStatus?.('online');
         } catch (err) {
           const kind = err instanceof NetplayError ? err.kind : 'offline';
-          if (kind === 'auth' || kind === 'not-published') {
-            // retrying fast cannot help (guest / script missing): report and let the session retry slowly
+          if (kind === 'auth' || kind === 'not-published' || kind === 'full') {
+            // retrying fast cannot help (guest / script missing / room full): report and let the session retry slowly
             opts.onStatus?.('offline', kind);
             link.close();
             return;

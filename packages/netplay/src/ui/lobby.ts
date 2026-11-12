@@ -14,6 +14,8 @@ export interface LobbyLabels {
   back: string; leave: string; yourCode: string; shareHint: string; copy: string; copied: string; share: string;
   players: string; you: string; waitingMore: string; start: string; waitingStart: string; ready: string;
   badCode: string; offline: string; version: string; signIn: string; unavailable: string; close: string;
+  /** The room is full (members) or its log reached the cap. Optional: falls back to the built-in text. */
+  full?: string;
   yourName: string;
   addLocal: string; sameScreen: string; removeLocal: string; /** Someone else's local seat: «на экране {name}». */ withOwner: string;
   /** `turnChoice`: label, «Off», «{s} s», the hint under the buttons. */ turnTimer: string; turnOff: string; turnSeconds: string; turnHint: string;
@@ -25,7 +27,7 @@ const en: LobbyLabels = {
   share: 'Share…', players: 'Players', you: 'you', waitingMore: 'Waiting for players… ({n} of {min} needed)', start: 'Start the game',
   waitingStart: 'Waiting for everyone to press Start…', ready: 'ready', badCode: 'That code doesn’t look right. Codes have 6 letters and digits.',
   offline: 'Can’t reach the game server. Check your connection and try again.', version: 'Your friend has a different version of the game. Both of you should reload the page.',
-  signIn: 'Online play needs an account. Sign in, then try again.', unavailable: 'Online play is not switched on on the server yet. Try again later.',
+  signIn: 'Online play needs an account. Sign in, then try again.', unavailable: 'Online play is not switched on on the server yet. Try again later.', full: 'This room is full. Open a new room.',
   close: 'Close', yourName: 'Your name (friends see it)',
   addLocal: '+ Player on this device', sameScreen: 'same screen', removeLocal: 'Remove', withOwner: "on {name}'s screen",
   turnTimer: 'Time per move', turnOff: 'Off', turnSeconds: '{s} s', turnHint: 'Everyone moves at the same time. When time runs out, whoever has not chosen gets the default move.',
@@ -37,7 +39,7 @@ const ru: LobbyLabels = {
   share: 'Поделиться…', players: 'Игроки', you: 'вы', waitingMore: 'Ждём игроков… (нужно {min}, сейчас {n})', start: 'Начать игру',
   waitingStart: 'Ждём, пока все нажмут «Начать»…', ready: 'готов', badCode: 'Код не подходит: в нём 6 букв и цифр.',
   offline: 'Нет связи с игровым сервером. Проверьте интернет и попробуйте ещё раз.', version: 'У друга другая версия игры. Обновите страницу оба.',
-  signIn: 'Для игры онлайн нужен аккаунт. Войдите и попробуйте ещё раз.', unavailable: 'Онлайн-игра ещё не включена на сервере. Попробуйте позже.',
+  signIn: 'Для игры онлайн нужен аккаунт. Войдите и попробуйте ещё раз.', unavailable: 'Онлайн-игра ещё не включена на сервере. Попробуйте позже.', full: 'Комната заполнена. Откройте новую.',
   close: 'Закрыть', yourName: 'Ваше имя (его увидят друзья)',
   addLocal: '+ Игрок на этом устройстве', sameScreen: 'этот экран', removeLocal: 'Убрать', withOwner: 'на экране {name}',
   turnTimer: 'Время на ход', turnOff: 'Выкл', turnSeconds: '{s} с', turnHint: 'Все ходят одновременно. Если время выйдет, за того, кто не успел, будет сделан ход по умолчанию.',
@@ -49,7 +51,7 @@ const pt: LobbyLabels = {
   share: 'Compartilhar…', players: 'Jogadores', you: 'você', waitingMore: 'Aguardando jogadores… ({n} de {min})', start: 'Começar o jogo',
   waitingStart: 'Aguardando todos apertarem Começar…', ready: 'pronto', badCode: 'Esse código não parece certo. Códigos têm 6 letras e números.',
   offline: 'Sem conexão com o servidor do jogo. Verifique a internet e tente de novo.', version: 'Seu amigo tem outra versão do jogo. Recarreguem a página.',
-  signIn: 'O jogo online precisa de uma conta. Entre e tente de novo.', unavailable: 'O jogo online ainda não está ativado no servidor. Tente mais tarde.',
+  signIn: 'O jogo online precisa de uma conta. Entre e tente de novo.', unavailable: 'O jogo online ainda não está ativado no servidor. Tente mais tarde.', full: 'Esta sala está cheia. Abra uma nova.',
   close: 'Fechar', yourName: 'Seu nome (os amigos verão)',
   addLocal: '+ Jogador neste aparelho', sameScreen: 'mesma tela', removeLocal: 'Remover', withOwner: 'na tela de {name}',
   turnTimer: 'Tempo por jogada', turnOff: 'Desl.', turnSeconds: '{s} s', turnHint: 'Todos jogam ao mesmo tempo. Quando o tempo acaba, quem não escolheu recebe a jogada padrão.',
@@ -286,7 +288,7 @@ export function mountLobby<S, I, V>(parent: HTMLElement, lobby: LobbyController<
       card.append(btn(L.start, () => lobby.start(), true, !s.canStart, 'start'), btn(L.leave, () => lobby.cancel(), false, false, 'leave'));
       say(`${L.yourCode} ${(s.code ?? '').split('').join(' ')}. ${L.players} ${seated.length}/${s.max}. ${waitLine}`);
     } else if (s.screen === 'error') {
-      card.append(el('p', { class: 'np-err', role: 'alert' }, s.error === 'bad-code' ? L.badCode : s.error === 'version' ? L.version : s.error === 'sign-in' ? L.signIn : s.error === 'unavailable' ? L.unavailable : L.offline), btn(L.back, () => lobby.back(), true));
+      card.append(el('p', { class: 'np-err', role: 'alert' }, s.error === 'bad-code' ? L.badCode : s.error === 'version' ? L.version : s.error === 'sign-in' ? L.signIn : s.error === 'unavailable' ? L.unavailable : s.error === 'full' ? (L.full ?? LOBBY_LABELS.en.full!) : L.offline), btn(L.back, () => lobby.back(), true));
       queueMicrotask(() => (card.querySelector('.np-btn') as HTMLElement | null)?.focus());
     }
     if (msg) card.append(el('p', { class: 'np-msg' }, msg));

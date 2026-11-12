@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `@agentstack/netplay`: a full room (`ROOM_FULL`, `LOG_FULL`) is its own issue `full` («Комната заполнена — откройте новую», ru/en/pt) instead of «no connection»; the generated room's rate window is `const` (lint).
 - `@agentstack/netplay` StackScript transport: `RETRY` (room CAS conflict) now waits a jittered backoff (`conflictDelayMs`, options `conflictRetries` / `conflictBackoffMs`) and sends a fresh idempotency key per attempt (was: 3 immediate repeats with the same key).
 - `@agentstack/netplay/ui` match bar: `.np-bar{display:flex}` overrode `[hidden]`, so a `quiet` strip never hid (a second player list on phones). Games that patched it with their own `.np-bar[hidden]` CSS can drop the patch.
 

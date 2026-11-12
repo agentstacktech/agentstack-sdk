@@ -84,7 +84,7 @@ export interface LobbyState {
   /** Machine reason for the error screen. A full / running room is not an error: you join as a spectator (screen 'playing', `seat -1`). */
   readonly error: LobbyError | null;
 }
-export type LobbyError = 'bad-code' | 'offline' | 'version' | 'sign-in' | 'unavailable';
+export type LobbyError = 'bad-code' | 'offline' | 'version' | 'sign-in' | 'unavailable' | 'full';
 
 export interface LobbyOptions<S, I, V> {
   /** Game id (namespaces room ids). */
@@ -152,12 +152,13 @@ export function createLobby<S, I, V>(o: LobbyOptions<S, I, V>): LobbyController<
       if (started) { emit({ ...state, players: snap.players }); return; }
       if (snap.issue === 'auth') { emit({ ...idle('error', 'sign-in') }); return; }
       if (snap.issue === 'not-published') { emit({ ...idle('error', 'unavailable') }); return; }
+      if (snap.issue === 'full') { emit({ ...idle('error', 'full') }); return; }
       if (snap.connection === 'offline') { emit({ ...idle('error', 'offline') }); return; }
       emit({ screen: 'waiting', code, link, host, players: snap.players, min, max, ready: !!me?.ready, canStart: seated.length >= min && !me?.ready, error: null });
     };
     off = s.subscribe(sync);
     emit({ screen: 'waiting', code, link, host, players: [], min, max, ready: false, canStart: false, error: null });
-    s.join().catch(() => emit({ ...idle('error', s.snapshot.issue === 'auth' ? 'sign-in' : s.snapshot.issue === 'not-published' ? 'unavailable' : 'offline') }));
+    s.join().catch(() => emit({ ...idle('error', s.snapshot.issue === 'auth' ? 'sign-in' : s.snapshot.issue === 'not-published' ? 'unavailable' : s.snapshot.issue === 'full' ? 'full' : 'offline') }));
   };
   const leave = () => {
     off?.(); off = null;

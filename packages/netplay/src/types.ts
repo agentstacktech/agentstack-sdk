@@ -245,7 +245,7 @@ export interface Snapshot<S, V = S> {
   readonly hostWaitMs: number | null;
   readonly connection: ConnectionState;
   /** Why the connection is down or slowed: 'auth' (sign in first), 'rate' (server asked to slow down), 'not-published' (room script missing); null = no known reason. */
-  readonly issue: 'auth' | 'rate' | 'not-published' | null;
+  readonly issue: 'auth' | 'rate' | 'not-published' | 'full' | null;
 }
 
 export type ConnectionState = 'idle' | 'connecting' | 'online' | 'reconnecting' | 'offline';

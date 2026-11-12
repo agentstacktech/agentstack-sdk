@@ -168,7 +168,7 @@ export class Session<S, I, V = S> {
   /** Reconnect delay: exponential up to 10 s; a guest (`auth`) or a missing script waits 15 s; `rate` honours the server. */
   private retryDelay(retryAfterMs = 0): number {
     const exp = Math.min(10_000, 250 * 2 ** Math.min(this.retries, 6));
-    return this.issue === 'auth' || this.issue === 'not-published' ? Math.max(exp, 15_000) : Math.max(exp, retryAfterMs);
+    return this.issue === 'auth' || this.issue === 'not-published' || this.issue === 'full' ? Math.max(exp, 15_000) : Math.max(exp, retryAfterMs);
   }
   private setIssue(i: NetIssue | null): void {
     if (this.issue === i) return;
