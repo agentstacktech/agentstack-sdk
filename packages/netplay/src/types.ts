@@ -187,6 +187,8 @@ export interface Snapshot<S, V = S> {
   /** authority: the host is away — ms left (as of the last entry) before the match ends as 'host-lost'; null = host present. */
   readonly hostWaitMs: number | null;
   readonly connection: ConnectionState;
+  /** Why the connection is down or slowed: 'auth' (sign in first), 'rate' (server asked to slow down), 'not-published' (room script missing); null = no known reason. */
+  readonly issue: 'auth' | 'rate' | 'not-published' | null;
 }
 
 export type ConnectionState = 'idle' | 'connecting' | 'online' | 'reconnecting' | 'offline';

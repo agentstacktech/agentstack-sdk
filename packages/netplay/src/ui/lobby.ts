@@ -12,7 +12,7 @@ export interface LobbyLabels {
   title: string; create: string; createHint: string; join: string; joinHint: string; codePlaceholder: string; joinGo: string;
   back: string; leave: string; yourCode: string; shareHint: string; copy: string; copied: string; share: string;
   players: string; you: string; waitingMore: string; start: string; waitingStart: string; ready: string;
-  badCode: string; offline: string; version: string; close: string;
+  badCode: string; offline: string; version: string; signIn: string; unavailable: string; close: string;
 }
 const en: LobbyLabels = {
   title: 'Play with friends', create: 'Create a room', createHint: 'You get a code to send to friends', join: 'Join with a code',
@@ -21,6 +21,7 @@ const en: LobbyLabels = {
   share: 'Share…', players: 'Players', you: 'you', waitingMore: 'Waiting for players… ({n} of {min} needed)', start: 'Start the game',
   waitingStart: 'Waiting for everyone to press Start…', ready: 'ready', badCode: 'That code doesn’t look right. Codes have 6 letters and digits.',
   offline: 'Can’t reach the game server. Check your connection and try again.', version: 'Your friend has a different version of the game. Both of you should reload the page.',
+  signIn: 'Online play needs an account. Sign in, then try again.', unavailable: 'Online play is not switched on on the server yet. Try again later.',
   close: 'Close',
 };
 const ru: LobbyLabels = {
@@ -30,6 +31,7 @@ const ru: LobbyLabels = {
   share: 'Поделиться…', players: 'Игроки', you: 'вы', waitingMore: 'Ждём игроков… (нужно {min}, сейчас {n})', start: 'Начать игру',
   waitingStart: 'Ждём, пока все нажмут «Начать»…', ready: 'готов', badCode: 'Код не подходит: в нём 6 букв и цифр.',
   offline: 'Нет связи с игровым сервером. Проверьте интернет и попробуйте ещё раз.', version: 'У друга другая версия игры. Обновите страницу оба.',
+  signIn: 'Для игры онлайн нужен аккаунт. Войдите и попробуйте ещё раз.', unavailable: 'Онлайн-игра ещё не включена на сервере. Попробуйте позже.',
   close: 'Закрыть',
 };
 const pt: LobbyLabels = {
@@ -39,6 +41,7 @@ const pt: LobbyLabels = {
   share: 'Compartilhar…', players: 'Jogadores', you: 'você', waitingMore: 'Aguardando jogadores… ({n} de {min})', start: 'Começar o jogo',
   waitingStart: 'Aguardando todos apertarem Começar…', ready: 'pronto', badCode: 'Esse código não parece certo. Códigos têm 6 letras e números.',
   offline: 'Sem conexão com o servidor do jogo. Verifique a internet e tente de novo.', version: 'Seu amigo tem outra versão do jogo. Recarreguem a página.',
+  signIn: 'O jogo online precisa de uma conta. Entre e tente de novo.', unavailable: 'O jogo online ainda não está ativado no servidor. Tente mais tarde.',
   close: 'Fechar',
 };
 export const LOBBY_LABELS = { en, ru, pt } as const;
@@ -160,7 +163,7 @@ export function mountLobby<S, I, V>(parent: HTMLElement, lobby: LobbyController<
       else if (s.ready) card.append(el('p', { class: 'np-msg' }, L.waitingStart));
       card.append(btn(L.start, () => lobby.start(), true, !s.canStart), btn(L.leave, () => lobby.cancel()));
     } else if (s.screen === 'error') {
-      card.append(el('p', { class: 'np-err', role: 'alert' }, s.error === 'bad-code' ? L.badCode : s.error === 'version' ? L.version : L.offline), btn(L.back, () => lobby.back(), true));
+      card.append(el('p', { class: 'np-err', role: 'alert' }, s.error === 'bad-code' ? L.badCode : s.error === 'version' ? L.version : s.error === 'sign-in' ? L.signIn : s.error === 'unavailable' ? L.unavailable : L.offline), btn(L.back, () => lobby.back(), true));
     }
     if (msg) card.append(el('p', { class: 'np-msg', 'aria-live': 'polite' }, msg));
     if (s.screen === 'playing' && (o.hideOnStart ?? true)) close();

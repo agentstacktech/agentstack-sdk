@@ -9,6 +9,7 @@
  * ```
  */
 import type { QueueApi } from '../matchmaking.js';
+import { errorKind, NetplayError } from '../errors.js';
 import type { Body, Entry, Transport } from '../types.js';
 import { pollingTransport, type PollingOptions, type RoomApi } from './polling.js';
 
@@ -38,7 +39,7 @@ export function runValue(payload: unknown): unknown {
 function check(v: unknown, what: string): Record<string, unknown> {
   const r = runValue(v) as Record<string, unknown> | null;
   if (!r || typeof r !== 'object') throw new Error(`netplay: ${what} returned no value`);
-  if (typeof r.error === 'string') throw new Error(`netplay: ${what}: ${r.error}`);
+  if (typeof r.error === 'string') throw new NetplayError(errorKind(r.error), r.error, `netplay: ${what}`);
   return r;
 }
 
@@ -54,7 +55,7 @@ export function stackscriptRoomApi(runner: ScriptRunner, o: StackscriptRoomOptio
     async join(room) {
       const r = await call('room.join', { room });
       self = String(r.self ?? '');
-      if (!self) throw new Error('netplay: room.join gave no identity (sign-in required?)');
+      if (!self) throw new NetplayError('auth', 'no_identity', 'netplay: room.join gave no identity (sign-in required)');
       return { self };
     },
     async append(room, body, to) {

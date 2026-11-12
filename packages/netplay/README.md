@@ -62,6 +62,11 @@ const s = createSession(ticTacToe, { transport: stackscriptTransport(runner, opt
 The generated script enforces auth, room membership, entry size, per-user rate limit, private `to`
 entries, max users per room, chunked logs and lobby TTL. It needs no room `onTick`.
 
+No `@agentstack/sdk` in the game? `hostedMcpRunner({ projectId })` is the same call over the page's cookie session
+(`POST /s/{pid}/mcp`). Guests, rate limits and a not-yet-published script surface as `snapshot.issue` → `netStatus()`
+«Sign in to play online» / «The server asked us to slow down…» / «Online play is not switched on…». Contract-test
+your published script locally with `fakeHostedMcp` from `/testing`.
+
 ### Test it like a real match
 
 ```ts

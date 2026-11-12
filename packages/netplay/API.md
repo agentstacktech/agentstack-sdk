@@ -95,6 +95,12 @@ A full/running room is not an error: you watch as a spectator (`session.seat ===
 (`manual: false` = real timers, for a browser demo). `stackscriptTransport(runner, { scriptId, exportPrefix, version? = 'live', intervalMs? = 400, maxErrors? = 6, maxBackoffMs? = 5000 })` with
 `runner = sdk.stackscript(projectId, { hostedMcp: true })`. `createMatchmaker(stackscriptRoomApi(runner, opts))` → `quickMatch(game, seats)` → `{ room }`, `privateRoom(game)`.
 
+### Hosted MCP runner (games without @agentstack/sdk)
+
+`hostedMcpRunner({ projectId, origin? = '', token?, fetch? })` → a `ScriptRunner` that POSTs JSON-RPC `tools/call agentstack.execute { action: 'script.run' }` to `${origin}/s/${projectId}/mcp` with the page's `hosted_app` cookie (`credentials: 'include'`) and, when `token()` returns one, `Authorization: Bearer`. On HTTP 401 with a token it re-mints the cookie once (`POST /api/hosted-apps/{pid}/session`) and retries. Replies are unwrapped from `result.structuredContent` or `result.content[0].text` (`unwrapHostedReply`).
+Failures throw `NetplayError { kind, code, retryAfterMs? }` — `errorKind(code, httpStatus)`: `auth` (401/403, auth_required, unauthorized, session_user_required, relogin_required, room-script `AUTH`), `rate` (429, rate_limit_exceeded, rate_limited, `RATE_LIMIT`, `*quota*`), `not-published` (script_not_found), `offline` (network, 5xx), `server` (anything else).
+`pollingTransport` reacts: `rate` → waits `max(retry_after_ms, backoff)` without counting it as a dead link (`onStatus('reconnecting', 'rate')`); `auth` / `not-published` → `onStatus('offline', kind)` and closes. The session keeps the reason in `snapshot.issue` (`'auth' | 'rate' | 'not-published' | null`), retries auth / not-published every ≥15 s, and `netStatus()` returns `sign-in` / `busy` / `unavailable` (labels `signIn`, `busy`, `unavailable` in `NET_STATUS_LABELS`; lobby errors `sign-in`, `unavailable`). `minPollMs` (polling option) caps after-send polls.
+
 ### Dev relay — DEV ONLY (two windows / devices on one LAN, no server)
 
 `npm run dev-relay` (= `node tools/dev-relay.mjs --lan`; prints the LAN URLs) and on the client `devRelayTransport(url, user, pollingOptions?)` (poll 150 ms). Plain Node `http`, memory only, **no auth** (the client names itself), private `to` entries enforced, CORS `*`, 64 KB body cap. Never deploy it; production = `stackscriptTransport` + the published room script. Games: `?net=dev&relay=http://<lan-ip>:8787`.
@@ -110,6 +116,7 @@ A full/running room is not an error: you watch as a spectator (`session.seat ===
 → `{ hub, clients, run(ms, frame?), runToEnd(frame?, maxMs?), snaps() }`. Resolves once every player sees `playing` (so you can `input` at once);
 `run` calls `update()` on every client each frame. Users are `u1…`, spectators `s1…`.
 `loadRoomScript(source)` (sync) → runtime; `scriptServer(rt, prefix)` → `{ transport(user), pump() }` — `pump()` delivers everything synchronously; call it after `join`/`input`/`update`.
+`fakeHostedMcp(rt, { projectId, scriptId, tokens?, now?, rateLimitPerSec?, retryAfterMs?, mcpAcceptsBearer? })` → `{ fetch, browser(signedInUser?), stats }`: the hosted endpoints with recorded envelopes (guest 401 `auth_required`, mint 401/200, 429 `rate_limit_exceeded` + `retry_after_ms`, `script_not_found`, idempotent replays) around a `loadRoomScript` runtime — pass `browser('alice')` as `hostedMcpRunner({ fetch })` for contract tests; `stats` counts requests per export / user.
 `microtasks()` lets pending promises run between virtual frames. `seatOf(table, i)`.
 `await sendRaw(table, i, { k: 'cmd', d: … })` = a hacked client i (bypasses its local `input()` check; `m` defaults to the current match) — assert that everyone rejects it (`snapshot.notice` matches `/rejected/`).
 

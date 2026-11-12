@@ -2,6 +2,7 @@
  * Client session: connects a Game to a Transport, folds the room log, schedules inputs,
  * keeps the connection alive and exposes one Snapshot for the UI (view layer stays yours).
  */
+import { isIssue, NetplayError, type NetIssue } from './errors.js';
 import type { Game } from './define.js';
 import { commitHash, createRoom, playerById, reduceRoom, type RoomModel } from './room.js';
 import type { Body, ConnectionState, Entry, Link, Outcome, Seat, Snapshot, Transport } from './types.js';
@@ -51,6 +52,8 @@ export class Session<S, I, V = S> {
   private link: Link | null = null;
   private self = '';
   private connection: ConnectionState = 'idle';
+  /** Why the link is down / slowed, when the transport could tell (see NetplayError). */
+  private issue: NetIssue | null = null;
   private readonly listeners = new Set<Listener<S, V>>();
   private readonly stepListeners = new Set<(state: S | null, tick: number) => void>();
   private snap: Snapshot<S, V> | null = null;
@@ -101,21 +104,35 @@ export class Session<S, I, V = S> {
       this.link = await this.opts.transport.connect(this.opts.room, {
         afterSeq: this.model.lastSeq,
         onEntries: (es) => this.receive(es),
-        onStatus: (s) => {
-          if (s === 'offline' && this.link) { this.link.close(); this.link = null; this.retries += 1; this.retryAt = this.now() + Math.min(10_000, 250 * 2 ** Math.min(this.retries, 6)); }
+        onStatus: (s, detail) => {
+          if (s === 'offline' && this.link) { this.link.close(); this.link = null; this.retries += 1; this.retryAt = this.now() + this.retryDelay(); }
+          this.setIssue(s === 'online' ? null : isIssue(detail) ? detail : this.issue === 'rate' && s === 'reconnecting' ? null : this.issue);
           this.setConnection(s);
         },
       });
       this.self = this.link.self;
       this.retries = 0;
+      this.setIssue(null);
       this.setConnection('online');
     } catch (err) {
       this.link = null;
       this.retries += 1;
-      this.retryAt = this.now() + Math.min(10_000, 250 * 2 ** Math.min(this.retries, 6));
+      this.setIssue(err instanceof NetplayError && isIssue(err.kind) ? err.kind : null);
+      this.retryAt = this.now() + this.retryDelay((err as NetplayError)?.retryAfterMs);
       this.setConnection('offline');
       throw err;
     }
+  }
+
+  /** Reconnect delay: exponential up to 10 s; a guest (`auth`) or a missing script waits 15 s; `rate` honours the server. */
+  private retryDelay(retryAfterMs = 0): number {
+    const exp = Math.min(10_000, 250 * 2 ** Math.min(this.retries, 6));
+    return this.issue === 'auth' || this.issue === 'not-published' ? Math.max(exp, 15_000) : Math.max(exp, retryAfterMs);
+  }
+  private setIssue(i: NetIssue | null): void {
+    if (this.issue === i) return;
+    this.issue = i;
+    this.snap = null;
   }
 
   /** Subscribe to snapshots. Returns an unsubscribe function. Called immediately with the current one. */
@@ -165,7 +182,7 @@ export class Session<S, I, V = S> {
       players: m.players.map((p) => ({ ...p })), spectators: m.spectators.size, tick: m.tick,
       state: own ? m.state : null,
       view: own ? this.game.view(m.state as S, seat) : this.lastView,
-      outcome, desync: m.desync, rematch: [...m.rematch], notice: m.notice, connection: this.connection,
+      outcome, desync: m.desync, rematch: [...m.rematch], notice: m.notice, connection: this.connection, issue: this.issue,
       hostWaitMs: m.hostLostAt === null || m.phase !== 'playing' ? null : Math.max(0, m.hostLostAt + this.game.hostGraceMs - m.now),
     };
     return this.snap;
@@ -260,11 +277,24 @@ export class Session<S, I, V = S> {
     this.lastSendAt = this.now();
     let failed = false;
     items.forEach((it, i) => {
-      link.send(it.body, it.to).catch(() => {
+      link.send(it.body, it.to).catch((err: unknown) => {
         if (failed) return;
         failed = true;
         this.outbox.unshift(...items.slice(i));
-        if (this.link === link) { link.close(); this.link = null; this.retryAt = this.now(); this.setConnection('reconnecting'); }
+        if (this.link !== link) return;
+        link.close();
+        this.link = null;
+        const e = err instanceof NetplayError ? err : null;
+        if (e && isIssue(e.kind)) {
+          // rate: wait what the server asked (≥1 s); auth / not-published: slow retries (15 s) + plain status
+          this.retries += 1;
+          this.setIssue(e.kind);
+          this.retryAt = this.now() + (e.kind === 'rate' ? Math.max(1000, e.retryAfterMs ?? 0) : this.retryDelay());
+          this.setConnection(e.kind === 'rate' ? 'reconnecting' : 'offline');
+        } else {
+          this.retryAt = this.now();
+          this.setConnection('reconnecting');
+        }
       });
     });
   }

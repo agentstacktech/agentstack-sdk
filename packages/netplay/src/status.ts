@@ -5,6 +5,12 @@
 import type { Snapshot } from './types.js';
 
 export type NetStatus =
+  /** Guest / expired session: online play needs a signed-in account. */
+  | { kind: 'sign-in' }
+  /** The server asked us to slow down (rate limit / quota); polling backs off by itself. */
+  | { kind: 'busy' }
+  /** The room script is not published on this project (yet). */
+  | { kind: 'unavailable' }
   | { kind: 'offline' }
   | { kind: 'reconnecting' }
   /** authority: the host is away; `seconds` left before the match is called off. */
@@ -14,9 +20,12 @@ export type NetStatus =
   /** Hashes disagree; recovery (re-fold from the log) runs automatically. */
   | { kind: 'desync' };
 
-/** null = all good (or not playing). Priority: own connection > host > others > desync. */
+/** null = all good (or not playing). Priority: known server reason > own connection > host > others > desync. */
 export function netStatus<S, V>(s: Snapshot<S, V>): NetStatus | null {
+  if (s.issue === 'auth') return { kind: 'sign-in' };
+  if (s.issue === 'not-published') return { kind: 'unavailable' };
   if (s.phase === 'over') return null;
+  if (s.issue === 'rate') return { kind: 'busy' };
   if (s.connection === 'offline') return { kind: 'offline' };
   if (s.connection === 'reconnecting' || s.connection === 'connecting') return s.phase === 'playing' ? { kind: 'reconnecting' } : null;
   if (s.phase !== 'playing') return null;

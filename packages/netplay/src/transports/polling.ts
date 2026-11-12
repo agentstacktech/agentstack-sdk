@@ -4,6 +4,7 @@
  * the session reconnects from its last seq, nothing is lost or applied twice.
  */
 import type { Body, ConnectOptions, Entry, Link, Transport } from '../types.js';
+import { NetplayError } from '../errors.js';
 
 /** Minimal server contract. `stackscriptRoomApi` implements it on top of the SDK StackScript client. */
 export interface RoomApi {
@@ -25,6 +26,8 @@ export interface PollingOptions {
   maxBackoffMs?: number;
   /** Errors in a row before the link reports `offline` and closes (session then reconnects). Default 6. */
   maxErrors?: number;
+  /** Min gap between an after-send poll and the previous poll (ms). Default 0. */
+  minPollMs?: number;
 }
 
 /** Same curve as `pollBackoffMs` in @agentstack/sdk stackscript (base·2^n, capped). */
@@ -43,6 +46,9 @@ export function pollingTransport(api: RoomApi, o: PollingOptions = {}): Transpor
       let cursor = opts.afterSeq;
       let alive = true;
       let errors = 0;
+      let rateHits = 0;
+      let rateWaitMs = 0;
+      let lastPollAt = 0;
       let timer: ReturnType<typeof setTimeout> | null = null;
       let inflight = false;
       let again = false;
@@ -53,9 +59,11 @@ export function pollingTransport(api: RoomApi, o: PollingOptions = {}): Transpor
         if (!alive) return;
         if (inflight) { again = true; return; }
         inflight = true;
+        lastPollAt = Date.now();
         try {
           const es = await api.poll(room, cursor);
           errors = 0;
+          rateHits = 0;
           const fresh = es.filter((e) => e.seq > cursor);
           if (fresh.length) {
             cursor = fresh[fresh.length - 1]!.seq;
@@ -63,15 +71,30 @@ export function pollingTransport(api: RoomApi, o: PollingOptions = {}): Transpor
           }
           opts.onStatus?.('online');
         } catch (err) {
-          errors += 1;
-          opts.onStatus?.(errors >= maxErrors ? 'offline' : 'reconnecting', String(err));
-          if (errors >= maxErrors) { link.close(); return; }
+          const kind = err instanceof NetplayError ? err.kind : 'offline';
+          if (kind === 'auth' || kind === 'not-published') {
+            // retrying fast cannot help (guest / script missing): report and let the session retry slowly
+            opts.onStatus?.('offline', kind);
+            link.close();
+            return;
+          }
+          if (kind === 'rate') {
+            // the server asked us to slow down: honour retry_after_ms, never count it as a dead link
+            rateWaitMs = Math.max((err as NetplayError).retryAfterMs ?? 0, backoffMs(++rateHits, interval, cap));
+            opts.onStatus?.('reconnecting', 'rate');
+          } else {
+            errors += 1;
+            opts.onStatus?.(errors >= maxErrors ? 'offline' : 'reconnecting', String(err));
+            if (errors >= maxErrors) { link.close(); return; }
+          }
         } finally {
           inflight = false;
         }
         if (!alive) return;
         if (timer) clearTimeout(timer);
-        timer = setTimeout(() => void tick(), again ? 0 : errors ? backoffMs(errors, interval, cap) : interval);
+        const wait = rateWaitMs || (again ? 0 : errors ? backoffMs(errors, interval, cap) : interval);
+        rateWaitMs = 0;
+        timer = setTimeout(() => void tick(), wait);
         again = false;
       };
       const link: Link = {
@@ -84,7 +107,8 @@ export function pollingTransport(api: RoomApi, o: PollingOptions = {}): Transpor
             return api.append(room, body, to);
           });
           chain = p.catch(() => { broken = true; });
-          return p.then(() => { if (o.pollAfterSend ?? true) void tick(); });
+          // poll right after our own entry so it shows up fast — but at most once per `minPollMs` (request budget)
+          return p.then(() => { if ((o.pollAfterSend ?? true) && Date.now() - lastPollAt >= (o.minPollMs ?? 0)) void tick(); });
         },
         close() { alive = false; if (timer) clearTimeout(timer); },
       };

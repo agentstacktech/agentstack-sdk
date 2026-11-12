@@ -34,6 +34,7 @@
 9. **Two real devices before the server exists**: `npm run dev-relay` + `devRelayTransport(url, user)` (DEV ONLY, no auth — never ship it as the production transport).
 10. **Lobby**: private rooms = `createLobby({ game, connect, onStart })` (+ optional `mountLobby` from `/ui`); quick match = `createMatchmaker(...)`.
 11. **UI**: render from `session.subscribe(snapshot)`; `input()` only queues — `update()` (or `autoPumpMs`) sends; for realtime loops use `onStep()` / `confirmed(tick)`; show connection trouble with `netStatus(snapshot)` (or the `mountNetStatus` pill from `/ui`); for an existing engine write a thin adapter (see "Ports" below).
+12. **Production transport (`net=as`)**: `stackscriptTransport(sdk.stackscript(pid, { hostedMcp: true }) | hostedMcpRunner({ projectId: pid }), { scriptId, exportPrefix })`; contract-test it with `fakeHostedMcp(loadRoomScript(source), …)` and keep the request rate under the room's `ratePer10s` (count with `stats`).
 
 See [test/recipe.test.ts](test/recipe.test.ts) — rock-paper-scissors built only from this file.
 
