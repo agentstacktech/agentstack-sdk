@@ -58,11 +58,15 @@ Tested by doing exactly these steps in an empty folder (`test/starter.test.ts` c
    <div id="app"></div>
    <script type="module">import { startStarter } from './src/game.ts'; startStarter(document.getElementById('app'), 'ru');</script>
    ```
-4. **Two players + a spectator on one screen** `two.html` (same-origin iframes share the in-page hub; no server):
+4. **Two players + a spectator on one screen** `two.html` (same-origin iframes share one in-page hub; no server). The **page** creates the hub: if the first iframe created it, reloading that iframe would take every room with it (the hub's code dies with its page):
    ```html
    <!doctype html><style>body{margin:0;display:flex;height:100vh}iframe{flex:1;border:1px solid #888}</style>
-   <iframe name="ana" src="/?join=TEST42&user=ana"></iframe><iframe name="bruno" src="/?join=TEST42&user=bruno"></iframe>
-   <script>setTimeout(() => document.body.insertAdjacentHTML('beforeend', '<iframe name="zoe" src="/?join=TEST42&user=zoe"></iframe>'), 3000)</script>
+   <script type="module">
+     import { memoryHub } from '@agentstack/netplay';
+     window.__netplayHub = memoryHub({ manual: false, latencyMs: 40 });
+     const add = (u) => document.body.insertAdjacentHTML('beforeend', `<iframe name="${u}" src="/?join=TEST42&user=${u}"></iframe>`);
+     add('ana'); add('bruno'); setTimeout(() => add('zoe'), 3000);
+   </script>
    ```
 5. **Run**: `npx vite` → open `http://localhost:5173/two.html` (the port vite prints). Both seats fill → the match starts; ana's `+1 +2 +3` are live, the bar says «bruno думает…»/«ana думает…», zoe sees «Вы зритель». Reach 21 → «Победа» / «Вы проиграли», «Реванш (1/2)», then «Счёт 1:0». Alone: open `/` — the lobby shows a room code and an invite link (memory hub = same page only; for two devices see step 8).
 6. **Test** `src/game.test.ts` (`npx vitest run`):

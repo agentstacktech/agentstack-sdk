@@ -81,7 +81,13 @@ export function memoryHub(o: MemoryHubOptions = {}): MemoryHub {
     if (!mine.length) return;
     const due = Math.max(now() + delay(), sub.lastDue); // per-subscriber FIFO
     sub.lastDue = due;
-    schedule(due, () => { if (sub.alive) sub.onEntries(mine); });
+    schedule(due, () => {
+      if (!sub.alive) return;
+      // A subscriber whose page is gone (an iframe reloaded while the hub lives in the parent: Firefox throws «dead
+      // object») or whose handler throws must not stop delivery to everyone else: drop that link (a live session
+      // reconnects) and log it so the error stays visible.
+      try { sub.onEntries(mine); } catch (err) { sub.alive = false; subs.delete(sub); console.error('memoryHub: dropped a subscriber whose handler threw', err); }
+    });
   }
   function append(room: string, from: string, body: Body, to?: string): void {
     const log = logs.get(room) ?? [];
