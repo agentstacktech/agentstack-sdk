@@ -227,3 +227,13 @@ describe('session hooks for games with their own loop', () => {
     expect(ticks.at(-1)).toBe(a.snapshot.tick);
   });
 });
+
+describe('memoryHub ordering', () => {
+  it('keeps each client\'s own entries in send order under jitter', async () => {
+    const hub = memoryHub({ manual: true, latencyMs: 20, jitterMs: 200, seed: 4 });
+    const link = await hub.transport('a').connect('r', { afterSeq: 0, onEntries: () => {} });
+    for (let i = 0; i < 50; i++) void link.send({ k: 'hash', m: 1, t: i, h: i });
+    hub.advance(2000);
+    expect(hub.log('r').map((e) => (e.body as { t: number }).t)).toEqual(Array.from({ length: 50 }, (_, i) => i));
+  });
+});

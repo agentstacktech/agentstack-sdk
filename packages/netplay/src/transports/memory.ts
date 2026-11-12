@@ -98,13 +98,15 @@ export function memoryHub(o: MemoryHubOptions = {}): MemoryHub {
         async connect(room, opts): Promise<Link> {
           if (blocked.has(user)) throw new Error('memoryHub: connection refused');
           const sub: Sub = { user, room, cursor: opts.afterSeq, onEntries: opts.onEntries, alive: true, lastDue: 0 };
+          let upDue = 0; // uplink FIFO: jitter never reorders one client's own entries
           subs.add(sub);
           deliver(sub); // backlog for late joiners / reconnects
           return {
             self: user,
             send(body, to) {
               if (!sub.alive) return Promise.reject(new Error('memoryHub: link closed'));
-              schedule(now() + delay(), () => append(room, user, body, to));
+              upDue = Math.max(now() + delay(), upDue);
+              schedule(upDue, () => append(room, user, body, to));
               return Promise.resolve();
             },
             close() { sub.alive = false; subs.delete(sub); },
