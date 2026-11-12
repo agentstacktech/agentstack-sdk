@@ -107,7 +107,7 @@ Tested by doing exactly these steps in an empty folder (`test/starter.test.ts` c
 
 Keep the screen a **presenter**: one pure function `snapshot → plain data` (stage, clock, names, rematch state), unit-tested; the DOM code only paints it.
 
-- **Who**: `localName(game)` → `id` for the transport user, `name` for `createSession({ name })` and `mountLobby({ nameField })`. Never seat by display name. Create it once per page (a duplicated tab swaps its copied id before the first `me.id` read).
+- **Who**: `localName(game)` → `id` for the transport user, `name` for `createSession({ name })` and `mountLobby({ nameField })`. Never seat by display name. Create it once per page (a duplicated tab swaps its copied id before the first `me.id` read); `await me.ready` before joining straight from an invite link.
 - **Reload**: everything the screen shows must come from the log, not local flags. A «locked this round» flag must be keyed by `match` *and* round (a rematch restarts round 0 — a stale flag froze WT's form), or read `session.model.commits`. Secret games: `secretStore: sessionStorage`.
 - **Late join / reload after the end**: wait for `phase !== 'lobby'`, not `=== 'playing'` — a finished room never plays again until a rematch.
 - **Spectators** (`seat === -1`): hide inputs and the rematch button; say who won by name («Victory: Ana»), not «Defeat».

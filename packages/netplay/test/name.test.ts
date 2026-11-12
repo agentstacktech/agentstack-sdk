@@ -62,6 +62,34 @@ describe('localName (ui)', () => {
     // another game in the same tab is a separate id space
     expect(localName('wt', { local, session: tab1, channel }).id).not.toBe(original);
   });
+  it('a real BroadcastChannel answers async: `await me.ready` before joining (invite link / ?join=)', async () => {
+    const open = new Set<IdChannel>();
+    const channel = (): IdChannel => {
+      const c: IdChannel = { onmessage: null, postMessage: (m) => { for (const o of open) if (o !== c) setTimeout(() => o.onmessage?.({ data: m }), 2); }, close: () => void open.delete(c) };
+      open.add(c);
+      return c;
+    };
+    const tab1 = mem(), local = mem();
+    const a = localName('g', { local, session: tab1, channel });
+    await a.ready; const original = a.id;
+    const dup = mem(); for (const [k, v] of tab1.m) dup.m.set(k, v);
+    const b = localName('g', { local, session: dup, channel, waitMs: 50 });
+    await b.ready; // resolved by the original's «mine», not by the timeout
+    expect(b.id).not.toBe(original);
+    open.clear(); // reload: nobody left to answer → ready after waitMs, id kept
+    const t0 = Date.now(), r = localName('g', { local, session: tab1, channel, waitMs: 30 });
+    await r.ready;
+    expect([r.id, Date.now() - t0 >= 25]).toEqual([original, true]);
+  });
+
+  it('two localName() calls in one page (the real BroadcastChannel) keep one id', async () => {
+    if (typeof BroadcastChannel !== 'function') return;
+    const tab = mem(), local = mem();
+    const a = localName('same-page', { local, session: tab }); await a.ready;
+    const b = localName('same-page', { local, session: tab, waitMs: 40 }); await b.ready; // e.g. the lobby opened again
+    expect(b.id).toBe(a.id);
+  });
+
   it('an id the game already used is never swapped, and ?user= never asks', () => {
     const sent: unknown[] = [];
     const ch = (): IdChannel => ({ onmessage: null, postMessage: (m) => void sent.push(m), close: () => {} });

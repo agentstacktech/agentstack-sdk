@@ -35,7 +35,7 @@ export function startStarter(root: HTMLElement, lang: 'ru' | 'en' | 'pt' = 'en',
     onStart: (session) => play(session),
   });
   const ui = mountLobby(root, lobby, { labels: LOBBY_LABELS[lang], title: '21', nameField: me });
-  if (!lobby.joinFromUrl()) lobby.create();
+  void me.ready.then(() => lobby.joinFromUrl() || lobby.create()); // a duplicated tab swaps its copied id first
 
   function play(session: Session<S21, number>) {
     const board = Object.assign(document.createElement('main'), { style: 'padding: 56px 12px' }); // below the bar
