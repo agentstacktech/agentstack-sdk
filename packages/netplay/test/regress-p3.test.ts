@@ -65,3 +65,17 @@ describe('secret reveal survives a reload while its send was failing', () => {
     expect(B.snapshot.state!.r).toEqual([12]);
   });
 });
+
+describe('pass 4: closing tab', () => {
+  it('hosted requests ask for keepalive so the last write of a closing tab still goes out (big bodies do not)', async () => {
+    const { hostedMcpRunner } = await import('../src/index.js');
+    const seen: (boolean | undefined)[] = [];
+    const r = hostedMcpRunner({ projectId: 1, fetch: (async (_u: string, init?: RequestInit) => {
+      seen.push(init?.keepalive);
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { structuredContent: { success: true, data: { result: { ok: true } } } } }), { headers: { 'content-type': 'application/json' } });
+    }) as typeof fetch });
+    await r.run({ script_id: 's', export: 'x', input: { a: 1 } } as never).catch(() => {});
+    await r.run({ script_id: 's', export: 'x', input: { a: 'z'.repeat(20_000) } } as never).catch(() => {});
+    expect(seen).toEqual([true, false]);
+  });
+});

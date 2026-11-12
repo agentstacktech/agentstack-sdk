@@ -48,6 +48,8 @@ function codeOf(p: Json | null): string {
   return typeof eo?.code === 'string' ? eo.code : '';
 }
 
+const KEEPALIVE_MAX = 8 * 1024;
+
 export function hostedMcpRunner(o: HostedMcpOptions): ScriptRunner {
   const f = o.fetch ?? ((...a: Parameters<typeof fetch>) => fetch(...a));
   const base = (o.origin ?? '').replace(/\/+$/, '');
@@ -67,12 +69,14 @@ export function hostedMcpRunner(o: HostedMcpOptions): ScriptRunner {
       return r.ok;
     } catch { return false; }
   };
-  const once = (params: Json) => f(`${base}/s/${o.projectId}/mcp`, {
-    method: 'POST', credentials: 'include', headers: headers(), signal: timeout(),
-    body: JSON.stringify({ jsonrpc: '2.0', id: ++id, method: 'tools/call', params: { name: 'agentstack.execute', arguments: {
+  const once = (params: Json) => {
+    const body = JSON.stringify({ jsonrpc: '2.0', id: ++id, method: 'tools/call', params: { name: 'agentstack.execute', arguments: {
       action: 'script.run', params: { project_id: o.projectId, ...params }, context: { project_id: o.projectId }, options: { execution_intent: 'direct' },
-    } } }),
-  });
+    } } });
+    // keepalive: the last write of a closing tab / swiped-away phone app (leave, away beat) still reaches the room.
+    // Browsers cap keepalive bodies at 64 kB in flight, so only small requests (all of ours in practice) ask for it.
+    return f(`${base}/s/${o.projectId}/mcp`, { method: 'POST', credentials: 'include', headers: headers(), signal: timeout(), body, keepalive: body.length < KEEPALIVE_MAX });
+  };
   return {
     async run(p) {
       let r: Response;
