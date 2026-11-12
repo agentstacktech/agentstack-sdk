@@ -172,6 +172,8 @@ export class Session<S, I, V = S> {
     if (seat < 0 || m.phase !== 'playing') return false;
     const g = this.game;
     if (g.mode !== 'lockstep') {
+      // validate locally when this client holds the state (fold: everyone; authority: the host) — same check every client runs
+      if (m.state !== null && m.state !== undefined && g.input(value, seat, m.state as S) === undefined) return false;
       const host = m.players[0]?.id;
       const to = g.mode === 'authority' && this.opts.transport.caps.privateEntries && host && host !== this.self ? host : undefined;
       this.push({ k: 'cmd', m: m.match, d: value }, to);

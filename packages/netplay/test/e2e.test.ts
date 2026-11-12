@@ -11,7 +11,10 @@ describe('fold: tic-tac-toe, two clients + spectator', () => {
     await t.run(200);
     expect(t.snaps().map((s) => s.phase)).toEqual(['playing', 'playing', 'playing']);
     expect([a!.seat, b!.seat, spec!.seat]).toEqual([0, 1, -1]);
-    expect(b!.input(4)).toBe(true); // out of turn: sent, but every client rejects it
+    expect(b!.input(4)).toBe(false); // out of turn: refused locally (same check every client runs)
+    // a hacked client bypassing its own check: the raw entry reaches the log, every client rejects it
+    const evil = await t.hub.transport('u2').connect(t.clients[0]!.snapshot.room, { afterSeq: 1e9, onEntries: () => {} });
+    void evil.send({ k: 'cmd', m: 1, d: 4, n: 9e15 });
     await t.run(200);
     expect(a!.snapshot.state!.cells[4]).toBe(-1);
     expect(b!.snapshot.notice).toMatch(/rejected/);

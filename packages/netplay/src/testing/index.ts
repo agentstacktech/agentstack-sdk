@@ -32,9 +32,14 @@ export interface TableOptions extends MemoryHubOptions {
   session?: Partial<Omit<SessionOptions, 'transport' | 'room'>>;
   /** Players press Ready after joining (needed when players < seats.max). Default: players < seats.max. */
   ready?: boolean;
+  /** Resolve only once every player sees phase `playing` (up to 10 s virtual). Default true; false = return in the lobby. */
+  waitPlaying?: boolean;
 }
 
-/** Seat `players` clients (+ spectators) in one room. Users are 'u1', 'u2', … ('s1' … for spectators). */
+/**
+ * Seat `players` clients (+ spectators) in one room. Users are 'u1', 'u2', … ('s1' … for spectators).
+ * Resolves when the match is `playing` on every player (unless `waitPlaying: false` or players < seats.min).
+ */
 export async function createTable<S, I, V>(game: Game<S, I, V>, o: TableOptions = {}): Promise<Table<S, I, V>> {
   const hub = memoryHub({ manual: true, ...o });
   const room = o.room ?? `${game.id}-test`;
@@ -54,6 +59,15 @@ export async function createTable<S, I, V>(game: Game<S, I, V>, o: TableOptions 
     for (const c of clients.slice(0, n)) c.ready();
     hub.advance(frameMs);
     await microtasks();
+  }
+  // with latency the seats may still be in the lobby here: settle until every player sees `playing`
+  // (so `t.clients[0].input(...)` right after `await createTable(...)` just works)
+  if (n >= game.seats.min && o.waitPlaying !== false) {
+    for (let e = 0; e < 10_000 && !clients.slice(0, n).every((c) => c.snapshot.phase === 'playing'); e += frameMs) {
+      clients.forEach((c) => c.update());
+      hub.advance(frameMs);
+      await microtasks();
+    }
   }
   const t: Table<S, I, V> = {
     hub, clients,
