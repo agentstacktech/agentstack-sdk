@@ -28,7 +28,7 @@ const en: LobbyLabels = {
   signIn: 'Online play needs an account. Sign in, then try again.', unavailable: 'Online play is not switched on on the server yet. Try again later.',
   close: 'Close', yourName: 'Your name (friends see it)',
   addLocal: '+ Player on this device', sameScreen: 'same screen', removeLocal: 'Remove', withOwner: "on {name}'s screen",
-  turnTimer: 'Time per move', turnOff: 'Off', turnSeconds: '{s} s', turnHint: 'Everyone moves at the same time. When time runs out, a default move is made for whoever has not chosen.',
+  turnTimer: 'Time per move', turnOff: 'Off', turnSeconds: '{s} s', turnHint: 'Everyone moves at the same time. When time runs out, whoever has not chosen gets the default move.',
 };
 const ru: LobbyLabels = {
   title: 'Игра с друзьями', create: 'Создать комнату', createHint: 'Вы получите код для друзей', join: 'Войти по коду',
@@ -40,7 +40,7 @@ const ru: LobbyLabels = {
   signIn: 'Для игры онлайн нужен аккаунт. Войдите и попробуйте ещё раз.', unavailable: 'Онлайн-игра ещё не включена на сервере. Попробуйте позже.',
   close: 'Закрыть', yourName: 'Ваше имя (его увидят друзья)',
   addLocal: '+ Игрок на этом устройстве', sameScreen: 'этот экран', removeLocal: 'Убрать', withOwner: 'на экране {name}',
-  turnTimer: 'Время на ход', turnOff: 'Выкл', turnSeconds: '{s} с', turnHint: 'Все ходят одновременно. Когда время выйдет, за тех, кто не выбрал, сделается ход по умолчанию.',
+  turnTimer: 'Время на ход', turnOff: 'Выкл', turnSeconds: '{s} с', turnHint: 'Все ходят одновременно. Если время выйдет, за того, кто не успел, будет сделан ход по умолчанию.',
 };
 const pt: LobbyLabels = {
   title: 'Jogar com amigos', create: 'Criar sala', createHint: 'Você recebe um código para enviar aos amigos', join: 'Entrar com código',
