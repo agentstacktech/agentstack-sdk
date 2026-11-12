@@ -38,6 +38,8 @@ seats not `1 ≤ min ≤ max ≤ 64`, missing `step` (lockstep) / `apply` (fold,
 `save()` → `RngState` (`createRng(saved)` continues). `ctx.rng` is derived per tick: no state to store. Helpers: `deriveSeed(seed, ...ints)`,
 `seedFromString(s)`, `mix32(x)`, `hashState(v)`, `hashString(s)`, `canonicalJson(v)`.
 
+**Errors:** `defineGame` throws `defineGame: …` for a bad id/version/seats, a missing `step`/`apply`/`view` for the mode, `clockMs` without `clock`, `secret` outside lockstep, any negative/NaN number (`hashEvery`, `clockMs`, `timeouts.*`) and an unknown `onTimeout`. Runtime rejections never throw: they land in `snapshot.notice`.
+
 ## `createSession(game, options): Session`
 
 | Option | Default | Notes |
@@ -106,3 +108,15 @@ A full/running room is not an error: you watch as a spectator (`session.seat ===
 `loadRoomScript(source)` (sync) → runtime; `scriptServer(rt, prefix)` → `{ transport(user), pump() }` — `pump()` delivers everything synchronously; call it after `join`/`input`/`update`.
 `microtasks()` lets pending promises run between virtual frames. `seatOf(table, i)`.
 `await sendRaw(table, i, { k: 'cmd', d: … })` = a hacked client i (bypasses its local `input()` check; `m` defaults to the current match) — assert that everyone rejects it (`snapshot.notice` matches `/rejected/`).
+
+## Bundle size (esbuild, minified, gzip -9; measured at 1e8468e)
+
+| Import | min | gzip |
+|---|---|---|
+| typical game: `defineGame`, `createSession`, `stackscriptTransport` | 21.5 KB | 7.7 KB |
+| + `memoryHub`, `createLobby`, `/ui` `mountLobby` + `mountNetStatus` | 32.4 KB | 12.0 KB |
+| everything from `.` | 35.2 KB | 12.5 KB |
+| `/ui` alone | 12.7 KB | 4.8 KB |
+| `generateRoomScript` alone (build-time) | 6.4 KB | 2.3 KB |
+
+No runtime dependencies; `sideEffects: false`, so unused transports/generator are tree-shaken.

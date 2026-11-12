@@ -36,6 +36,13 @@ export function defineGame<S, I, V = S>(def: GameDef<S, I, V>): Game<S, I, V> {
   if (def.mode === 'authority' && !def.view) throw new Error('defineGame: authority games need view() (what each seat may see)');
   if (def.clockMs && (!def.clock || def.mode === 'lockstep')) throw new Error('defineGame: clockMs needs clock() in a fold / authority game');
   if (def.secret && def.mode !== 'lockstep') throw new Error('defineGame: secret (commit–reveal) is a lockstep option');
+  const nonNeg = (name: string, v: unknown) => {
+    if (v !== undefined && !(typeof v === 'number' && Number.isFinite(v) && v >= 0)) throw new Error(`defineGame: ${name} must be a finite number ≥ 0 (got ${String(v)})`);
+  };
+  nonNeg('hashEvery', def.hashEvery); nonNeg('clockMs', def.clockMs);
+  for (const k of ['turnMs', 'presenceMs', 'hostGraceMs'] as const) nonNeg(`timeouts.${k}`, def.timeouts?.[k]);
+  const ot = def.timeouts?.onTimeout;
+  if (ot !== undefined && ot !== 'idle' && ot !== 'forfeit') throw new Error(`defineGame: timeouts.onTimeout must be 'idle' or 'forfeit' (got ${String(ot)})`);
   const turnBased = def.mode === 'lockstep' && (def.timeouts?.turnMs ?? 0) >= 1000;
   return {
     ...def,
