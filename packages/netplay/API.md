@@ -99,3 +99,4 @@ A full/running room is not an error: you watch as a spectator (`session.seat ===
 `run` calls `update()` on every client each frame. Users are `u1…`, spectators `s1…`.
 `loadRoomScript(source)` (sync) → runtime; `scriptServer(rt, prefix)` → `{ transport(user), pump() }` — `pump()` delivers everything synchronously; call it after `join`/`input`/`update`.
 `microtasks()` lets pending promises run between virtual frames. `seatOf(table, i)`.
+`await sendRaw(table, i, { k: 'cmd', d: … })` = a hacked client i (bypasses its local `input()` check; `m` defaults to the current match) — assert that everyone rejects it (`snapshot.notice` matches `/rejected/`).

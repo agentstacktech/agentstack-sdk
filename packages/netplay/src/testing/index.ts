@@ -5,7 +5,7 @@
 import type { Game } from '../define.js';
 import { createSession, type Session, type SessionOptions } from '../session.js';
 import { memoryHub, type MemoryHub, type MemoryHubOptions } from '../transports/memory.js';
-import type { Seat, Snapshot } from '../types.js';
+import type { Body, Seat, Snapshot } from '../types.js';
 
 export { loadRoomScript, scriptServer, ScriptError, type ScriptRuntime } from './scriptRuntime.js';
 
@@ -89,6 +89,18 @@ export async function createTable<S, I, V>(game: Game<S, I, V>, o: TableOptions 
   };
   return t;
 }
+
+/**
+ * Simulate a hacked client: append a raw body to the room log as client `i`'s user, bypassing its local
+ * `input()` checks (so you can assert that every other client rejects it). `n` is stamped above anything real.
+ */
+export async function sendRaw<S, I, V>(t: Table<S, I, V>, i: number, body: Body | Record<string, unknown>): Promise<void> {
+  const c = t.clients[i]!;
+  const link = await t.hub.transport(c.snapshot.self).connect(c.snapshot.room, { afterSeq: Number.MAX_SAFE_INTEGER, onEntries: () => {} });
+  await link.send({ m: c.snapshot.match, ...body, n: 2 ** 52 + ++rawN } as Body);
+  link.close();
+}
+let rawN = 0;
 
 /** Convenience: seat of client i (spectators -1). */
 export const seatOf = <S, I, V>(t: Table<S, I, V>, i: number): Seat => t.clients[i]!.seat;
