@@ -286,9 +286,10 @@ export function reduceRoom<S, I, V>(m: RoomModel<S, I, V>, e: Entry): void {
       if (g.secret) {
         const c = m.commits.get(b.t)?.[p.seat];
         if (c === undefined) { m.notice = `reveal without commit seat ${p.seat} tick ${b.t}`; return; }
-        if (b.d.length !== 1 || commitHash(b.d, String(b.salt ?? '')) !== c || g.input(b.d[0], p.seat, m.state) === undefined) {
+        const forged = b.d.length !== 1 || commitHash(b.d, String(b.salt ?? '')) !== c;
+        if (forged || g.input(b.d[0], p.seat, m.state) === undefined) {
           // a committed seat that reveals something else (or an invalid move) plays idle this tick, so the others don't wait out the clock
-          m.notice = `reveal mismatch seat ${p.seat} tick ${b.t}`;
+          m.notice = forged ? `reveal mismatch seat ${p.seat} tick ${b.t}` : `rejected input seat ${p.seat} tick ${b.t}`;
           if (b.t >= m.tick) { const row = m.inputs.get(b.t) ?? []; if (row[p.seat] === undefined) row[p.seat] = g.idle; m.inputs.set(b.t, row); drainLockstep(m); }
           return;
         }
