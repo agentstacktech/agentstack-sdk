@@ -30,7 +30,8 @@
     "AGENTS.md",
     "AI_INDEX.md",
     "examples",
-    "API.md"
+    "API.md",
+    "tools/dev-relay.mjs"
   ],
   "sideEffects": false,
   "scripts": {
@@ -39,7 +40,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
     "test": "vitest run",
     "gen:room": "npm run build --silent && node tools/gen-room.mjs",
-    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "dev-relay": "node tools/dev-relay.mjs --lan"
   },
   "engines": {
     "node": ">=20.0.0"

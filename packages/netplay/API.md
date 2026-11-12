@@ -95,6 +95,10 @@ A full/running room is not an error: you watch as a spectator (`session.seat ===
 (`manual: false` = real timers, for a browser demo). `stackscriptTransport(runner, { scriptId, exportPrefix, version? = 'live', intervalMs? = 400, maxErrors? = 6, maxBackoffMs? = 5000 })` with
 `runner = sdk.stackscript(projectId, { hostedMcp: true })`. `createMatchmaker(stackscriptRoomApi(runner, opts))` → `quickMatch(game, seats)` → `{ room }`, `privateRoom(game)`.
 
+### Dev relay — DEV ONLY (two windows / devices on one LAN, no server)
+
+`npm run dev-relay` (= `node tools/dev-relay.mjs --lan`; prints the LAN URLs) and on the client `devRelayTransport(url, user, pollingOptions?)` (poll 150 ms). Plain Node `http`, memory only, **no auth** (the client names itself), private `to` entries enforced, CORS `*`, 64 KB body cap. Never deploy it; production = `stackscriptTransport` + the published room script. Games: `?net=dev&relay=http://<lan-ip>:8787`.
+
 ## Room script generator
 
 `generateRoomScript(game, { prefix = id, maxBody = 4000, ratePer10s = 120, maxUsers = max + 8, chunk = 64, pollLimit = 256, lobbyTtlMs = 120000 })` → TypeScript source

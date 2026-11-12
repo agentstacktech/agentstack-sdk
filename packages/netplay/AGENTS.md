@@ -31,8 +31,9 @@
    - e2e: `createTable(game, { players: 2, spectators: 1, latencyMs, jitterMs })` and assert `snaps()[1].state` equals `snaps()[0].state`, outcome agreed, `desync === null`;
    - server: `loadRoomScript(generateRoomScript(game, { prefix }))` + `scriptServer(rt, prefix)` with two sessions.
 8. **Room script**: commit the generated file and a test that it equals the generator output. Publishing it is a platform action that needs the project owner's approval.
-9. **Lobby**: private rooms = `createLobby({ game, connect, onStart })` (+ optional `mountLobby` from `/ui`); quick match = `createMatchmaker(...)`.
-10. **UI**: render from `session.subscribe(snapshot)`; `input()` only queues — `update()` (or `autoPumpMs`) sends; for realtime loops use `onStep()` / `confirmed(tick)`; show connection trouble with `netStatus(snapshot)` (or the `mountNetStatus` pill from `/ui`); for an existing engine write a thin adapter (see "Ports" below).
+9. **Two real devices before the server exists**: `npm run dev-relay` + `devRelayTransport(url, user)` (DEV ONLY, no auth — never ship it as the production transport).
+10. **Lobby**: private rooms = `createLobby({ game, connect, onStart })` (+ optional `mountLobby` from `/ui`); quick match = `createMatchmaker(...)`.
+11. **UI**: render from `session.subscribe(snapshot)`; `input()` only queues — `update()` (or `autoPumpMs`) sends; for realtime loops use `onStep()` / `confirmed(tick)`; show connection trouble with `netStatus(snapshot)` (or the `mountNetStatus` pill from `/ui`); for an existing engine write a thin adapter (see "Ports" below).
 
 See [test/recipe.test.ts](test/recipe.test.ts) — rock-paper-scissors built only from this file.
 
