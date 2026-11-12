@@ -23,6 +23,7 @@ describe('matchBar (presenter)', () => {
     const away = base({ players: [s.players[0]!, { ...s.players[1]!, status: 'away' }] });
     expect(matchBar(away, { ...ru, done: () => false }).players[1]!.status).toBe('нет связи');
     expect(matchBar(s, ru).players[1]!.status).toBe(''); // no turns → no thinking/ready
+    expect(matchBar(s, { ...ru, pace: 'race', done: (seat) => seat === 0 }).players.map((p) => p.status)).toEqual(['закончил', 'играет…']);
   });
 
   it('end: win / lose / spectator «Победа: имя», rematch votes, the ask, blocked when someone left, series', () => {

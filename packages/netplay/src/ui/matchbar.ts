@@ -16,14 +16,14 @@ import type { Session } from '../session.js';
 import type { Outcome, Snapshot } from '../types.js';
 
 export interface MatchBarLabels {
-  you: string; thinking: string; ready: string; away: string; left: string; watching: string;
+  you: string; thinking: string; ready: string; playing: string; finished: string; away: string; left: string; watching: string;
   win: string; lose: string; draw: string; winner: string; cleared: string; failed: string;
   rematch: string; rematchVotes: string; waitingOthers: string; wantsRematch: string; cantRematch: string;
   newRoom: string; menu: string; series: string; draws: string; coopSeries: string; seconds: string;
   reasonLeft: string; reasonAway: string; reasonHost: string;
 }
 const en: MatchBarLabels = {
-  you: 'you', thinking: 'thinking…', ready: 'ready', away: 'no connection', left: 'left', watching: 'You are watching',
+  you: 'you', thinking: 'thinking…', ready: 'ready', playing: 'playing…', finished: 'finished', away: 'no connection', left: 'left', watching: 'You are watching',
   win: 'You won!', lose: 'You lost', draw: 'Draw', winner: 'Winner: {name}', cleared: 'Cleared together!', failed: 'Not this time',
   rematch: 'Rematch', rematchVotes: 'Rematch ({n}/{k})', waitingOthers: 'Waiting for the others… ({n}/{k})', wantsRematch: '{names} wants a rematch',
   cantRematch: 'Not enough players for a rematch — start a new room', newRoom: 'New room', menu: 'Menu',
@@ -31,7 +31,7 @@ const en: MatchBarLabels = {
   reasonLeft: '{names} left the game', reasonAway: '{names} lost connection', reasonHost: 'The host lost connection',
 };
 const ru: MatchBarLabels = {
-  you: 'вы', thinking: 'думает…', ready: 'готов', away: 'нет связи', left: 'вышел', watching: 'Вы зритель',
+  you: 'вы', thinking: 'думает…', ready: 'готов', playing: 'играет…', finished: 'закончил', away: 'нет связи', left: 'вышел', watching: 'Вы зритель',
   win: 'Вы победили!', lose: 'Вы проиграли', draw: 'Ничья', winner: 'Победа: {name}', cleared: 'Пройдено вместе!', failed: 'В этот раз не вышло',
   rematch: 'Реванш', rematchVotes: 'Реванш ({n}/{k})', waitingOthers: 'Ждём остальных… ({n}/{k})', wantsRematch: '{names}: хочет реванш',
   cantRematch: 'Для реванша не хватает игроков — создайте новую комнату', newRoom: 'Новая комната', menu: 'Меню',
@@ -39,7 +39,7 @@ const ru: MatchBarLabels = {
   reasonLeft: '{names}: вышел из игры', reasonAway: '{names}: нет связи', reasonHost: 'Ведущий потерял связь',
 };
 const pt: MatchBarLabels = {
-  you: 'você', thinking: 'pensando…', ready: 'pronto', away: 'sem conexão', left: 'saiu', watching: 'Você está assistindo',
+  you: 'você', thinking: 'pensando…', ready: 'pronto', playing: 'jogando…', finished: 'terminou', away: 'sem conexão', left: 'saiu', watching: 'Você está assistindo',
   win: 'Você venceu!', lose: 'Você perdeu', draw: 'Empate', winner: 'Vitória: {name}', cleared: 'Vencemos juntos!', failed: 'Não foi dessa vez',
   rematch: 'Revanche', rematchVotes: 'Revanche ({n}/{k})', waitingOthers: 'Aguardando os outros… ({n}/{k})', wantsRematch: '{names} quer revanche',
   cantRematch: 'Faltam jogadores para a revanche — crie uma nova sala', newRoom: 'Nova sala', menu: 'Menu',
@@ -55,8 +55,10 @@ export interface MatchBarOptions {
   kind?: 'versus' | 'coop';
   /** coop: did this outcome count as a win? Default: reason 'cleared' or 'won'. */
   won?: (o: Outcome) => boolean;
-  /** true = this seat already moved this turn («ready»), false = «thinking…», undefined = the game has no turns. */
+  /** true = this seat already moved this turn («ready»), false = «thinking…», undefined = the game has no turns. With `pace: 'race'`: «finished» / «playing…». */
   done?: (seat: number, s: Snap) => boolean | undefined;
+  /** 'turns' (default): thinking / ready. 'race' (everyone plays at once, e.g. a score race): playing / finished. */
+  pace?: 'turns' | 'race';
   /** Short per-seat extra, e.g. «★ 1200». */
   detail?: (seat: number, s: Snap) => string | undefined;
   /** ms left on the turn / beat clock; null = no clock. */
@@ -88,7 +90,8 @@ export function matchBar(s: Snap, o: MatchBarOptions = {}): MatchBarModel {
   const over = s.phase === 'over';
   const players = s.players.map((p) => {
     const d = p.status === 'on' && s.phase === 'playing' ? o.done?.(p.seat, s) : undefined;
-    const status = p.status === 'left' ? L.left : p.status === 'away' ? L.away : d === true ? L.ready : d === false && p.id !== s.self ? L.thinking : '';
+    const race = o.pace === 'race';
+    const status = p.status === 'left' ? L.left : p.status === 'away' ? L.away : d === true ? (race ? L.finished : L.ready) : d === false && p.id !== s.self ? (race ? L.playing : L.thinking) : '';
     return { name: p.name || p.id, you: p.id === s.self, status, detail: o.detail?.(p.seat, s) ?? '' };
   });
   const ms = s.phase === 'playing' ? (o.clock?.(s) ?? null) : null;
