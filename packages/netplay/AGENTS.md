@@ -59,6 +59,18 @@ See [test/recipe.test.ts](test/recipe.test.ts) — rock-paper-scissors built onl
 - **Don't** assume join order = connect-call order: seats follow server order (`hello` entries).
 - **Don't** publish/promote room scripts or touch live sites from an agent run without the owner's explicit approval.
 
+## Match screen checklist (bugs found in real games, 2026-11-12)
+
+Keep the screen a **presenter**: one pure function `snapshot → plain data` (stage, clock, names, rematch state), unit-tested; the DOM code only paints it.
+
+- **Who**: `localName(game)` → `id` for the transport user, `name` for `createSession({ name })` and `mountLobby({ nameField })`. Never seat by display name.
+- **Reload**: everything the screen shows must come from the log, not local flags. A «locked this round» flag must be keyed by `match` *and* round (a rematch restarts round 0 — a stale flag froze WT's form), or read `session.model.commits`. Secret games: `secretStore: sessionStorage`.
+- **Late join / reload after the end**: wait for `phase !== 'lobby'`, not `=== 'playing'` — a finished room never plays again until a rematch.
+- **Spectators** (`seat === -1`): hide inputs and the rematch button; say who won by name («Victory: Ana»), not «Defeat».
+- **Rematch**: show the vote count, «your opponent wants a rematch», and when they left (`status === 'left'`) hide Rematch and offer «New room». Keep a series score by **player id** (seats can change after a rematch).
+- **Clock**: `turnMs - (now - model.tickStartT)`; highlight the last 10 s; consider locking a legal pending move at the buzzer instead of losing the turn.
+- **Errors**: map `input()` refusal codes to sentences in every language you ship.
+
 ## File map
 
 | Path | Role |
