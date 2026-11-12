@@ -90,3 +90,37 @@ describe('match bar CSS', () => {
     expect(MATCH_BAR_CSS).toMatch(/\.np-end\[hidden\]/);
   });
 });
+
+describe('away: background polling slows down (battery, data, request budget)', () => {
+  it('a hidden tab polls every ≥3 s instead of 0.4 s and catches up at once on return', async () => {
+    const { vi } = await import('vitest');
+    const { pollingTransport, createSession: cs } = await import('../src/index.js');
+    vi.useFakeTimers();
+    try {
+      const log: { seq: number; from: string; t: number; body: { k: string } }[] = [];
+      let polls = 0;
+      const api = {
+        privateEntries: false,
+        async join() { return { self: 'b' }; },
+        async append(_r: string, body: unknown) { log.push({ seq: log.length + 1, from: 'b', t: Date.now(), body: body as { k: string } }); },
+        async poll(_r: string, after: number) { polls++; log.push({ seq: log.length + 1, from: 'a', t: Date.now(), body: { k: 'clock' } }); return log.filter((e) => e.seq > after); },
+      };
+      const s = cs(race, { transport: pollingTransport(api as never, { intervalMs: 400 }), room: 'r' });
+      await s.join();
+      await vi.advanceTimersByTimeAsync(4000);
+      const active = polls;
+      (s as unknown as { hidden: boolean; model: { phase: string } }).model.phase = 'playing'; // away() only acts mid-match
+      s.away(true);
+      polls = 0;
+      await vi.advanceTimersByTimeAsync(12_000);
+      const hidden = polls;
+      polls = 0;
+      s.away(false);
+      await vi.advanceTimersByTimeAsync(10);
+      expect(active).toBeGreaterThanOrEqual(8); // ~10 polls in 4 s
+      expect(hidden).toBeLessThanOrEqual(5); // ≤ 4–5 polls in 12 s
+      expect(polls).toBeGreaterThanOrEqual(1); // back: polled at once
+      s.close();
+    } finally { vi.useRealTimers(); }
+  });
+});

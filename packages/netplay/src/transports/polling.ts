@@ -63,6 +63,7 @@ export function pollingTransport(api: RoomApi, o: PollingOptions = {}): Transpor
       // after a failed append nothing later may reach the server first (the session re-sends from the failure, in order)
       let broken = false;
       let period = interval;
+      let floor = 0; // background tab: poll no faster than this (Link.pace)
       const deliver = (es: readonly Entry[]): void => {
         const fresh = es.filter((e) => e.seq > cursor);
         if (!fresh.length) return;
@@ -73,7 +74,8 @@ export function pollingTransport(api: RoomApi, o: PollingOptions = {}): Transpor
       // a timer poll is skipped while piggybacked reads (appendRead) keep us fresh anyway
       const timed = (): void => {
         const fresh = Date.now() - lastReadAt;
-        if (alive && !errors && !rateHits && fresh < period) { timer = setTimeout(timed, period - fresh); return; }
+        const p = Math.max(period, floor);
+        if (alive && !errors && !rateHits && fresh < p) { timer = setTimeout(timed, p - fresh); return; }
         void tick();
       };
       const tick = async (): Promise<void> => {
@@ -111,7 +113,7 @@ export function pollingTransport(api: RoomApi, o: PollingOptions = {}): Transpor
         }
         if (!alive) return;
         if (timer) clearTimeout(timer);
-        const wait = rateWaitMs || (again ? 0 : errors ? backoffMs(errors, interval, cap) : period);
+        const wait = rateWaitMs || (again ? 0 : errors ? backoffMs(errors, interval, cap) : Math.max(period, floor));
         rateWaitMs = 0;
         timer = setTimeout(timed, wait);
         again = false;
@@ -120,6 +122,11 @@ export function pollingTransport(api: RoomApi, o: PollingOptions = {}): Transpor
         self,
         send(body, to) { return enqueue([to ? { body, to } : { body }]); },
         ...(api.appendRead ? { sendMany: (items: readonly { body: Body; to?: string }[]) => enqueue(items) } : {}),
+        pace(ms) {
+          const was = floor;
+          floor = ms && ms > 0 ? ms : 0;
+          if (!floor && was && alive && !inflight) { if (timer) clearTimeout(timer); void tick(); } // back: catch up at once
+        },
         close() { alive = false; if (timer) clearTimeout(timer); },
       };
       const enqueue = (items: readonly { body: Body; to?: string }[]): Promise<void> => {

@@ -6,6 +6,7 @@
 
 ### Добавлено
 
+- `@agentstack/netplay`: фоновая вкладка опрашивает реже — `Link.pace?(ms|null)` (polling-транспорты), `away(true)` замедляет опрос до `SessionOptions.hiddenPollMs` (по умолчанию 3000 мс), при возврате — опрос сразу (батарея, мобильный трафик, лимит запросов комнаты).
 - `@agentstack/netplay`: `session.inputAll(cmd)` — одна запись на устройство для всех его мест (отчёт часов на общем столе); генератор комнаты: `maxLog` (по умолчанию 100000, `LOG_FULL`), чанк лога 64 → 16.
 - `@agentstack/netplay`: несколько победителей (`Outcome.winners`, команды и общая победа), команды зрителей (`GameDef.audience`, `session.audience`), фоновая вкладка (`session.away`, `bindVisibility`), команды в полосе матча (`team`, `teamName`).
 

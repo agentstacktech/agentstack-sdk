@@ -27,6 +27,8 @@ export interface SessionOptions {
   params?: Record<string, unknown>;
   /** lockstep: ticks of input delay. Default 0 for turn-based/secret games, 2 for realtime. */
   inputDelay?: number;
+  /** Background tab (`away(true)`): poll the room no faster than this (ms; polling transports). Default 3000. */
+  hiddenPollMs?: number;
   /** lockstep: how many ticks a client may run ahead of the confirmed tick before input() stalls. */
   maxAhead?: number;
   /**
@@ -150,6 +152,7 @@ export class Session<S, I, V = S> {
       });
       if (!current()) { link.close(); return; }
       this.link = link;
+      if (this.hidden) link.pace?.(this.opts.hiddenPollMs ?? 3000); // reconnected while in the background
       this.self = link.self;
       this.retries = 0;
       this.setIssue(null);
@@ -253,6 +256,7 @@ export class Session<S, I, V = S> {
     if (!hidden) {
       if (!this.hidden) return;
       this.hidden = false;
+      this.link?.pace?.(null);
       this.push({ k: 'clock' });
     } else {
       if (this.hidden || this.seat < 0 || this.model.phase !== 'playing') return;
@@ -260,6 +264,7 @@ export class Session<S, I, V = S> {
       // inputs still batched (sendEveryMs) go out BEFORE the away entry: any entry after it would mark the seats present again
       this.flushBatch();
       this.push({ k: 'away' });
+      this.link?.pace?.(this.opts.hiddenPollMs ?? 3000);
     }
     this.flush();
   }

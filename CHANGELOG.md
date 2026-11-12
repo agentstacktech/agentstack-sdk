@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `@agentstack/netplay`: background tab polls slower — `Link.pace?(ms|null)` (polling transports), `away(true)` slows polling to `SessionOptions.hiddenPollMs` (default 3000 ms), return polls at once (battery, mobile data, room request budget).
 - `@agentstack/netplay`: `Session.inputAll(cmd)` — fold / authority command for every seat on the device in one entry (`{ k: 'cmd', a: 1 }`), so a shared-table clock report with local seats costs one entry instead of one per seat. Room generator: `maxLog` (default 100000, `LOG_FULL`), default `chunk` 64 → 16 (less rewritten per append).
 - `@agentstack/netplay` 0.1.0 (`sdk.netplay.gen1`): game-agnostic deterministic multiplayer — `defineGame` (lockstep / fold / authority), room-log reducer (lobby, ready, rematch, timeouts, spectators, commit–reveal, desync hashes), transports (memory, polling, StackScript via the SDK client, WSS), matchmaking, StackScript room-script generator, `@agentstack/netplay/testing` harness. Docs: `packages/netplay/README.md`, `AGENTS.md`.
 - `@agentstack/netplay`: several winners — `Outcome.winners` (teams, shared wins), `MatchResult.winners` (ids), `outcomeWinners` / `isWinner` / `resultWinners` / `normalizeOutcome`; `seriesScore` counts a shared win for each winner.

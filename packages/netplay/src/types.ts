@@ -261,6 +261,8 @@ export interface Link {
   send(body: Body, to?: string): Promise<void>;
   /** Optional: several bodies in one request, same ordering rules (HTTP transports — request budget). */
   sendMany?(items: readonly { body: Body; to?: string }[]): Promise<void>;
+  /** Optional (polling transports): poll no faster than `ms` (background tab: battery, data, request budget); null = normal pace, poll now. */
+  pace?(ms: number | null): void;
   close(): void;
 }
 
