@@ -110,6 +110,7 @@ mountLobby(document.body, lobby, { labels: LOBBY_LABELS.en, title: 'Tic-tac-toe'
 
 ## Examples
 
+- [examples/starter.ts](examples/starter.ts) — **start here**: a whole browser game («21») with lobby, board and match bar in 59 lines; step by step in [AGENTS.md](AGENTS.md) «A new multiplayer game in 10 minutes».
 - [examples/tic-tac-toe.ts](examples/tic-tac-toe.ts) — `fold`, forfeit on silence.
 - [examples/tug-of-war.ts](examples/tug-of-war.ts) — `lockstep` realtime with hashes.
 
