@@ -84,3 +84,22 @@ it('mints a guest hosted session on auth_required (never before), re-mints on au
   expect(m.matchId).toBe('qm_9');
   expect(log).toEqual(['rooms.quick_match', 'session:{"guest":true}', 'rooms.quick_match', 'rooms.quick_match']);
 });
+
+it('sends X-CSRF-Token from the csrf_token cookie on the session mint and MCP calls (403 csrf_validation_failed otherwise)', async () => {
+  const g = globalThis as unknown as { document?: { cookie: string } };
+  const had = g.document; g.document = { cookie: 'a=1; csrf_token=tok%2B1' };
+  const seen: string[] = [];
+  const f = (async (url: string, init: RequestInit) => {
+    const h = init.headers as Record<string, string>;
+    seen.push(`${String(url).includes('/session') ? 'session' : 'mcp'}:${h['x-csrf-token'] ?? '-'}`);
+    if (String(url).includes('/session')) return new Response('{"ok":true}', { status: 200 });
+    if (seen.filter((x) => x.startsWith('mcp')).length === 1) return new Response(JSON.stringify({ error: { code: -32001, message: 'auth_required', data: { code: 'auth_required' } } }), { status: 401 });
+    return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { content: [{ type: 'text', text: JSON.stringify({ ok: true, data: { matches: [], count: 0 } }) }] } }), { status: 200 });
+  }) as unknown as typeof fetch;
+  try {
+    const rooms = hostedRooms({ projectId: 7, scriptId: 's', fetch: f });
+    await rooms.listOpen?.().catch(() => []);
+    expect(seen[0]).toBe('mcp:tok+1');
+    expect(seen).toContain('session:tok+1');
+  } finally { g.document = had; }
+});

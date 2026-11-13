@@ -77,6 +77,8 @@ export interface HostedRoomsOptions {
   reprobeMs?: number;
   /** Mint a hosted-app session cookie (guest or bearer) when a call answers auth_required, then retry once. Default true. */
   session?: boolean;
+  /** Send `X-CSRF-Token` from the page's `csrf_token` cookie (double-submit CSRF on cookie-authenticated POSTs). Default true. */
+  csrf?: boolean;
 }
 
 export interface RoomsApi {
@@ -149,11 +151,21 @@ export function hostedRooms(o: HostedRoomsOptions): RoomsApi {
   // A guest page has no hosted-app cookie until it asks for one. We never overwrite a working cookie: the first auth error mints one
   // (guest, or with the player's bearer) and the call is retried once.
   let session: Promise<boolean> | null = null;
+  // Double-submit CSRF: once the page holds a readable `csrf_token` cookie (any platform call can set it, e.g. the shop's
+  // /api/commerce/*), cookie-authenticated POSTs without the matching X-CSRF-Token header get 403 csrf_validation_failed.
+  const csrf = (h: Record<string, string>) => {
+    if (o.csrf === false) return h;
+    try {
+      const m = typeof document !== 'undefined' ? /(?:^|;\s*)csrf_token=([^;]+)/.exec(document.cookie) : null;
+      if (m) h['x-csrf-token'] = decodeURIComponent(m[1]!);
+    } catch { /* no document / cookie access */ }
+    return h;
+  };
   const mintSession = (): Promise<boolean> => {
     const t = o.token?.();
     const h: Record<string, string> = { 'content-type': 'application/json', accept: 'application/json' };
     if (t) h.authorization = `Bearer ${t}`;
-    return f(`${base}/api/hosted-apps/${o.projectId}/session`, { method: 'POST', credentials: 'include', headers: h, body: t ? '{}' : '{"guest":true}' })
+    return f(`${base}/api/hosted-apps/${o.projectId}/session`, { method: 'POST', credentials: 'include', headers: csrf(h), body: t ? '{}' : '{"guest":true}' })
       .then((r) => r.ok, () => false);
   };
   const ensureSession = (): Promise<boolean> => { if (o.session === false) return Promise.resolve(true); session = mintSession(); return session; };
@@ -177,7 +189,7 @@ export function hostedRooms(o: HostedRoomsOptions): RoomsApi {
     } } });
     const signal = typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(o.timeoutMs ?? 15_000) : undefined;
     let r: Response;
-    try { r = await f(`${base}/s/${o.projectId}/mcp`, { method: 'POST', credentials: 'include', headers: h, body, ...(keepalive ? { keepalive: true } : signal ? { signal } : {}) }); }
+    try { r = await f(`${base}/s/${o.projectId}/mcp`, { method: 'POST', credentials: 'include', headers: csrf(h), body, ...(keepalive ? { keepalive: true } : signal ? { signal } : {}) }); }
     catch (e) { throw new NetplayError('offline', 'network', String((e as Error)?.message ?? e)); }
     let text = await r.text();
     if (text.includes('\ndata:') || text.startsWith('data:') || text.startsWith('event:')) {
