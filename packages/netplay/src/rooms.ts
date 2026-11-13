@@ -36,6 +36,8 @@ export interface HostedRoomsOptions {
   token?: () => string | null | undefined;
   fetch?: typeof fetch;
   timeoutMs?: number;
+  /** Re-try a lobby action that was missing after this long (ms). Default 60000. */
+  reprobeMs?: number;
 }
 
 export interface RoomsApi {
@@ -77,6 +79,10 @@ export function hostedRooms(o: HostedRoomsOptions): RoomsApi {
   const base = (o.origin ?? '').replace(/\/+$/, '');
   const mode = o.mode ?? '1v1';
   const sup: { create: boolean | null; listOpen: boolean | null; joinByCode: boolean | null } = { create: null, listOpen: null, joinByCode: null };
+  // «missing» expires: the server can ship rooms.create / list_open / join_by_code while the page is open
+  const supAt: Record<string, number> = {};
+  const reprobeMs = o.reprobeMs ?? 60_000;
+  const mark = (k: keyof typeof sup, v: boolean) => { sup[k] = v; supAt[k] = Date.now(); };
   let id = 0;
   async function call(action: string, params: Json): Promise<Json> {
     const h: Record<string, string> = { 'content-type': 'application/json', accept: 'application/json', 'x-project-id': String(o.projectId) };
@@ -120,22 +126,26 @@ export function hostedRooms(o: HostedRoomsOptions): RoomsApi {
       return `${host}/api/stream-relay/ws/rooms/${encodeURIComponent(m.roomId)}?token=${encodeURIComponent(tok)}`;
     },
     async create(x = {}) {
-      try { const d = await call('rooms.create', { script_id: o.scriptId, mode, idempotency_key: key('cr'), ...x }); sup.create = true; return parseMatch(d); }
-      catch (e) { if (missing(e)) sup.create = false; throw e; }
+      try { const d = await call('rooms.create', { script_id: o.scriptId, mode, idempotency_key: key('cr'), ...x }); mark('create', true); return parseMatch(d); }
+      catch (e) { if (missing(e)) mark('create', false); throw e; }
     },
     async listOpen() {
       try {
         const d = await call('rooms.list_open', { script_id: o.scriptId, mode });
-        sup.listOpen = true;
+        mark('listOpen', true);
         const list = (Array.isArray(d.rooms) ? d.rooms : Array.isArray(d.items) ? d.items : []) as Json[];
         return list.map((r) => ({ roomId: str(r.room_id), ...(str(r.code) ? { code: str(r.code) } : {}), ...(str(r.name) ? { name: str(r.name) } : {}), seatsTaken: num(r.seats_taken, 1), seatsNeeded: num(r.seats_needed, 2) }));
-      } catch (e) { if (missing(e)) sup.listOpen = false; throw e; }
+      } catch (e) { if (missing(e)) mark('listOpen', false); throw e; }
     },
     async joinByCode(code) {
-      try { const d = await call('rooms.join_by_code', { script_id: o.scriptId, code: code.trim().toUpperCase() }); sup.joinByCode = true; return parseMatch(d); }
-      catch (e) { if (missing(e)) sup.joinByCode = false; throw e; }
+      try { const d = await call('rooms.join_by_code', { script_id: o.scriptId, code: code.trim().toUpperCase() }); mark('joinByCode', true); return parseMatch(d); }
+      catch (e) { if (missing(e)) mark('joinByCode', false); throw e; }
     },
-    support: () => ({ ...sup }),
+    support: () => {
+      const out = { ...sup };
+      for (const k of ['create', 'listOpen', 'joinByCode'] as const) if (out[k] === false && Date.now() - (supAt[k] ?? 0) > reprobeMs) out[k] = null;
+      return out;
+    },
   };
 }
 
