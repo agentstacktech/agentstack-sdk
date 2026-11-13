@@ -5,3 +5,5 @@ export { localName, cleanName, type LocalName, type IdChannel } from './name.js'
 export { mountMatchBar, matchBar, MATCH_BAR_LABELS, MATCH_BAR_CSS, type MatchBarLabels, type MatchBarOptions, type MatchBarModel, type MatchBarUi } from './matchbar.js';
 export { applyTheme, themeCss, type ThemeOptions } from './theme.js';
 export { bindVisibility } from './visibility.js';
+
+export { mountQuickPlay, guessSignedIn, QUICK_LABELS, type QuickLabels, type QuickPlayOptions, type QuickPlayUi } from './quick.js';
