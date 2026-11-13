@@ -326,6 +326,7 @@ export function mountQuickPlay<S extends SessionLike>(container: HTMLElement, o:
     const draw = () => {
       if (my !== token) return;
       const ps = present();
+      const n = ps.length + (ps.some((p) => p.id === s.snapshot.self) ? 0 : 1); // I am in the room before the session lists me
       const items = ps.map((p) => el('li', '', p.name + (p.id === s.snapshot.self ? ` (${L.you})` : '')));
       if (!ps.some((p) => p.id === s.snapshot.self)) items.unshift(el('li', '', `${s.snapshot.players.find((p) => p.id === s.snapshot.self)?.name ?? ''} (${L.you})`.trim()));
       for (let i = items.length; i < seats(); i++) items.push(el('li', 'empty', L.emptySeat));
@@ -335,7 +336,7 @@ export function mountQuickPlay<S extends SessionLike>(container: HTMLElement, o:
       const sl = serverLeft();
       if (sl !== null && !started) {
         const left = Math.ceil(sl / 1000);
-        line.textContent = ps.length >= minStart() ? L.startsIn : `${L.waitingPlayers} · ${ps.length}/${seats()}`;
+        line.textContent = ps.length >= minStart() ? L.startsIn : `${L.waitingPlayers} · ${n}/${seats()}`;
         big.textContent = ps.length >= minStart() ? String(left) : `0:${String(left).padStart(2, '0')}`;
         if (sl <= 0 && ps.length >= minStart()) { started = true; s.ready(); }
         return;
@@ -348,8 +349,8 @@ export function mountQuickPlay<S extends SessionLike>(container: HTMLElement, o:
         if (left === 0 && !started) { started = true; s.ready(); }
       } else {
         const left = Math.max(0, Math.ceil((searchDeadline - now) / 1000));
-        if (m.code && m.status !== 'waiting') { line.textContent = `${L.waitingPlayers} · ${ps.length}/${seats()}`; big.textContent = `${ps.length}/${seats()}`; return; }
-        line.textContent = `${L.searching} · ${Math.max(1, ps.length)}/${seats()}`; big.textContent = `0:${String(left).padStart(2, '0')}`;
+        if (m.code && m.status !== 'waiting') { line.textContent = `${L.waitingPlayers} · ${n}/${seats()}`; big.textContent = `${n}/${seats()}`; return; }
+        line.textContent = `${L.searching} · ${n}/${seats()}`; big.textContent = `0:${String(left).padStart(2, '0')}`;
         if (left === 0 && !asked) {
           asked = true;
           const more = btn(L.waitMore, '', () => { asked = false; more.remove(); solo?.remove(); searchDeadline = Date.now() + search; });
