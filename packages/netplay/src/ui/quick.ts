@@ -103,8 +103,10 @@ const CSS = `.npq{position:fixed;inset:0;z-index:2147483000;display:grid;place-i
 .npq-b.main small{color:inherit;opacity:.75}
 .npq-b:disabled{opacity:.45;cursor:default}
 .npq-row{display:flex;gap:8px;width:100%}
-.npq-row .npq-b{align-items:center;justify-content:center;min-height:48px;font-size:16px}
+.npq-row .npq-b{flex:1;width:auto;align-items:center;justify-content:center;min-height:48px;font-size:16px}
+.npq-row .npq-b.go{flex:0 0 auto;padding:0 22px}
 .npq-in{flex:1;min-width:0;min-height:48px;padding:0 14px;border-radius:14px;border:1px solid var(--np-line,#ffffff1f);background:#0003;color:inherit;font:600 17px var(--np-font,system-ui);text-transform:uppercase}
+.npq-in::placeholder{text-transform:none;font-weight:500;font-size:15px}
 .npq-big{font-size:64px;font-weight:800;line-height:1;text-align:center;font-variant-numeric:tabular-nums}
 .npq-note{margin:0;font-size:14px;color:var(--np-muted,#bba98c);text-align:center}
 .npq-err{margin:0;font-size:14px;color:#ff9b8a;text-align:center}
@@ -113,7 +115,7 @@ const CSS = `.npq{position:fixed;inset:0;z-index:2147483000;display:grid;place-i
 .npq-list li.empty{opacity:.5;font-style:italic}
 .npq-code{margin:0;text-align:center;font:800 30px/1.2 var(--np-font,system-ui);letter-spacing:.18em;font-variant-numeric:tabular-nums;user-select:all}
 .npq-list li[role=button]{cursor:pointer}
-.npq-tag{align-self:center;font-size:11px;letter-spacing:.12em;text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1px solid var(--np-line,#ffffff1f);color:var(--np-muted,#bba98c)}`;
+.npq-tag{align-self:center;white-space:nowrap;font-size:11px;letter-spacing:.12em;text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1px solid var(--np-line,#ffffff1f);color:var(--np-muted,#bba98c)}`;
 
 /** Best guess without a game hook: a bearer token in this tab's storage (games pass `signedIn` when they know better). */
 export function guessSignedIn(): boolean {
@@ -208,7 +210,7 @@ export function mountQuickPlay<S extends SessionLike>(container: HTMLElement, o:
     head(L.codeTitle);
     const row = el('div', 'npq-row');
     const inp = el('input', 'npq-in'); inp.placeholder = L.codePlaceholder; inp.autocomplete = 'off'; inp.spellcheck = false;
-    const go = btn(L.codeGo, '', () => void byCode(inp.value), true);
+    const go = btn(L.codeGo, '', () => void byCode(inp.value), true); go.classList.add('go');
     inp.onkeydown = (ev) => { if (ev.key === 'Enter') void byCode(inp.value); };
     row.append(inp, go);
     card.append(row);
@@ -340,6 +342,7 @@ export function mountQuickPlay<S extends SessionLike>(container: HTMLElement, o:
         if (left === 0 && !started) { started = true; s.ready(); }
       } else {
         const left = Math.max(0, Math.ceil((searchDeadline - now) / 1000));
+        if (m.code && m.status !== 'waiting') { line.textContent = `${L.waitingPlayers} · ${ps.length}/${seats()}`; big.textContent = `${ps.length}/${seats()}`; return; }
         line.textContent = `${L.searching} · ${ps.length}/${seats()}`; big.textContent = `0:${String(left).padStart(2, '0')}`;
         if (left === 0 && !asked) {
           asked = true;
