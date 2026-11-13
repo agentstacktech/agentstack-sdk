@@ -25,4 +25,4 @@ export { generateRoomScriptP1, type RoomScriptP1Options } from './generator/room
 export type * from './types.js';
 
 export { relayTransport, type RelayOptions, type RelayStats } from './transports/relay.js';
-export { hostedRooms, setActiveMatch, activeMatch, activeMatchTransport, type RoomsApi, type QuickMatch, type OpenRoom, type HostedRoomsOptions } from './rooms.js';
+export { hostedRooms, setActiveMatch, activeMatch, activeMatchTransport, parseMatch, parseInvite, countdownLeftMs, type RoomsApi, type QuickMatch, type OpenRoom, type HostedRoomsOptions, type ServerPlayer, type RoomVisibility, type CreateOptions } from './rooms.js';

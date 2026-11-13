@@ -11,7 +11,7 @@
  *     onStart: (s) => runOnline(s), onSolo: startSolo, signedIn: () => !!token(),
  *   });
  */
-import { setActiveMatch, type QuickMatch, type RoomsApi } from '../rooms.js';
+import { countdownLeftMs, parseInvite, setActiveMatch, type QuickMatch, type RoomsApi, type OpenRoom, type RoomVisibility } from '../rooms.js';
 import { NetplayError } from '../errors.js';
 
 interface SessionLike {
@@ -28,6 +28,7 @@ export interface QuickLabels {
   noOpponent: string; waitMore: string; codeTitle: string; codePlaceholder: string; codeGo: string; openRooms: string;
   openSoon: string; openEmpty: string; codeSoon: string; createSoon: string; signInToCreate: string; signIn: string;
   invite: string; copied: string; offline: string; badCode: string; preview: string; close: string;
+  createPublic: string; createPublicHint: string; createPrivate: string; createPrivateHint: string; roomCode: string; roomFull: string; roomRunning: string; waitingPlayers: string;
 }
 export const QUICK_LABELS: Record<'ru' | 'en' | 'pt', QuickLabels> = {
   ru: {
@@ -35,30 +36,33 @@ export const QUICK_LABELS: Record<'ru' | 'en' | 'pt', QuickLabels> = {
     join: 'Подключиться к матчу', joinHint: 'По коду или из списка комнат', solo: 'Играть одному',
     searching: 'Ищем соперника', startsIn: 'Старт через', players: 'Игроки', you: 'вы', emptySeat: 'свободное место', cancel: 'Отмена', back: 'Назад',
     noOpponent: 'Соперник пока не нашёлся', waitMore: 'Ждать ещё', codeTitle: 'Подключиться по коду', codePlaceholder: 'Код или ссылка-приглашение', codeGo: 'Войти',
-    openRooms: 'Открытые комнаты', openSoon: 'Список комнат скоро появится на сервере', openEmpty: 'Открытых комнат нет', codeSoon: 'Вход по коду скоро появится на сервере. Пока войдите по ссылке-приглашению из быстрого матча.',
-    createSoon: 'Свой матч скоро появится на сервере. Пока позовите друга ссылкой из быстрого матча.', signInToCreate: 'Чтобы создать свой матч, войдите в аккаунт. Без входа доступны быстрый матч и вход по коду.', signIn: 'Войти',
+    openRooms: 'Открытые комнаты', openSoon: 'Список комнат сейчас недоступен', openEmpty: 'Открытых комнат нет. Создайте свой матч или сыграйте быстрый.', codeSoon: 'Вход по коду сейчас недоступен. Войдите по ссылке-приглашению из быстрого матча.',
+    createSoon: 'Создание матча сейчас недоступно. Позовите друга ссылкой из быстрого матча.', signInToCreate: 'Чтобы создать свой матч, войдите в аккаунт. Без входа доступны быстрый матч и вход по коду.', signIn: 'Войти',
     invite: 'Скопировать приглашение', copied: 'Ссылка скопирована', offline: 'Нет связи с игровым сервером. Попробуйте ещё раз.', badCode: 'Код не подошёл',
     preview: 'Тестовый режим', close: 'Закрыть',
+    createPublic: 'Открытый матч', createPublicHint: 'Виден в списке комнат, войти может любой', createPrivate: 'Закрытый матч', createPrivateHint: 'Только по коду или ссылке', roomCode: 'Код комнаты', roomFull: 'Комната уже заполнена', roomRunning: 'Матч в этой комнате уже идёт', waitingPlayers: 'Ждём игроков',
   },
   en: {
     title: 'Multiplayer', quick: 'Quick match', quickHint: 'Straight into a room, starts on a countdown', create: 'Create a match', createHint: 'A room with a code for friends',
     join: 'Join a match', joinHint: 'By code or from the room list', solo: 'Play solo',
     searching: 'Looking for an opponent', startsIn: 'Starts in', players: 'Players', you: 'you', emptySeat: 'free seat', cancel: 'Cancel', back: 'Back',
     noOpponent: 'No opponent yet', waitMore: 'Keep waiting', codeTitle: 'Join by code', codePlaceholder: 'Code or invite link', codeGo: 'Join',
-    openRooms: 'Open rooms', openSoon: 'The room list is coming to the server soon', openEmpty: 'No open rooms', codeSoon: 'Joining by code is coming soon. For now use the invite link from a quick match.',
-    createSoon: 'Own matches are coming soon. For now invite a friend with the quick match link.', signInToCreate: 'Sign in to create a match. Without an account you can play a quick match or join by code.', signIn: 'Sign in',
+    openRooms: 'Open rooms', openSoon: 'The room list is unavailable right now', openEmpty: 'No open rooms. Create a match or play a quick one.', codeSoon: 'Joining by code is unavailable right now. Use the invite link from a quick match.',
+    createSoon: 'Creating a match is unavailable right now. Invite a friend with the quick match link.', signInToCreate: 'Sign in to create a match. Without an account you can play a quick match or join by code.', signIn: 'Sign in',
     invite: 'Copy invite', copied: 'Link copied', offline: 'Can’t reach the game server. Try again.', badCode: 'That code did not work',
     preview: 'Preview', close: 'Close',
+    createPublic: 'Public match', createPublicHint: 'Listed in open rooms, anyone can join', createPrivate: 'Private match', createPrivateHint: 'Only by code or link', roomCode: 'Room code', roomFull: 'That room is full', roomRunning: 'That match has already started', waitingPlayers: 'Waiting for players',
   },
   pt: {
     title: 'Multijogador', quick: 'Partida rápida', quickHint: 'Direto para uma sala, começa na contagem', create: 'Criar partida', createHint: 'Sala com código para amigos',
     join: 'Entrar numa partida', joinHint: 'Por código ou pela lista de salas', solo: 'Jogar sozinho',
     searching: 'Procurando adversário', startsIn: 'Começa em', players: 'Jogadores', you: 'você', emptySeat: 'lugar livre', cancel: 'Cancelar', back: 'Voltar',
     noOpponent: 'Nenhum adversário ainda', waitMore: 'Esperar mais', codeTitle: 'Entrar com código', codePlaceholder: 'Código ou link de convite', codeGo: 'Entrar',
-    openRooms: 'Salas abertas', openSoon: 'A lista de salas chega em breve ao servidor', openEmpty: 'Nenhuma sala aberta', codeSoon: 'Entrar por código chega em breve. Por enquanto use o link de convite da partida rápida.',
-    createSoon: 'Partidas próprias chegam em breve. Por enquanto convide um amigo com o link da partida rápida.', signInToCreate: 'Entre na conta para criar uma partida. Sem conta: partida rápida e entrar por código.', signIn: 'Entrar',
+    openRooms: 'Salas abertas', openSoon: 'A lista de salas está indisponível agora', openEmpty: 'Nenhuma sala aberta. Crie uma partida ou jogue uma rápida.', codeSoon: 'Entrar por código está indisponível agora. Use o link de convite da partida rápida.',
+    createSoon: 'Criar partida está indisponível agora. Convide um amigo com o link da partida rápida.', signInToCreate: 'Entre na conta para criar uma partida. Sem conta: partida rápida e entrar por código.', signIn: 'Entrar',
     invite: 'Copiar convite', copied: 'Link copiado', offline: 'Sem conexão com o servidor. Tente de novo.', badCode: 'Esse código não funcionou',
     preview: 'Prévia', close: 'Fechar',
+    createPublic: 'Partida aberta', createPublicHint: 'Aparece na lista, qualquer um entra', createPrivate: 'Partida fechada', createPrivateHint: 'Só por código ou link', roomCode: 'Código da sala', roomFull: 'Essa sala está cheia', roomRunning: 'Essa partida já começou', waitingPlayers: 'Aguardando jogadores',
   },
 };
 
@@ -107,6 +111,8 @@ const CSS = `.npq{position:fixed;inset:0;z-index:2147483000;display:grid;place-i
 .npq-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
 .npq-list li{display:flex;justify-content:space-between;gap:8px;padding:10px 14px;border-radius:12px;background:#0002}
 .npq-list li.empty{opacity:.5;font-style:italic}
+.npq-code{margin:0;text-align:center;font:800 30px/1.2 var(--np-font,system-ui);letter-spacing:.18em;font-variant-numeric:tabular-nums;user-select:all}
+.npq-list li[role=button]{cursor:pointer}
 .npq-tag{align-self:center;font-size:11px;letter-spacing:.12em;text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1px solid var(--np-line,#ffffff1f);color:var(--np-muted,#bba98c)}`;
 
 /** Best guess without a game hook: a bearer token in this tab's storage (games pass `signedIn` when they know better). */
@@ -156,25 +162,44 @@ export function mountQuickPlay<S extends SessionLike>(container: HTMLElement, o:
     if (err) say(err, true);
   }
 
+  const isMissing = (e: unknown) => e instanceof NetplayError && e.code === 'action_not_found';
+  const joinErr = (e: unknown) => isMissing(e) ? L.codeSoon
+    : e instanceof NetplayError && (e.kind === 'full' || e.code === 'room_full') ? L.roomFull
+    : e instanceof NetplayError && e.code === 'room_running' ? L.roomRunning
+    : e instanceof NetplayError && e.kind === 'server' ? L.badCode : msgOf(e);
+
+  function needSignIn(): void {
+    say(L.signInToCreate);
+    if (o.onSignIn) card.append(btn(L.signIn, '', () => o.onSignIn!(), true));
+  }
+
   function create(): void {
     stop(); token++;
     head(L.create);
-    if (!signed()) {
-      say(L.signInToCreate);
-      if (o.onSignIn) card.append(btn(L.signIn, '', () => o.onSignIn!(), true));
-    } else if (o.rooms.support().create === false) say(L.createSoon);
+    if (!signed()) needSignIn();
+    else if (o.rooms.support().create === false) say(L.createSoon);
     else {
-      const my = token;
-      say('…');
-      o.rooms.create().then((m) => { if (my === token) room(m); else void o.rooms.leave(m); }).catch((e) => {
-        if (my !== token) return;
-        head(L.create);
-        say(e instanceof NetplayError && e.code === 'action_not_found' ? L.createSoon : msgOf(e), !(e instanceof NetplayError && e.code === 'action_not_found'));
-        card.append(btn(L.back, '', () => menu()));
-      });
-      return;
+      card.append(btn(L.createPrivate, L.createPrivateHint, () => void make('private'), true));
+      card.append(btn(L.createPublic, L.createPublicHint, () => void make('public')));
     }
     card.append(btn(L.back, '', () => menu()));
+  }
+
+  async function make(visibility: RoomVisibility): Promise<void> {
+    stop();
+    const my = ++token;
+    head(L.create);
+    say('…');
+    try {
+      const m = await o.rooms.create({ visibility });
+      if (my === token) room(m); else void o.rooms.leave(m);
+    } catch (e) {
+      if (my !== token) return;
+      head(L.create);
+      if (e instanceof NetplayError && e.kind === 'auth') needSignIn();
+      else say(isMissing(e) ? L.createSoon : msgOf(e), !isMissing(e));
+      card.append(btn(L.back, '', () => menu()));
+    }
   }
 
   function join(err = ''): void {
@@ -195,7 +220,14 @@ export function mountQuickPlay<S extends SessionLike>(container: HTMLElement, o:
       if (o.rooms.support().listOpen === false) { list.replaceChildren(el('li', 'empty', L.openSoon)); return; }
       o.rooms.listOpen().then((rs) => {
         if (my !== token) return;
-        list.replaceChildren(...(rs.length ? rs.map((r) => { const li = el('li', '', r.name || r.code || r.roomId); li.append(el('span', '', `${r.seatsTaken}/${r.seatsNeeded}`)); if (r.code) { li.style.cursor = 'pointer'; li.onclick = () => void byCode(r.code!); } return li; }) : [el('li', 'empty', L.openEmpty)]));
+        list.replaceChildren(...(rs.length ? rs.map((r) => {
+          const li = el('li', '', r.name || r.hostName || r.code || r.roomId.slice(-6));
+          li.append(el('span', '', `${r.seatsTaken}/${r.seatsNeeded}`));
+          li.setAttribute('role', 'button'); li.tabIndex = 0;
+          li.onclick = () => void fromList(r);
+          li.onkeydown = (ev) => { if (ev.key === 'Enter') void fromList(r); };
+          return li;
+        }) : [el('li', 'empty', L.openEmpty)]));
       }).catch(() => { if (my === token) list.replaceChildren(el('li', 'empty', L.openSoon)); });
     };
     fill();
@@ -204,25 +236,35 @@ export function mountQuickPlay<S extends SessionLike>(container: HTMLElement, o:
     setTimeout(() => inp.focus(), 0);
   }
 
-  async function byCode(raw: string): Promise<void> {
-    const v = raw.trim();
-    if (!v) return;
+  async function fromList(r: OpenRoom): Promise<void> {
     const my = ++token;
-    const inv = /[?&]match=([^&\s]+)/.exec(v) ? { match: decodeURIComponent(/[?&]match=([^&\s]+)/.exec(v)![1]!), invite: decodeURIComponent(/[?&]invite=([^&\s]+)/.exec(v)?.[1] ?? '') } : null;
+    try { const m = await o.rooms.joinRoom(r); if (my === token) room(m); else void o.rooms.leave(m); }
+    catch (e) { if (my === token) join(joinErr(e)); }
+  }
+
+  async function byCode(raw: string): Promise<void> {
+    const v = parseInvite(raw);
+    if (!v.match && !v.code) return;
+    const my = ++token;
     try {
-      if (inv) {
-        const m = await o.rooms.quickMatch(inv);
-        if (my !== token) return;
-        if (m.matchId !== inv.match) { void o.rooms.leave(m); join(L.codeSoon); return; } // the server put us elsewhere: no invite join yet
+      if (v.match) {
+        // wave 2: rooms.join_by_code takes the invite link; older servers: quick_match with match_id + invite
+        if (o.rooms.support().joinByCode !== false) {
+          try { const m = await o.rooms.joinByCode(raw); if (my === token) room(m); else void o.rooms.leave(m); return; }
+          catch (e) { if (!isMissing(e)) throw e; }
+        }
+        const m = await o.rooms.quickMatch({ match: v.match, ...(v.invite ? { invite: v.invite } : {}) });
+        if (my !== token) { void o.rooms.leave(m); return; }
+        if (m.matchId !== v.match) { void o.rooms.leave(m); join(L.codeSoon); return; } // the server put us elsewhere
         room(m);
       } else {
         if (o.rooms.support().joinByCode === false) { join(L.codeSoon); return; }
-        const m = await o.rooms.joinByCode(v);
-        if (my === token) room(m);
+        const m = await o.rooms.joinByCode(v.code!);
+        if (my === token) room(m); else void o.rooms.leave(m);
       }
     } catch (e) {
       if (my !== token) return;
-      join(e instanceof NetplayError && e.code === 'action_not_found' ? L.codeSoon : e instanceof NetplayError && e.kind === 'server' ? L.badCode : msgOf(e));
+      join(joinErr(e));
     }
   }
 
@@ -255,22 +297,41 @@ export function mountQuickPlay<S extends SessionLike>(container: HTMLElement, o:
     const list = el('ul', 'npq-list');
     const foot = el('div', 'npq-row');
     const inviteB = btn(L.invite, '', () => {
-      const url = o.inviteUrl ? o.inviteUrl(m) : (() => { const u = new URL(location.href); u.searchParams.set('match', m.matchId); if (m.invite) u.searchParams.set('invite', m.invite); return u.toString(); })();
+      const url = o.inviteUrl ? o.inviteUrl(m) : (() => { const u = new URL(location.href); for (const k of ['match', 'invite', 'code']) u.searchParams.delete(k); if (m.code) u.searchParams.set('code', m.code); else { u.searchParams.set('match', m.matchId); if (m.invite) u.searchParams.set('invite', m.invite); } return u.toString(); })();
       void navigator.clipboard?.writeText(url).then(() => { inviteB.firstChild!.textContent = L.copied; }, () => {});
     });
     const cancel = btn(L.cancel, '', () => { s.leave(); void o.rooms.leave(m); cur = null; menu(); });
     foot.append(inviteB, cancel);
-    card.append(line, big, el('h2', '', L.players), list, foot);
+    const codeBox = el('div', '', '');
+    const drawCode = () => {
+      if (!m.code) { codeBox.replaceChildren(); return; }
+      if (codeBox.dataset.code === m.code) return;
+      codeBox.dataset.code = m.code;
+      codeBox.replaceChildren(el('p', 'npq-note', L.roomCode), el('p', 'npq-code', m.code));
+    };
+    card.append(codeBox, line, big, el('h2', '', L.players), list, foot);
     const seats = () => Math.max(m.seatsNeeded, 2);
     const present = () => s.snapshot.players.filter((p) => p.status !== 'left' && p.seat >= 0);
+    const minStart = () => Math.max(2, m.minPlayers ?? 2);
     const full = () => present().length >= seats() || (m.status === 'started' && present().length >= 2);
+    // server countdown (wave 2): the server owns the start time; we only show it and press ready once enough players are here
+    const serverLeft = () => (m.status === 'countdown' || m.status === 'starting' ? countdownLeftMs(m) : null);
     const draw = () => {
       if (my !== token) return;
       const ps = present();
       const items = ps.map((p) => el('li', '', p.name + (p.id === s.snapshot.self ? ` (${L.you})` : '')));
       for (let i = ps.length; i < seats(); i++) items.push(el('li', 'empty', L.emptySeat));
       list.replaceChildren(...items);
+      drawCode();
       const now = Date.now();
+      const sl = serverLeft();
+      if (sl !== null && !started) {
+        const left = Math.ceil(sl / 1000);
+        line.textContent = ps.length >= minStart() ? L.startsIn : `${L.waitingPlayers} · ${ps.length}/${seats()}`;
+        big.textContent = ps.length >= minStart() ? String(left) : `0:${String(left).padStart(2, '0')}`;
+        if (sl <= 0 && ps.length >= minStart()) { started = true; s.ready(); }
+        return;
+      }
       if (goAt && !full() && !started) goAt = 0;
       if (!goAt && full()) goAt = now + (o.countdownS ?? 3) * 1000;
       if (goAt) {
@@ -294,7 +355,7 @@ export function mountQuickPlay<S extends SessionLike>(container: HTMLElement, o:
       if (snap.phase === 'playing' && my === token) { const c = cur!; stop(); token++; cur = null; hide(); o.onStart(c.s, c.m); }
     });
     timers.push(setInterval(draw, 250));
-    timers.push(setInterval(() => { if (!goAt) void o.rooms.status(m).then((x) => { m = x; if (cur) cur.m = x; }).catch(() => {}); }, o.pollMs ?? 1000));
+    timers.push(setInterval(() => { if (!started) void o.rooms.status(m).then((x) => { if (my !== token) return; m = x; if (cur) cur.m = x; setActiveMatch(x, o.rooms); }).catch(() => {}); }, o.pollMs ?? 1000));
     void s.join().catch((e) => { if (my === token) { s.leave(); void o.rooms.leave(m); cur = null; menu(msgOf(e)); } });
     draw();
   }
@@ -309,9 +370,10 @@ export function mountQuickPlay<S extends SessionLike>(container: HTMLElement, o:
     joinFromUrl() {
       const p = new URLSearchParams(location.search);
       const match = p.get('match');
-      if (!match) return false;
-      void byCode(`?match=${encodeURIComponent(match)}&invite=${encodeURIComponent(p.get('invite') ?? '')}`);
-      return true;
+      const code = p.get('code') ?? p.get('room');
+      if (match) { void byCode(`?match=${encodeURIComponent(match)}&invite=${encodeURIComponent(p.get('invite') ?? '')}`); return true; }
+      if (code && /^[A-Za-z0-9]{4,8}$/.test(code)) { void byCode(code); return true; }
+      return false;
     },
   };
 }
