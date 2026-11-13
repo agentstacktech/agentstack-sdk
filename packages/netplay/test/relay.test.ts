@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { relayTransport, createSession, type Entry } from '../src/index.js';
 import { ticTacToe } from '../examples/tic-tac-toe.js';
+import { tugOfWar } from '../examples/tug-of-war.js';
 
 /** Fake of the **actual** raw-payload relay, copies and own echoes included. No network. */
 class Relay {
@@ -122,5 +123,24 @@ it('reads the shipped flat relay_envelope v1 shape ({relay_envelope:"v1", sender
   A.input(0);
   await advance(500);
   expect(A.snapshot.state).toEqual(B.snapshot.state);
+  A.close(); B.close();
+});
+
+it('a second join() on a playing session keeps ONE link: realtime lockstep keeps ticking on both (game adapter re-joins after the quick-play screen)', async () => {
+  vi.useFakeTimers();
+  const r = new Relay(); r.envelope = 'flat'; r.copies = 2;
+  const A = createSession(tugOfWar, { transport: relayTransport({ self: 'a', host: true, url: () => 'ws://test', WebSocket: r.Ctor }), room: 'r', name: 'A', autoPumpMs: 10 });
+  const B = createSession(tugOfWar, { transport: relayTransport({ self: 'b', host: false, url: () => 'ws://test', WebSocket: r.Ctor }), room: 'r', name: 'B', autoPumpMs: 10 });
+  await Promise.all([A.join(), B.join(), advance(500)]);
+  A.ready(); B.ready();
+  await advance(500);
+  expect(A.snapshot.phase).toBe('playing');
+  const peers = r.peers.length;
+  await Promise.all([A.join(), B.join()]); // the adapter's connect(): must not open a second socket
+  expect(r.peers.length).toBe(peers);
+  for (let i = 0; i < 60; i++) { A.input(1); B.input(0); await advance(20); }
+  expect(A.snapshot.tick).toBeGreaterThan(10);
+  expect(B.snapshot.tick).toBeGreaterThan(10);
+  expect(Math.abs(A.snapshot.tick - B.snapshot.tick)).toBeLessThan(6);
   A.close(); B.close();
 });

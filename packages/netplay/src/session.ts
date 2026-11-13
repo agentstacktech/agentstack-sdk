@@ -128,6 +128,10 @@ export class Session<S, I, V = S> {
 
   /** Connect and send hello. Resolves once the link is up (entries keep streaming in). */
   async join(): Promise<void> {
+    // already in the room over a live link (e.g. a quick-play screen joined, then the game's adapter calls join() again):
+    // a second link would race the first one for the same frames (the relay sequencer then fed a session nobody reads)
+    if (this.link && !this.leaving) return;
+    if (this.connecting && !this.leaving) { await this.connecting; return; }
     this.leaving = false; // a session joined again after leave(): no stale leave goes out
     this.outbox = this.outbox.filter((it) => it.body.k !== 'leave');
     await this.connect();
@@ -159,7 +163,9 @@ export class Session<S, I, V = S> {
         },
       });
       if (!current()) { link.close(); return; }
+      const prev = this.link;
       this.link = link;
+      if (prev && prev !== link) { try { prev.close(); } catch { /* already closed */ } } // never keep two live links
       if (this.hidden) link.pace?.(this.opts.hiddenPollMs ?? 3000); // reconnected while in the background
       this.self = link.self;
       this.retries = 0;
