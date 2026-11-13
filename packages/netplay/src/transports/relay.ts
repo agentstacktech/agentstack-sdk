@@ -125,7 +125,9 @@ export function relayTransport(o: RelayOptions): Transport {
           const m = JSON.parse(raw) as Record<string, unknown>;
           // Server envelope (CursorDeploy P0 fix, relay_envelope v1): dedupe by (sender_connection_id, seq), drop our own.
           // Without it (older relay) our own {s, q / g} envelope below does the same job.
-          const env = m && typeof m === 'object' ? (m.relay_envelope as { sender_connection_id?: unknown; seq?: unknown } | undefined) : undefined;
+          // Shipped shape (13.11 18:53): flat {relay_envelope:'v1', sender_connection_id, sender_user_id, seq, ts, body}; also accept a nested object.
+          const re = m && typeof m === 'object' ? m.relay_envelope : undefined;
+          const env = (re === 'v1' || re === 1 ? m : re && typeof re === 'object' ? re : undefined) as { sender_connection_id?: unknown; seq?: unknown } | undefined;
           if (env && typeof env === 'object') {
             const sc = String(env.sender_connection_id ?? '');
             if (sc && myConn && sc === myConn) { stats.echoes++; return; }
@@ -134,7 +136,8 @@ export function relayTransport(o: RelayOptions): Transport {
               if (env.seq <= last) { stats.copies++; return; }
               envSeen.set(sc, env.seq);
             }
-            w = ((m.payload ?? m.data ?? m) as unknown) as Wire;
+            const inner = (m.body ?? m.payload ?? m.data ?? (re && typeof re === 'object' ? (re as Record<string, unknown>).body : undefined) ?? m) as Record<string, unknown>;
+            w = ((inner && inner.type === 'broadcast' && inner.payload ? inner.payload : inner) as unknown) as Wire;
           } else w = (m.type === 'broadcast' && m.payload ? m.payload : m) as unknown as Wire;
         } catch { return; }
         if (!w || w.np !== 1 || typeof w.s !== 'string') return;

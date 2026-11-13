@@ -7,7 +7,7 @@ class Relay {
   peers: FakeWs[] = [];
   copies = 200;
   seq = 0;
-  envelope = false;
+  envelope: boolean | 'flat' = false;
   drop = 0;
   Ctor: typeof FakeWs;
   constructor() {
@@ -22,7 +22,9 @@ class Relay {
         const seq = ++r.seq;
         for (const p of r.peers) {
           if (p.readyState !== 1) continue;
-          const data = r.envelope ? JSON.stringify({ type: 'broadcast', payload: m.payload, relay_envelope: { v: 1, sender_connection_id: this.conn, seq, exclude_self: true } }) : JSON.stringify(m.payload);
+          if (r.envelope === 'flat' && p === this) continue; // the shipped relay honours exclude_self
+          const data = r.envelope === 'flat' ? JSON.stringify({ relay_envelope: 'v1', sender_connection_id: this.conn, sender_user_id: null, seq, ts: Date.now() / 1000, body: m.payload })
+            : r.envelope ? JSON.stringify({ type: 'broadcast', payload: m.payload, relay_envelope: { v: 1, sender_connection_id: this.conn, seq, exclude_self: true } }) : JSON.stringify(m.payload);
           for (let i = 0; i < r.copies; i++) p.onmessage?.({ data });
         }
       }
@@ -102,5 +104,23 @@ it('uses relay_envelope v1 when the server sends it (dedupe by sender_connection
   expect(a.map((e) => e.from).sort()).toEqual(['a', 'b']);
   expect(a).toHaveLength(2);
   expect(b).toEqual(a);
+  A.close(); B.close();
+});
+
+it('reads the shipped flat relay_envelope v1 shape ({relay_envelope:"v1", sender_connection_id, seq, body}) and runs a game', async () => {
+  vi.useFakeTimers();
+  const r = new Relay(); r.envelope = 'flat'; r.copies = 3;
+  const A = createSession(ticTacToe, { transport: relayTransport({ self: 'a', host: true, url: () => 'ws://test', WebSocket: r.Ctor }), room: 'r', name: 'A', autoPumpMs: 10 });
+  const B = createSession(ticTacToe, { transport: relayTransport({ self: 'b', host: false, url: () => 'ws://test', WebSocket: r.Ctor }), room: 'r', name: 'B', autoPumpMs: 10 });
+  const joins = [A.join(), B.join()];
+  await advance(500);
+  await Promise.all(joins);
+  expect(B.snapshot.players.map((p) => p.id)).toEqual(['a', 'b']);
+  A.ready(); B.ready();
+  await advance(500);
+  expect(B.snapshot.phase).toBe('playing');
+  A.input(0);
+  await advance(500);
+  expect(A.snapshot.state).toEqual(B.snapshot.state);
   A.close(); B.close();
 });
