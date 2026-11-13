@@ -97,6 +97,7 @@ const CSS = `.npq{position:fixed;inset:0;z-index:2147483000;display:grid;place-i
 .npq[hidden],.npq:not([open]){display:none}
 dialog.npq{margin:0;width:100%;height:100%;max-width:none;max-height:none;border:0;box-sizing:border-box}
 dialog.npq::backdrop{background:transparent}
+dialog.npq{background:var(--np-backdrop,rgba(8,6,4,.78));backdrop-filter:blur(3px)}
 .npq-card{width:min(440px,100%);max-height:calc(100dvh - 32px);overflow:auto;display:flex;flex-direction:column;gap:12px;padding:24px 20px;border-radius:22px;background:var(--np-bg,#1f1812);border:1px solid var(--np-line,#ffffff1f);box-shadow:0 24px 60px #000a}
 .npq h2{margin:0 0 4px;font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--np-muted,#bba98c);text-align:center}
 .npq-b{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;min-height:60px;padding:12px 16px;border-radius:16px;border:1px solid var(--np-line,#ffffff1f);background:var(--np-key,#ffffff14);color:inherit;font:700 18px var(--np-font,system-ui);text-align:left;cursor:pointer}
@@ -325,7 +326,8 @@ export function mountQuickPlay<S extends SessionLike>(container: HTMLElement, o:
       if (my !== token) return;
       const ps = present();
       const items = ps.map((p) => el('li', '', p.name + (p.id === s.snapshot.self ? ` (${L.you})` : '')));
-      for (let i = ps.length; i < seats(); i++) items.push(el('li', 'empty', L.emptySeat));
+      if (!ps.some((p) => p.id === s.snapshot.self)) items.unshift(el('li', '', `${s.snapshot.players.find((p) => p.id === s.snapshot.self)?.name ?? ''} (${L.you})`.trim()));
+      for (let i = items.length; i < seats(); i++) items.push(el('li', 'empty', L.emptySeat));
       list.replaceChildren(...items);
       drawCode();
       const now = Date.now();
@@ -346,7 +348,7 @@ export function mountQuickPlay<S extends SessionLike>(container: HTMLElement, o:
       } else {
         const left = Math.max(0, Math.ceil((searchDeadline - now) / 1000));
         if (m.code && m.status !== 'waiting') { line.textContent = `${L.waitingPlayers} · ${ps.length}/${seats()}`; big.textContent = `${ps.length}/${seats()}`; return; }
-        line.textContent = `${L.searching} · ${ps.length}/${seats()}`; big.textContent = `0:${String(left).padStart(2, '0')}`;
+        line.textContent = `${L.searching} · ${Math.max(1, ps.length)}/${seats()}`; big.textContent = `0:${String(left).padStart(2, '0')}`;
         if (left === 0 && !asked) {
           asked = true;
           const more = btn(L.waitMore, '', () => { asked = false; more.remove(); solo?.remove(); searchDeadline = Date.now() + search; });
