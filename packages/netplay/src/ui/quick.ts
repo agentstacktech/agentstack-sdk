@@ -94,7 +94,9 @@ export interface QuickPlayOptions<S extends SessionLike> {
 export interface QuickPlayUi { show(): void; hide(): void; destroy(): void; joinFromUrl(): boolean }
 
 const CSS = `.npq{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;padding:16px;background:var(--np-backdrop,#0009);font:16px/1.45 var(--np-font,system-ui,sans-serif);color:var(--np-fg,#f6ecd9)}
-.npq[hidden]{display:none}
+.npq[hidden],.npq:not([open]){display:none}
+dialog.npq{margin:0;width:100%;height:100%;max-width:none;max-height:none;border:0;box-sizing:border-box}
+dialog.npq::backdrop{background:transparent}
 .npq-card{width:min(440px,100%);max-height:calc(100dvh - 32px);overflow:auto;display:flex;flex-direction:column;gap:12px;padding:24px 20px;border-radius:22px;background:var(--np-bg,#1f1812);border:1px solid var(--np-line,#ffffff1f);box-shadow:0 24px 60px #000a}
 .npq h2{margin:0 0 4px;font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--np-muted,#bba98c);text-align:center}
 .npq-b{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;min-height:60px;padding:12px 16px;border-radius:16px;border:1px solid var(--np-line,#ffffff1f);background:var(--np-key,#ffffff14);color:inherit;font:700 18px var(--np-font,system-ui);text-align:left;cursor:pointer}
@@ -129,10 +131,11 @@ export function mountQuickPlay<S extends SessionLike>(container: HTMLElement, o:
   const doc = o.doc ?? document;
   const L: QuickLabels = { ...QUICK_LABELS[o.lang ?? 'ru'], ...(o.labels ?? {}) };
   if (!doc.getElementById('npq-css')) { const st = doc.createElement('style'); st.id = 'npq-css'; st.textContent = CSS; doc.head.append(st); }
-  const root = doc.createElement('div');
+  // A <dialog> opened with showModal() sits in the top layer, above a game's own modal menus (a plain z-index cannot beat them).
+  const root = doc.createElement('dialog');
   root.className = 'npq';
-  root.setAttribute('role', 'dialog');
   root.setAttribute('aria-modal', 'true');
+  root.addEventListener('cancel', (ev) => ev.preventDefault()); // Esc does not strand the player without a screen
   const card = doc.createElement('div');
   card.className = 'npq-card';
   root.append(card);
@@ -369,9 +372,13 @@ export function mountQuickPlay<S extends SessionLike>(container: HTMLElement, o:
     draw();
   }
 
-  function show(): void { root.hidden = false; }
-  function hide(): void { root.hidden = true; }
+  function show(): void {
+    root.hidden = false;
+    try { if (root.isConnected && !root.open) { if (root.parentElement !== container) container.append(root); root.showModal(); } } catch { root.setAttribute('open', ''); }
+  }
+  function hide(): void { root.hidden = true; try { if (root.open) root.close(); } catch { root.removeAttribute('open'); } }
   menu();
+  show();
   return {
     show() { show(); if (!cur) menu(); },
     hide,
