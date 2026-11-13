@@ -82,7 +82,7 @@ export function relayTransport(o: RelayOptions): Transport {
   return {
     caps: { privateEntries: true, kind: 'relay' },
     stats: () => ({ ...stats }),
-    async connect(room: string, opts: ConnectOptions): Promise<Link> {
+    async connect(_room: string, opts: ConnectOptions): Promise<Link> {
       const Ctor = o.WebSocket ?? (globalThis as unknown as { WebSocket?: new (u: string) => WsLike }).WebSocket;
       if (!Ctor) throw new Error('relay: no WebSocket available');
       const ws = new Ctor(await o.url());
