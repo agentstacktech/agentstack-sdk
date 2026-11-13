@@ -42,10 +42,10 @@ export interface QuickMatch {
   readonly version?: number;
 }
 export interface OpenRoom {
-  readonly roomId: string; readonly code?: string; readonly name?: string; readonly seatsTaken: number; readonly seatsNeeded: number;
+  readonly roomId: string; readonly matchId?: string; readonly code?: string; readonly name?: string; readonly seatsTaken: number; readonly seatsNeeded: number;
   readonly status?: string; readonly countdownEndsAtMs?: number | null; readonly hostName?: string; readonly mode?: string;
 }
-export interface CreateOptions { visibility?: RoomVisibility; name?: string; seats?: number; minToStart?: number; settings?: Record<string, unknown> }
+export interface CreateOptions { visibility?: RoomVisibility; name?: string; seats?: number; minToStart?: number; settings?: Record<string, unknown>; botFillAfterMs?: number }
 
 /** Milliseconds until the server countdown ends (null when the server runs no countdown). */
 export function countdownLeftMs(m: Pick<QuickMatch, 'countdownEndsAtMs' | 'clockSkewMs'>, now = Date.now()): number | null {
@@ -57,10 +57,12 @@ export function parseInvite(text: string): { match?: string; invite?: string; co
   const v = text.trim();
   const mm = /[?&]match=([^&\s#]+)/.exec(v);
   const inv = /[?&]invite=([^&\s#]+)/.exec(v);
-  const jc = /[?&](?:join|code)=([^&\s#]+)/.exec(v);
-  if (mm) return { match: decodeURIComponent(mm[1]!), ...(inv ? { invite: decodeURIComponent(inv[1]!) } : {}), link: v };
-  if (jc) return { code: decodeURIComponent(jc[1]!).toUpperCase() };
-  return v ? { code: v.replace(/\s+/g, '').toUpperCase() } : {};
+  const jc = /[?&](?:join|code|invite_code)=([^&\s#]+)/.exec(v);
+  const norm = (c: string) => { const t = c.replace(/\s+/g, ''); return /^[0-9a-f]+$/i.test(t) ? t.toLowerCase() : t; };
+  if (mm) return { match: decodeURIComponent(mm[1]!), ...(inv ? { invite: decodeURIComponent(inv[1]!), code: norm(decodeURIComponent(inv[1]!)) } : {}), link: v };
+  if (inv) return { code: norm(decodeURIComponent(inv[1]!)) };
+  if (jc) return { code: norm(decodeURIComponent(jc[1]!)) };
+  return v ? { code: norm(v) } : {};
 }
 
 export interface HostedRoomsOptions {
@@ -123,7 +125,7 @@ export function parseMatch(d0: Json, prev?: QuickMatch, now = Date.now()): Quick
     seatsNeeded: num(d.seats_needed, num(d.max_players, prev?.seatsNeeded ?? 2)),
     ...(link ? { inviteLink: link } : {}),
     ...(inv ? { invite: decodeURIComponent(inv) } : {}),
-    ...(str(d.code) ? { code: str(d.code) } : prev?.code ? { code: prev.code } : {}),
+    ...((str(d.invite_code) || str(d.join_code) || str(d.code)) ? { code: str(d.invite_code) || str(d.join_code) || str(d.code) } : prev?.code ? { code: prev.code } : {}),
     ...(vis === 'public' || vis === 'private' ? { visibility: vis } : prev?.visibility ? { visibility: prev.visibility } : {}),
     ...(typeof d.min_players === 'number' ? { minPlayers: d.min_players } : prev?.minPlayers ? { minPlayers: prev.minPlayers } : {}),
     ...(str(d.host_user_id) ? { hostUserId: str(d.host_user_id) } : prev?.hostUserId ? { hostUserId: prev.hostUserId } : {}),
@@ -189,7 +191,7 @@ export function hostedRooms(o: HostedRoomsOptions): RoomsApi {
     const sc = (v: unknown) => (typeof v === 'string' ? v : '');
     const eo = obj(err);
     // JSON-RPC errors carry a number code and the platform code in data.code; a bare auth reply is { code: 'auth_required' }
-    const code = typeof err === 'string' ? err : sc(obj(eo?.data)?.code) || sc(eo?.code) || (eo && typeof eo.code === 'number' ? `rpc_${eo.code}` : '') || str(p.error_code) || (p.data === undefined ? sc(obj(j)?.code) : '');
+    const code = str(p.error_code) || (typeof err === 'string' ? err : '') || sc(obj(eo?.data)?.code) || sc(eo?.code) || (eo && typeof eo.code === 'number' ? `rpc_${eo.code}` : '') || str(p.error_code) || (p.data === undefined ? sc(obj(j)?.code) : '');
     if (!r.ok || p.ok === false || code) throw new NetplayError(errorKind(code || `http_${r.status}`, r.status), code || `http_${r.status}`, str(obj(err)?.message));
     return obj(p.data) ?? p;
   }
@@ -211,11 +213,13 @@ export function hostedRooms(o: HostedRoomsOptions): RoomsApi {
       return `${host}/api/stream-relay/ws/rooms/${encodeURIComponent(m.roomId)}?token=${encodeURIComponent(tok)}`;
     },
     async create(x = {}) {
+      // shipped contract (13.11 18:53): script_id, mode, visibility, bot_fill_after_ms; the rest only when asked
       const p: Json = { script_id: o.scriptId, mode, visibility: x.visibility ?? 'private', idempotency_key: key('cr') };
       if (x.seats) p.max_players = x.seats;
       if (x.minToStart) p.min_to_start = x.minToStart;
       if (x.name) p.name = x.name;
       if (x.settings) p.settings = x.settings;
+      if (x.botFillAfterMs !== undefined) p.bot_fill_after_ms = x.botFillAfterMs;
       try { const d = await call('rooms.create', p); mark('create', true); return parseMatch(d); }
       catch (e) { if (missing(e)) mark('create', false); throw e; }
     },
@@ -223,9 +227,9 @@ export function hostedRooms(o: HostedRoomsOptions): RoomsApi {
       try {
         const d = await call('rooms.list_open', { script_id: o.scriptId, mode, limit: 20 });
         mark('listOpen', true);
-        const list = (Array.isArray(d.rooms) ? d.rooms : Array.isArray(d.items) ? d.items : []) as Json[];
+        const list = (Array.isArray(d.matches) ? d.matches : Array.isArray(d.rooms) ? d.rooms : Array.isArray(d.items) ? d.items : []) as Json[];
         return list.map((r) => ({
-          roomId: str(r.room_id), ...(str(r.code) ? { code: str(r.code) } : {}), ...(str(r.name) ? { name: str(r.name) } : {}),
+          roomId: str(r.room_id), ...((str(r.invite_code) || str(r.join_code) || str(r.code)) ? { code: str(r.invite_code) || str(r.join_code) || str(r.code) } : {}), ...(str(r.match_id) ? { matchId: str(r.match_id) } : {}), ...(str(r.name) ? { name: str(r.name) } : {}),
           seatsTaken: num(r.seats_taken, 1), seatsNeeded: num(r.seats_needed, num(r.max_players, 2)),
           ...(str(r.status) ? { status: str(r.status) } : {}), ...(typeof r.countdown_ends_at_ms === 'number' ? { countdownEndsAtMs: r.countdown_ends_at_ms } : {}),
           ...(str(r.host_display_name) ? { hostName: str(r.host_display_name) } : {}), ...(str(r.mode) ? { mode: str(r.mode) } : {}),
@@ -234,12 +238,14 @@ export function hostedRooms(o: HostedRoomsOptions): RoomsApi {
     },
     async joinByCode(text) {
       const v = parseInvite(text);
-      const p: Json = { script_id: o.scriptId, idempotency_key: key('jc') };
-      if (v.link) p.invite_link = v.link; else if (v.code) p.code = v.code; else throw new NetplayError('server', 'bad_code');
+      // shipped contract: { invite_code } (a link carries it as ?invite=)
+      if (!v.code) throw new NetplayError('server', 'bad_code');
+      const p: Json = { invite_code: v.code };
       try { const d = await call('rooms.join_by_code', p); mark('joinByCode', true); return parseMatch(d); }
       catch (e) { if (missing(e)) mark('joinByCode', false); throw e; }
     },
     async joinRoom(r) {
+      if (r.code) return api.joinByCode(r.code);
       try { return parseMatch(await call('rooms.join', { script_id: o.scriptId, room_id: r.roomId, idempotency_key: key('jr') })); }
       catch (e) { if (missing(e) && r.code) return api.joinByCode(r.code); throw e; }
     },

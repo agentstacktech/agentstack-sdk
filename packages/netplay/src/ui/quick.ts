@@ -117,6 +117,7 @@ dialog.npq{background:var(--np-backdrop,rgba(8,6,4,.78));backdrop-filter:blur(3p
 .npq-list li{display:flex;justify-content:space-between;gap:8px;padding:10px 14px;border-radius:12px;background:#0002}
 .npq-list li.empty{opacity:.5;font-style:italic}
 .npq-code{margin:0;text-align:center;font:800 30px/1.2 var(--np-font,system-ui);letter-spacing:.18em;font-variant-numeric:tabular-nums;user-select:all}
+.npq-code.long{font-size:clamp(18px,6vw,26px);letter-spacing:.08em;word-break:break-all}
 .npq-list li[role=button]{cursor:pointer}
 .npq-tag{align-self:center;white-space:nowrap;font-size:11px;letter-spacing:.12em;text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1px solid var(--np-line,#ffffff1f);color:var(--np-muted,#bba98c)}`;
 
@@ -213,7 +214,7 @@ export function mountQuickPlay<S extends SessionLike>(container: HTMLElement, o:
     const my = token;
     head(L.codeTitle);
     const row = el('div', 'npq-row');
-    const inp = el('input', 'npq-in'); inp.placeholder = L.codePlaceholder; inp.autocomplete = 'off'; inp.spellcheck = false;
+    const inp = el('input', 'npq-in'); inp.style.textTransform = 'none'; inp.placeholder = L.codePlaceholder; inp.autocomplete = 'off'; inp.spellcheck = false;
     const go = btn(L.codeGo, '', () => void byCode(inp.value), true); go.classList.add('go');
     inp.onkeydown = (ev) => { if (ev.key === 'Enter') void byCode(inp.value); };
     row.append(inp, go);
@@ -313,7 +314,7 @@ export function mountQuickPlay<S extends SessionLike>(container: HTMLElement, o:
       if (!m.code) { codeBox.replaceChildren(); return; }
       if (codeBox.dataset.code === m.code) return;
       codeBox.dataset.code = m.code;
-      codeBox.replaceChildren(el('p', 'npq-note', L.roomCode), el('p', 'npq-code', m.code));
+      const cEl = el('p', 'npq-code', m.code); if (m.code.length > 8) cEl.classList.add('long'); codeBox.replaceChildren(el('p', 'npq-note', L.roomCode), cEl);
     };
     card.append(codeBox, line, big, el('h2', '', L.players), list, foot);
     const seats = () => Math.max(m.seatsNeeded, 2);
@@ -390,7 +391,7 @@ export function mountQuickPlay<S extends SessionLike>(container: HTMLElement, o:
       const match = p.get('match');
       const code = p.get('code') ?? p.get('room');
       if (match) { void byCode(`?match=${encodeURIComponent(match)}&invite=${encodeURIComponent(p.get('invite') ?? '')}`); return true; }
-      if (code && /^[A-Za-z0-9]{4,8}$/.test(code)) { void byCode(code); return true; }
+      if (code && /^[A-Za-z0-9]{4,32}$/.test(code)) { void byCode(code); return true; }
       return false;
     },
   };

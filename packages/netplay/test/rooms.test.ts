@@ -23,41 +23,43 @@ it('parses the hosted quick_match reply (guest shape, 13.11) and marks missing l
 
 it('wave 2: create(visibility) / list_open / join_by_code (code + invite link) / join from list, room snapshot + server countdown', async () => {
   const seen: { action: string; p: Record<string, unknown> }[] = [];
-  const room = (x: Record<string, unknown>) => ({ room_id: 'r:K7QM2X', match_id: 'm_1', visibility: 'private', code: 'K7QM2X', invite_link: '/play?match=m_1&invite=zz', status: 'open', min_players: 2, max_players: 2, seats_taken: 1, host_user_id: 'u1', players: [{ seat: 0, user_id: 'u1', display_name: 'Алекс', is_host: true }], countdown_ends_at_ms: null, version: 3, server_now_ms: 1_000_000, ...x });
+  const room = (x: Record<string, unknown>) => ({ room_id: 'r:K7QM2X', match_id: 'm_1', visibility: 'private', invite_code: 'f0c91d3db25e', invite_link: '/play?match=m_1&invite=zz', status: 'open', min_players: 2, max_players: 2, seats_taken: 1, host_user_id: 'u1', players: [{ seat: 0, user_id: 'u1', display_name: 'Алекс', is_host: true }], countdown_ends_at_ms: null, version: 3, server_now_ms: 1_000_000, ...x });
   const f = (async (_u: string, init: RequestInit) => {
     const a = JSON.parse(String(init.body)).params.arguments;
     seen.push({ action: a.action, p: a.params });
     if (a.action === 'rooms.create') return a.params.visibility === 'public' ? reply({ ok: false, error: { code: 'auth_required_to_host' } }) : reply({ data: { ok: true, data: { room: room({}), seat: 0 } } });
-    if (a.action === 'rooms.list_open') return reply({ data: { ok: true, data: { rooms: [{ room_id: 'r:PUB', max_players: 2, seats_taken: 1, status: 'open', host_display_name: 'Боб' }] } } });
-    if (a.action === 'rooms.join_by_code') return a.params.code === 'BAD000' ? reply({ ok: false, error: { code: 'bad_code' } }) : reply({ data: { ok: true, data: { room: room({ status: 'countdown', seats_taken: 2, countdown_ends_at_ms: 1_003_000 }), seat: 1 } } });
+    if (a.action === 'rooms.list_open') return reply({ data: { ok: true, data: { matches: [{ match_id: 'm_p', room_id: 'r:PUB', seats_needed: 2, seats_taken: 1, invite_code: 'aa11bb22cc33' }], count: 1 } } });
+    if (a.action === 'rooms.join_by_code') return a.params.invite_code === 'bad000' ? reply({ data: { ok: false, error_code: 'invite_not_found', error: 'unknown invite code' } }) : reply({ data: { ok: true, data: { room: room({ status: 'countdown', seats_taken: 2, countdown_ends_at_ms: 1_003_000 }), seat: 1 } } });
     if (a.action === 'rooms.join') return reply({ ok: false, error: { code: 'action_not_found' } });
     return reply({ ok: false, error: { code: 'action_not_found' } });
   }) as unknown as typeof fetch;
   const r = hostedRooms({ projectId: 2152, scriptId: 'stones-duel-room', fetch: f, session: false });
   const m = await r.create({ visibility: 'private' });
-  expect(m).toMatchObject({ code: 'K7QM2X', visibility: 'private', seat: 0, hostUserId: 'u1', seatsNeeded: 2, countdownEndsAtMs: null, version: 3 });
+  expect(m).toMatchObject({ code: 'f0c91d3db25e', visibility: 'private', seat: 0, hostUserId: 'u1', seatsNeeded: 2, countdownEndsAtMs: null, version: 3 });
   expect(m.players?.[0]).toMatchObject({ name: 'Алекс', isHost: true });
   await expect(r.create({ visibility: 'public' })).rejects.toMatchObject({ kind: 'auth', code: 'auth_required_to_host' });
   const list = await r.listOpen();
-  expect(list[0]).toMatchObject({ roomId: 'r:PUB', seatsNeeded: 2, hostName: 'Боб', status: 'open' });
-  const j = await r.joinByCode(' k7qm2x ');
+  expect(list[0]).toMatchObject({ roomId: 'r:PUB', matchId: 'm_p', seatsNeeded: 2, code: 'aa11bb22cc33' });
+  const j = await r.joinByCode(' F0C91D3DB25E ');
   expect(j).toMatchObject({ seat: 1, status: 'countdown', seatsTaken: 2 });
   const left = countdownLeftMs(j, 1_000_500 + (j.clockSkewMs ?? 0));
   expect(left).toBe(2500);
   await r.joinByCode('https://agentstack.tech/s/2152/kamni/?mp=qm&match=m_1&invite=zz');
-  await expect(r.joinByCode('BAD000')).rejects.toMatchObject({ kind: 'server', code: 'bad_code' });
+  await expect(r.joinByCode('BAD000')).rejects.toMatchObject({ kind: 'server', code: 'invite_not_found' });
   await expect(r.joinRoom({ roomId: 'r:PUB', seatsTaken: 1, seatsNeeded: 2 })).rejects.toMatchObject({ code: 'action_not_found' });
-  await r.joinRoom({ roomId: 'r:PUB', code: 'K7QM2X', seatsTaken: 1, seatsNeeded: 2 });
+  await r.joinRoom({ roomId: 'r:PUB', code: 'aa11bb22cc33', seatsTaken: 1, seatsNeeded: 2 });
   const p = (a: string) => seen.filter((x) => x.action === a).map((x) => x.p);
   expect(p('rooms.create')[0]).toMatchObject({ visibility: 'private', script_id: 'stones-duel-room', project_id: 2152 });
-  expect(p('rooms.join_by_code').map((x) => x.code ?? x.invite_link)).toEqual(['K7QM2X', 'https://agentstack.tech/s/2152/kamni/?mp=qm&match=m_1&invite=zz', 'BAD000', 'K7QM2X']);
+  expect(p('rooms.join_by_code').map((x) => x.invite_code)).toEqual(['f0c91d3db25e', 'zz', 'bad000', 'aa11bb22cc33']);
+  expect(Object.keys(p('rooms.join_by_code')[0]!).sort()).toEqual(['invite_code', 'project_id']);
   expect(r.support()).toMatchObject({ create: true, listOpen: true, joinByCode: true });
 });
 
 it('parseInvite: link, ?code=, bare code', () => {
   expect(parseInvite('https://x/s/1/?match=m%201&invite=ab')).toMatchObject({ match: 'm 1', invite: 'ab' });
-  expect(parseInvite('?code=k7qm2x')).toEqual({ code: 'K7QM2X' });
-  expect(parseInvite(' k7 qm2x ')).toEqual({ code: 'K7QM2X' });
+  expect(parseInvite('?code=F0C91D3DB25E')).toEqual({ code: 'f0c91d3db25e' });
+  expect(parseInvite(' f0c9 1d3d b25e ')).toEqual({ code: 'f0c91d3db25e' });
+  expect(parseInvite('/play?match=m&invite=ab12')).toMatchObject({ match: 'm', code: 'ab12' });
 });
 
 it('parseMatch keeps the old flat quick_match shape', () => {
