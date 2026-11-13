@@ -21,4 +21,5 @@ export { netStatus, seriesScore, type NetStatus } from './status.js';
 export { outcomeWinners, isWinner, resultWinners, normalizeOutcome } from './outcome.js';
 export { openPhase, readyPhase, unreadyPhase, touchPhase, phaseLeft, phaseTimedOut, phaseWaiting, resolvePhase, phaseDone, turnSeconds, TURN_CHOICES, type SimPhase } from './phase.js';
 export { generateRoomScript, type RoomScriptOptions } from './generator/roomScript.js';
+export { generateRoomScriptP1, type RoomScriptP1Options } from './generator/roomScriptP1.js';
 export type * from './types.js';
