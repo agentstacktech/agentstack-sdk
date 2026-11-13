@@ -6,19 +6,24 @@ import { ticTacToe } from '../examples/tic-tac-toe.js';
 class Relay {
   peers: FakeWs[] = [];
   copies = 200;
+  seq = 0;
+  envelope = false;
   drop = 0;
   Ctor: typeof FakeWs;
   constructor() {
     const r = this;
     this.Ctor = class extends FakeWs {
-      constructor(_url: string) { super(); r.peers.push(this); setTimeout(() => { this.readyState = 1; this.onmessage?.({ data: '{"type":"connected","connection_id":"c"}' }); }, 0); }
+      conn = 'conn_' + r.peers.length;
+      constructor(_url: string) { super(); r.peers.push(this); setTimeout(() => { this.readyState = 1; this.onmessage?.({ data: JSON.stringify({ type: 'connected', connection_id: this.conn }) }); }, 0); }
       send(data: string) {
         const m = JSON.parse(data);
         if (m.type !== 'broadcast') return;
         if (r.drop > 0) { r.drop--; return; }
+        const seq = ++r.seq;
         for (const p of r.peers) {
           if (p.readyState !== 1) continue;
-          for (let i = 0; i < r.copies; i++) p.onmessage?.({ data: JSON.stringify(m.payload) });
+          const data = r.envelope ? JSON.stringify({ type: 'broadcast', payload: m.payload, relay_envelope: { v: 1, sender_connection_id: this.conn, seq, exclude_self: true } }) : JSON.stringify(m.payload);
+          for (let i = 0; i < r.copies; i++) p.onmessage?.({ data });
         }
       }
     };
@@ -81,5 +86,21 @@ it('starts a real game session on raw relay (1000 copies per frame), no scripts'
   expect(A.snapshot.state).toEqual(B.snapshot.state);
   expect(A.snapshot.tick).toBeGreaterThan(0);
   expect(A.snapshot.desync).toBeNull();
+  A.close(); B.close();
+});
+
+it('uses relay_envelope v1 when the server sends it (dedupe by sender_connection_id+seq, own frames dropped)', async () => {
+  vi.useFakeTimers();
+  const r = new Relay(); r.envelope = true; r.copies = 300;
+  const a: Entry[] = [], b: Entry[] = [];
+  const pA = relayTransport({ self: 'a', host: true, url: () => 'ws://test', WebSocket: r.Ctor }).connect('r', { afterSeq: 0, onEntries: (e) => a.push(...e) });
+  const pB = relayTransport({ self: 'b', host: false, url: () => 'ws://test', WebSocket: r.Ctor }).connect('r', { afterSeq: 0, onEntries: (e) => b.push(...e) });
+  await advance(5);
+  const A = await pA, B = await pB;
+  await B.send({ k: 'ready' }); await A.send({ k: 'ready' });
+  await advance(300);
+  expect(a.map((e) => e.from).sort()).toEqual(['a', 'b']);
+  expect(a).toHaveLength(2);
+  expect(b).toEqual(a);
   A.close(); B.close();
 });

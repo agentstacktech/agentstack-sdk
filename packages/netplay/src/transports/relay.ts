@@ -10,6 +10,8 @@
  *     dropped before JSON.parse, entries are accepted once by `g`, proposals once by (sender, q);
  *   - at most `drainPerTick` frames are handled per tick and at most `maxQueue` wait (the rest are dropped — they are
  *     copies; a real gap is healed by `hello` → the sequencer re-sends the log after the gap).
+ * When the relay adds `relay_envelope` {sender_connection_id, seq, exclude_self} (P0 fix), it is used first: copies by
+ * (sender_connection_id, seq) and frames from our own connection are dropped before our envelope is read.
  * Private entries (`to`) are filtered on the client (the relay is public): fine for 1v1 duels, not anti-cheat.
  * The sequencer keeps the log in memory: if it reloads, the room cannot be resumed (start a new quick match).
  *
@@ -96,6 +98,8 @@ export function relayTransport(o: RelayOptions): Transport {
       let lastHello = 0;
       let outE: WEntry[] = [];
       const mine: WEntry[] = [];
+      const envSeen = new Map<string, number>();
+      let myConn = '';
       const put = (w: Wire) => { if (!closed && ws.readyState === 1) ws.send(JSON.stringify({ type: 'broadcast', payload: w, exclude_self: true, qos: 'reliable' })); };
       const deliver = (list: WEntry[]) => {
         const out: Entry[] = [];
@@ -117,7 +121,22 @@ export function relayTransport(o: RelayOptions): Transport {
       };
       const handle = (raw: string) => {
         let w: Wire;
-        try { w = JSON.parse(raw) as Wire; } catch { return; }
+        try {
+          const m = JSON.parse(raw) as Record<string, unknown>;
+          // Server envelope (CursorDeploy P0 fix, relay_envelope v1): dedupe by (sender_connection_id, seq), drop our own.
+          // Without it (older relay) our own {s, q / g} envelope below does the same job.
+          const env = m && typeof m === 'object' ? (m.relay_envelope as { sender_connection_id?: unknown; seq?: unknown } | undefined) : undefined;
+          if (env && typeof env === 'object') {
+            const sc = String(env.sender_connection_id ?? '');
+            if (sc && myConn && sc === myConn) { stats.echoes++; return; }
+            if (sc && typeof env.seq === 'number') {
+              const last = envSeen.get(sc) ?? -Infinity;
+              if (env.seq <= last) { stats.copies++; return; }
+              envSeen.set(sc, env.seq);
+            }
+            w = ((m.payload ?? m.data ?? m) as unknown) as Wire;
+          } else w = (m.type === 'broadcast' && m.payload ? m.payload : m) as unknown as Wire;
+        } catch { return; }
         if (!w || w.np !== 1 || typeof w.s !== 'string') return;
         if (w.s === o.self) { stats.echoes++; return; }
         if (o.host) {
@@ -186,6 +205,7 @@ export function relayTransport(o: RelayOptions): Transport {
         ws.onmessage = (ev) => {
           const raw = typeof ev.data === 'string' ? ev.data : String(ev.data);
           stats.received++;
+          if (!myConn && raw.includes('"connected"')) { try { const c = JSON.parse(raw) as { type?: string; connection_id?: string }; if (c.type === 'connected' && c.connection_id) myConn = c.connection_id; } catch { /* not JSON */ } }
           if (!ready) { if (raw.includes('"connected"')) go(); }
           if (!raw.includes('"np":1') && !raw.includes('"np": 1')) return; // presence / state / pong spam: ignore cheaply
           if (seenRaw.has(raw)) { stats.copies++; return; }
