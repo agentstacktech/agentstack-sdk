@@ -157,16 +157,16 @@ export function hostedRooms(o: HostedRoomsOptions): RoomsApi {
   const ensureSession = (): Promise<boolean> => { if (o.session === false) return Promise.resolve(true); session = mintSession(); return session; };
   const AUTHY = new Set(['auth_required', 'unauthorized', 'hosted_app_session_required', 'session_setup_required', 'expired', 'http_401']);
   const BUSY = new Set(['server_busy', 'http_503', 'http_502']);
-  async function call(action: string, params: Json, attempt = 0): Promise<Json> {
+  async function call(action: string, params: Json, attempt = 0, keepalive = false): Promise<Json> {
     if (session) await session; // a mint in flight: wait for its cookie
-    try { return await call1(action, params); }
+    try { return await call1(action, params, keepalive); }
     catch (e) {
       if (attempt === 0 && e instanceof NetplayError && AUTHY.has(e.code)) { await ensureSession(); return call(action, params, 1); }
       if (attempt < 2 && e instanceof NetplayError && BUSY.has(e.code)) { await new Promise((r) => setTimeout(r, 700 * (attempt + 1))); return call(action, params, attempt + 1); }
       throw e;
     }
   }
-  async function call1(action: string, params: Json): Promise<Json> {
+  async function call1(action: string, params: Json, keepalive = false): Promise<Json> {
     const h: Record<string, string> = { 'content-type': 'application/json', accept: 'application/json', 'x-project-id': String(o.projectId) };
     const t = o.token?.();
     if (t) h.authorization = `Bearer ${t}`;
@@ -175,7 +175,7 @@ export function hostedRooms(o: HostedRoomsOptions): RoomsApi {
     } } });
     const signal = typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(o.timeoutMs ?? 15_000) : undefined;
     let r: Response;
-    try { r = await f(`${base}/s/${o.projectId}/mcp`, { method: 'POST', credentials: 'include', headers: h, body, ...(signal ? { signal } : {}) }); }
+    try { r = await f(`${base}/s/${o.projectId}/mcp`, { method: 'POST', credentials: 'include', headers: h, body, ...(keepalive ? { keepalive: true } : signal ? { signal } : {}) }); }
     catch (e) { throw new NetplayError('offline', 'network', String((e as Error)?.message ?? e)); }
     let text = await r.text();
     if (text.includes('\ndata:') || text.startsWith('data:') || text.startsWith('event:')) {
@@ -200,7 +200,7 @@ export function hostedRooms(o: HostedRoomsOptions): RoomsApi {
       return parseMatch(await call('rooms.quick_match', { script_id: o.scriptId, mode, idempotency_key: key('qm'), ...(x.match ? { match_id: x.match } : {}), ...(x.invite ? { invite: x.invite } : {}) }));
     },
     async status(m) { return parseMatch(await call('rooms.match_status', { script_id: o.scriptId, match_id: m.matchId }), m); },
-    async leave(m) { try { await call('rooms.leave', { script_id: o.scriptId, match_id: m.matchId }); } catch { /* best effort */ } },
+    async leave(m) { try { await call('rooms.leave', { script_id: o.scriptId, match_id: m.matchId }, 2, true); } catch { /* best effort */ } },
     async wsUrl(m) {
       const d = await call('stream.relay.ws_ticket', { room_id: m.roomId, match_id: m.matchId });
       const u = str(d.ws_connect_url);

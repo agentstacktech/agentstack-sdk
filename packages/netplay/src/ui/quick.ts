@@ -353,10 +353,16 @@ export function mountQuickPlay<S extends SessionLike>(container: HTMLElement, o:
         }
       }
     };
-    unsub = s.subscribe((snap) => {
+    const unsubSnap = s.subscribe((snap) => {
       draw();
       if (snap.phase === 'playing' && my === token) { const c = cur!; stop(); token++; cur = null; hide(); o.onStart(c.s, c.m); }
     });
+    unsub = () => { unsubSnap(); offBye(); };
+    // a closed tab must not leave a half-empty room that traps the next quick match
+    const bye = () => { if (cur && cur.m.matchId === m.matchId && !started) { try { s.leave(); } catch { /* */ } void o.rooms.leave(m); } };
+    const win = doc.defaultView;
+    win?.addEventListener('pagehide', bye);
+    const offBye = () => win?.removeEventListener('pagehide', bye);
     timers.push(setInterval(draw, 250));
     timers.push(setInterval(() => { if (!started) void o.rooms.status(m).then((x) => { if (my !== token) return; m = x; if (cur) cur.m = x; setActiveMatch(x, o.rooms); }).catch(() => {}); }, o.pollMs ?? 1000));
     void s.join().catch((e) => { if (my === token) { s.leave(); void o.rooms.leave(m); cur = null; menu(msgOf(e)); } });
