@@ -11,7 +11,7 @@ it('parses the hosted quick_match reply (guest shape, 13.11) and marks missing l
     if (a.action === 'stream.relay.ws_ticket') return reply({ data: { ok: true, data: { ws_connect_url: 'wss://x/api/stream-relay/ws/rooms/r?token=T' } } });
     return reply({ ok: false, error: { code: 'action_not_found', message: 'nope' } });
   }) as unknown as typeof fetch;
-  const r = hostedRooms({ projectId: 2141, scriptId: 'serpent-coop-room', fetch: f });
+  const r = hostedRooms({ projectId: 2141, scriptId: 'serpent-coop-room', fetch: f, session: false });
   const m = await r.quickMatch();
   expect(m).toMatchObject({ matchId: 'qm_1', roomId: 'qm:s:1v1:qm_1', seat: 1, status: 'started', seatsTaken: 2, seatsNeeded: 2, invite: 'ab12' });
   expect(await r.wsUrl(m)).toContain('token=');
@@ -33,7 +33,7 @@ it('wave 2: create(visibility) / list_open / join_by_code (code + invite link) /
     if (a.action === 'rooms.join') return reply({ ok: false, error: { code: 'action_not_found' } });
     return reply({ ok: false, error: { code: 'action_not_found' } });
   }) as unknown as typeof fetch;
-  const r = hostedRooms({ projectId: 2152, scriptId: 'stones-duel-room', fetch: f });
+  const r = hostedRooms({ projectId: 2152, scriptId: 'stones-duel-room', fetch: f, session: false });
   const m = await r.create({ visibility: 'private' });
   expect(m).toMatchObject({ code: 'K7QM2X', visibility: 'private', seat: 0, hostUserId: 'u1', seatsNeeded: 2, countdownEndsAtMs: null, version: 3 });
   expect(m.players?.[0]).toMatchObject({ name: 'Алекс', isHost: true });
@@ -64,4 +64,21 @@ it('parseMatch keeps the old flat quick_match shape', () => {
   const m = parseMatch({ match_id: 'qm_1', room_id: 'qm:s:1v1:qm_1', seat: 0, status: 'waiting', seats_taken: 1, seats_needed: 2 });
   expect(m).toMatchObject({ matchId: 'qm_1', seat: 0, status: 'waiting', seatsNeeded: 2, clockSkewMs: 0 });
   expect(countdownLeftMs(m)).toBeNull();
+});
+
+it('mints a guest hosted session on auth_required (never before), re-mints on auth_required, retries server_busy', async () => {
+  const log: string[] = [];
+  let mcpN = 0;
+  const f = (async (u: string, init: RequestInit) => {
+    if (u.endsWith('/api/hosted-apps/2141/session')) { log.push('session:' + String(init.body)); return new Response('{}', { status: 200 }); }
+    const a = JSON.parse(String(init.body)).params.arguments; log.push(a.action);
+    mcpN++;
+    if (mcpN === 1) return new Response(JSON.stringify({ code: 'auth_required', message: 'x' }), { status: 200 });
+    if (mcpN === 2) return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, error: { code: -32603, message: 'server_busy', data: { code: 'server_busy', retryable: true } } }), { status: 200 });
+    return reply({ data: { ok: true, data: { match_id: 'qm_9', room_id: 'r9', seat: 1, status: 'started' } } });
+  }) as unknown as typeof fetch;
+  const r = hostedRooms({ projectId: 2141, scriptId: 's', fetch: f });
+  const m = await r.quickMatch();
+  expect(m.matchId).toBe('qm_9');
+  expect(log).toEqual(['rooms.quick_match', 'session:{"guest":true}', 'rooms.quick_match', 'rooms.quick_match']);
 });

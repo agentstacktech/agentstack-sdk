@@ -73,6 +73,8 @@ export interface HostedRoomsOptions {
   timeoutMs?: number;
   /** Re-try a lobby action that was missing after this long (ms). Default 60000. */
   reprobeMs?: number;
+  /** Mint a hosted-app session cookie (guest or bearer) when a call answers auth_required, then retry once. Default true. */
+  session?: boolean;
 }
 
 export interface RoomsApi {
@@ -142,7 +144,29 @@ export function hostedRooms(o: HostedRoomsOptions): RoomsApi {
   const reprobeMs = o.reprobeMs ?? 60_000;
   const mark = (k: keyof typeof sup, v: boolean) => { sup[k] = v; supAt[k] = Date.now(); };
   let id = 0;
-  async function call(action: string, params: Json): Promise<Json> {
+  // A guest page has no hosted-app cookie until it asks for one. We never overwrite a working cookie: the first auth error mints one
+  // (guest, or with the player's bearer) and the call is retried once.
+  let session: Promise<boolean> | null = null;
+  const mintSession = (): Promise<boolean> => {
+    const t = o.token?.();
+    const h: Record<string, string> = { 'content-type': 'application/json', accept: 'application/json' };
+    if (t) h.authorization = `Bearer ${t}`;
+    return f(`${base}/api/hosted-apps/${o.projectId}/session`, { method: 'POST', credentials: 'include', headers: h, body: t ? '{}' : '{"guest":true}' })
+      .then((r) => r.ok, () => false);
+  };
+  const ensureSession = (): Promise<boolean> => { if (o.session === false) return Promise.resolve(true); session = mintSession(); return session; };
+  const AUTHY = new Set(['auth_required', 'unauthorized', 'hosted_app_session_required', 'session_setup_required', 'expired', 'http_401']);
+  const BUSY = new Set(['server_busy', 'http_503', 'http_502']);
+  async function call(action: string, params: Json, attempt = 0): Promise<Json> {
+    if (session) await session; // a mint in flight: wait for its cookie
+    try { return await call1(action, params); }
+    catch (e) {
+      if (attempt === 0 && e instanceof NetplayError && AUTHY.has(e.code)) { await ensureSession(); return call(action, params, 1); }
+      if (attempt < 2 && e instanceof NetplayError && BUSY.has(e.code)) { await new Promise((r) => setTimeout(r, 700 * (attempt + 1))); return call(action, params, attempt + 1); }
+      throw e;
+    }
+  }
+  async function call1(action: string, params: Json): Promise<Json> {
     const h: Record<string, string> = { 'content-type': 'application/json', accept: 'application/json', 'x-project-id': String(o.projectId) };
     const t = o.token?.();
     if (t) h.authorization = `Bearer ${t}`;
@@ -162,7 +186,10 @@ export function hostedRooms(o: HostedRoomsOptions): RoomsApi {
     try { j = JSON.parse(text); } catch { /* not JSON */ }
     const p = unwrapHostedReply(j);
     const err = p.error ?? obj(obj(j)?.error);
-    const code = typeof err === 'string' ? err : str(obj(err)?.code) || str(p.error_code);
+    const sc = (v: unknown) => (typeof v === 'string' ? v : '');
+    const eo = obj(err);
+    // JSON-RPC errors carry a number code and the platform code in data.code; a bare auth reply is { code: 'auth_required' }
+    const code = typeof err === 'string' ? err : sc(obj(eo?.data)?.code) || sc(eo?.code) || (eo && typeof eo.code === 'number' ? `rpc_${eo.code}` : '') || str(p.error_code) || (p.data === undefined ? sc(obj(j)?.code) : '');
     if (!r.ok || p.ok === false || code) throw new NetplayError(errorKind(code || `http_${r.status}`, r.status), code || `http_${r.status}`, str(obj(err)?.message));
     return obj(p.data) ?? p;
   }
