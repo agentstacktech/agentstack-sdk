@@ -12,11 +12,11 @@ export class NetplayError extends Error {
   }
 }
 
-const AUTH = new Set(['unauthorized', 'auth_required', 'not_authenticated', 'session_user_required', 'relogin_required', 'session_setup_required', 'hosted_app_session_required', 'scope_error', 'expired', 'AUTH']);
+const AUTH = new Set(['unauthorized', 'auth_required', 'not_authenticated', 'session_user_required', 'relogin_required', 'session_setup_required', 'hosted_app_session_required', 'scope_error', 'expired', 'AUTH', 'auth_required_to_host', 'login_required']);
 const RATE = new Set(['rate_limit_exceeded', 'rate_limited', 'RATE_LIMIT', 'quota_exceeded', 'fuel_exhausted', 'sandbox_limit_exceeded', 'too_many_requests']);
 const MISSING = new Set(['script_not_found', 'NO_EXPORT', 'export_not_found', 'action_not_found']);
 /** The room cannot take more: too many members (`ROOM_FULL`) or its log reached `maxLog` (`LOG_FULL`). A new room helps, retrying does not. */
-const FULL = new Set(['ROOM_FULL', 'LOG_FULL']);
+const FULL = new Set(['ROOM_FULL', 'LOG_FULL', 'room_full']);
 
 /** Map a platform / room-script error code (+ HTTP status) to a kind. */
 export function errorKind(code: string, status = 200): NetErrorKind {
