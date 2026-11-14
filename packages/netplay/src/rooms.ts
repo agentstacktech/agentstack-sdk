@@ -169,7 +169,8 @@ export function hostedRooms(o: HostedRoomsOptions): RoomsApi {
       .then((r) => r.ok, () => false);
   };
   const ensureSession = (): Promise<boolean> => { if (o.session === false) return Promise.resolve(true); session = mintSession(); return session; };
-  const AUTHY = new Set(['auth_required', 'unauthorized', 'hosted_app_session_required', 'session_setup_required', 'expired', 'http_401']);
+  // csrf_validation_failed: the page's csrf_token cookie rotated under us — a fresh mint re-pairs cookie and header
+  const AUTHY = new Set(['auth_required', 'unauthorized', 'hosted_app_session_required', 'session_setup_required', 'expired', 'http_401', 'csrf_validation_failed', 'hosted_cookie_missing']);
   const BUSY = new Set(['server_busy', 'http_503', 'http_502']);
   async function call(action: string, params: Json, attempt = 0, keepalive = false): Promise<Json> {
     if (session) await session; // a mint in flight: wait for its cookie
@@ -211,7 +212,15 @@ export function hostedRooms(o: HostedRoomsOptions): RoomsApi {
   const missing = (e: unknown) => e instanceof NetplayError && e.code === 'action_not_found';
   const api: RoomsApi = {
     async quickMatch(x = {}) {
-      return parseMatch(await call('rooms.quick_match', { script_id: o.scriptId, mode, idempotency_key: key('qm'), ...(x.match ? { match_id: x.match } : {}), ...(x.invite ? { invite: x.invite } : {}) }));
+      // Wave 3 (13.11.2026): a reply without a seat (`not_seated`, or seat < 0) / `match_full` = re-queue once with a new
+      // idempotency key, after leaving that match (the server's own advice in rooms.quick_match when_blocked)
+      const once = async () => parseMatch(await call('rooms.quick_match', { script_id: o.scriptId, mode, idempotency_key: key('qm'), ...(x.match ? { match_id: x.match } : {}), ...(x.invite ? { invite: x.invite } : {}) }));
+      let m: QuickMatch;
+      try { m = await once(); }
+      catch (e) { if (x.match || !(e instanceof NetplayError && (e.code === 'not_seated' || e.code === 'match_full'))) throw e; return once(); }
+      if (m.seat < 0 && !x.match) { if (m.matchId) await api.leave(m); m = await once(); }
+      if (m.seat < 0) throw new NetplayError('server', 'not_seated');
+      return m;
     },
     async status(m) { return parseMatch(await call('rooms.match_status', { script_id: o.scriptId, match_id: m.matchId }), m); },
     async leave(m) { try { await call('rooms.leave', { script_id: o.scriptId, match_id: m.matchId }, 2, true); } catch { /* best effort */ } },

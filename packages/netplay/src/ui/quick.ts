@@ -29,6 +29,8 @@ export interface QuickLabels {
   openSoon: string; openEmpty: string; codeSoon: string; createSoon: string; signInToCreate: string; signIn: string;
   invite: string; copied: string; offline: string; badCode: string; preview: string; close: string;
   createPublic: string; createPublicHint: string; createPrivate: string; createPrivateHint: string; roomCode: string; roomFull: string; roomRunning: string; waitingPlayers: string;
+  /** Wave 3 errors: the seat was lost (not_seated / not_a_participant), the server is full / busy, too many tries, no such invite. */
+  seatLost: string; busy: string; rate: string; noInvite: string; joinFailed: string;
 }
 export const QUICK_LABELS: Record<'ru' | 'en' | 'pt', QuickLabels> = {
   ru: {
@@ -41,6 +43,7 @@ export const QUICK_LABELS: Record<'ru' | 'en' | 'pt', QuickLabels> = {
     invite: 'Скопировать приглашение', copied: 'Ссылка скопирована', offline: 'Нет связи с игровым сервером. Попробуйте ещё раз.', badCode: 'Код не подошёл',
     preview: 'Тестовый режим', close: 'Закрыть',
     createPublic: 'Открытый матч', createPublicHint: 'Виден в списке комнат, войти может любой', createPrivate: 'Закрытый матч', createPrivateHint: 'Только по коду или ссылке', roomCode: 'Код комнаты', roomFull: 'Комната уже заполнена', roomRunning: 'Матч в этой комнате уже идёт', waitingPlayers: 'Ждём игроков',
+    seatLost: 'Место в комнате потеряно. Найдите матч заново.', busy: 'Игровой сервер сейчас занят. Попробуйте через минуту.', rate: 'Слишком много попыток. Подождите немного', noInvite: 'Комната с таким кодом не найдена или уже закрыта', joinFailed: 'Не удалось войти в комнату. Попробуйте ещё раз.',
   },
   en: {
     title: 'Multiplayer', quick: 'Quick match', quickHint: 'Straight into a room, starts on a countdown', create: 'Create a match', createHint: 'A room with a code for friends',
@@ -52,6 +55,7 @@ export const QUICK_LABELS: Record<'ru' | 'en' | 'pt', QuickLabels> = {
     invite: 'Copy invite', copied: 'Link copied', offline: 'Can’t reach the game server. Try again.', badCode: 'That code did not work',
     preview: 'Preview', close: 'Close',
     createPublic: 'Public match', createPublicHint: 'Listed in open rooms, anyone can join', createPrivate: 'Private match', createPrivateHint: 'Only by code or link', roomCode: 'Room code', roomFull: 'That room is full', roomRunning: 'That match has already started', waitingPlayers: 'Waiting for players',
+    seatLost: 'You lost your seat in the room. Find a match again.', busy: 'The game server is busy. Try again in a minute.', rate: 'Too many tries. Please wait', noInvite: 'No open room with that code', joinFailed: 'Could not join the room. Try again.',
   },
   pt: {
     title: 'Multijogador', quick: 'Partida rápida', quickHint: 'Direto para uma sala, começa na contagem', create: 'Criar partida', createHint: 'Sala com código para amigos',
@@ -63,6 +67,7 @@ export const QUICK_LABELS: Record<'ru' | 'en' | 'pt', QuickLabels> = {
     invite: 'Copiar convite', copied: 'Link copiado', offline: 'Sem conexão com o servidor. Tente de novo.', badCode: 'Esse código não funcionou',
     preview: 'Prévia', close: 'Fechar',
     createPublic: 'Partida aberta', createPublicHint: 'Aparece na lista, qualquer um entra', createPrivate: 'Partida fechada', createPrivateHint: 'Só por código ou link', roomCode: 'Código da sala', roomFull: 'Essa sala está cheia', roomRunning: 'Essa partida já começou', waitingPlayers: 'Aguardando jogadores',
+    seatLost: 'Você perdeu o lugar na sala. Procure uma partida de novo.', busy: 'O servidor está ocupado. Tente em um minuto.', rate: 'Muitas tentativas. Aguarde', noInvite: 'Nenhuma sala aberta com esse código', joinFailed: 'Não foi possível entrar na sala. Tente de novo.',
   },
 };
 
@@ -156,7 +161,17 @@ export function mountQuickPlay<S extends SessionLike>(container: HTMLElement, o:
   const stop = () => { for (const t of timers) clearInterval(t); timers = []; unsub?.(); unsub = null; };
   const head = (t: string) => { card.replaceChildren(); const h = el('h2', '', t); card.append(h); if (o.preview) { const tag = el('span', 'npq-tag', L.preview); h.append(' ', tag); } };
   const say = (msg: string, err = false) => card.append(el('p', err ? 'npq-err' : 'npq-note', msg));
-  const msgOf = (e: unknown) => (e instanceof NetplayError && e.kind === 'offline' ? L.offline : e instanceof NetplayError ? `${L.offline} (${e.code})` : L.offline);
+  const SEAT = new Set(['not_seated', 'not_a_participant', 'match_not_found']);
+  const BUSY = new Set(['room_table_full', 'room_create_failed', 'server_busy', 'http_503', 'http_502']);
+  const msgOf = (e: unknown): string => {
+    if (!(e instanceof NetplayError)) return L.offline;
+    if (e.kind === 'offline') return L.offline;
+    if (SEAT.has(e.code)) return L.seatLost;
+    if (BUSY.has(e.code)) return L.busy;
+    if (e.kind === 'rate') return e.retryAfterMs ? `${L.rate} (${Math.ceil(e.retryAfterMs / 1000)} s).` : `${L.rate}.`;
+    if (e.kind === 'auth') return L.signInToCreate;
+    return `${L.offline} (${e.code})`;
+  };
 
   function menu(err = ''): void {
     stop(); token++;
@@ -172,8 +187,11 @@ export function mountQuickPlay<S extends SessionLike>(container: HTMLElement, o:
   const isMissing = (e: unknown) => e instanceof NetplayError && e.code === 'action_not_found';
   const joinErr = (e: unknown) => isMissing(e) ? L.codeSoon
     : e instanceof NetplayError && (e.kind === 'full' || e.code === 'room_full') ? L.roomFull
-    : e instanceof NetplayError && e.code === 'room_running' ? L.roomRunning
-    : e instanceof NetplayError && e.kind === 'server' ? L.badCode : msgOf(e);
+    : e instanceof NetplayError && (e.code === 'room_running' || e.code === 'match_started') ? L.roomRunning
+    : e instanceof NetplayError && (e.code === 'invite_not_found' || e.code === 'bad_code' || e.code === 'match_not_found') ? L.noInvite
+    : e instanceof NetplayError && e.code === 'join_failed' ? L.joinFailed
+    : e instanceof NetplayError && (e.code === 'match_full') ? L.roomFull
+    : e instanceof NetplayError && e.kind === 'server' && !BUSY.has(e.code) && !SEAT.has(e.code) ? L.badCode : msgOf(e);
 
   function needSignIn(): void {
     say(L.signInToCreate);

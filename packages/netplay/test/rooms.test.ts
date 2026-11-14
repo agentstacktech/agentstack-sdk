@@ -103,3 +103,23 @@ it('sends X-CSRF-Token from the csrf_token cookie on the session mint and MCP ca
     expect(seen).toContain('session:tok+1');
   } finally { g.document = had; }
 });
+
+it('wave 3: quick_match without a seat (not_seated) leaves that match and re-queues once with a new key', async () => {
+  const seen: { action: string; p: Record<string, unknown> }[] = [];
+  let n = 0;
+  const f = (async (_u: string, init: RequestInit) => {
+    const a = JSON.parse(String(init.body)).params.arguments;
+    seen.push({ action: a.action, p: a.params });
+    if (a.action === 'rooms.quick_match') { n++; return n === 1 ? reply({ data: { ok: true, data: { match_id: 'qm_z', room_id: 'qm:z', status: 'started', seats_taken: 1 } } }) : reply({ data: { ok: true, data: { match_id: 'qm_2', room_id: 'qm:2', seat: 0, status: 'waiting' } } }); }
+    if (a.action === 'rooms.leave') return reply({ data: { ok: true, data: {} } });
+    return reply({ ok: false, error: { code: 'action_not_found' } });
+  }) as unknown as typeof fetch;
+  const r = hostedRooms({ projectId: 2141, scriptId: 's', fetch: f, session: false });
+  const m = await r.quickMatch();
+  expect(m).toMatchObject({ matchId: 'qm_2', seat: 0 });
+  expect(seen.map((x) => x.action)).toEqual(['rooms.quick_match', 'rooms.leave', 'rooms.quick_match']);
+  expect(seen[0]!.p.idempotency_key).not.toBe(seen[2]!.p.idempotency_key);
+  n = 0;
+  const g = (async (_u: string, init: RequestInit) => { const a = JSON.parse(String(init.body)).params.arguments; return a.action === 'rooms.quick_match' ? reply({ data: { ok: false, error_code: 'not_seated' } }) : reply({ data: { ok: true, data: {} } }); }) as unknown as typeof fetch;
+  await expect(hostedRooms({ projectId: 2141, scriptId: 's', fetch: g, session: false }).quickMatch()).rejects.toMatchObject({ code: 'not_seated' });
+});

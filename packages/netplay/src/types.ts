@@ -164,7 +164,7 @@ type BodyKind =
   | { k: 'locals'; names: string[] }
   | { k: 'ready' }
   /** `x[j-1]`: the batch of local seat j for the same ticks as `d` (missing = idle). */
-  | { k: 'in'; m: number; t: number; d: unknown[]; salt?: string; x?: unknown[][] }
+  | { k: 'in'; m: number; t: number; d: unknown[]; salt?: string; x?: unknown[][]; /** adaptiveDelay: the sender's echo time (ms) */ r?: number }
   | { k: 'commit'; m: number; t: number; h: number }
   /** `l`: local seat index (0 / missing = the member's own seat). */
   /** `l`: one local seat of the sender's device; `a: 1`: every seat of that device (own first, then locals) — one entry, e.g. a clock report. */

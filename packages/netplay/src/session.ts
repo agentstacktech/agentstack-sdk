@@ -32,6 +32,14 @@ export interface SessionOptions {
   /** lockstep: how many ticks a client may run ahead of the confirmed tick before input() stalls. */
   maxAhead?: number;
   /**
+   * lockstep (realtime): grow / shrink the input lead with the measured round trip instead of a fixed `inputDelay`.
+   * Every device advertises its own echo time on its input batches; the lead follows the slowest one:
+   * `ceil(maxRtt / tickMs) + margin`, clamped to [min, max]. On a slow relay (≈0.5 s one way, 13.11.2026) a fixed
+   * 2-tick delay left the 30 Hz world stepping 3–4 ticks a second; with the adaptive lead it runs at full rate,
+   * paying the latency as input lag instead of freezes. `inputDelay` is the starting lead (before an RTT is known).
+   */
+  adaptiveDelay?: { tickMs: number; min?: number; max?: number; margin?: number };
+  /**
    * lockstep: keep every confirmed row of the current match for `confirmed(t)` (default: the last HISTORY = 1024).
    * Turn it on when the game runs its own fixed-step loop: after a reload or a late join, its fresh world can
    * catch up from tick 0 (`while (row = confirmed(w.tick)) step(w, row)`). Cleared at every match start.
@@ -89,6 +97,8 @@ export class Session<S, I, V = S> {
   private leaving = false;
   private sentAt = new Map<number, number>();
   private rtt: number | null = null;
+  /** adaptiveDelay: the latest echo time each other device advertised (ms). */
+  private peerRtt = new Map<string, number>();
   private couriering = false;
   private connecting: Promise<void> | null = null;
   private linkGen = 0;
@@ -205,6 +215,21 @@ export class Session<S, I, V = S> {
    * includes the poll period, i.e. roughly what an opponent's input needs to reach us. See `suggestInputDelay`.
    */
   rttMs(): number | null { return this.rtt; }
+
+  /** adaptiveDelay: the input lead (ticks) the room needs now — own and advertised round trips. Else `inputDelay`. */
+  targetDelay(): number {
+    const a = this.opts.adaptiveDelay;
+    if (!a || !(a.tickMs > 0)) return this.inputDelay;
+    let worst = this.rtt ?? -1;
+    for (const v of this.peerRtt.values()) if (v > worst) worst = v;
+    const min = a.min ?? this.inputDelay, max = a.max ?? 60;
+    if (worst < 0) return Math.max(min, Math.min(max, this.inputDelay));
+    return Math.max(min, Math.min(max, Math.ceil(worst / a.tickMs) + (a.margin ?? 2)));
+  }
+  /** Debug / probes: current lead (ticks queued ahead of the confirmed tick) and the target. */
+  leadInfo(): { lead: number; target: number; rtt: number | null; peers: number[] } {
+    return { lead: this.nextTick - this.model.tick, target: this.targetDelay(), rtt: this.rtt, peers: [...this.peerRtt.values()] };
+  }
 
   /** lockstep input delay in ticks (option, or 0 for turn-based, 2 for realtime). */
   get inputDelay(): number {
@@ -395,7 +420,7 @@ export class Session<S, I, V = S> {
     const g = this.game;
     if (seat < 0 || m.phase !== 'playing' || g.mode !== 'lockstep' || g.secret) return false;
     const nl = localsOf(m, this.self).length;
-    const delay = this.inputDelay;
+    const delay = this.opts.adaptiveDelay ? this.targetDelay() : this.inputDelay;
     // keep a steady lead of `delay` ticks; only re-anchor if we fell behind (idle-filled while away, or a reload)
     let t = this.nextTick;
     if (t < m.tick) {
@@ -409,11 +434,21 @@ export class Session<S, I, V = S> {
       if (t > from) this.batch = this.idleBatch(from, t - from, nl);
     }
     if (t > m.tick + delay + (this.opts.maxAhead ?? 8)) return false;
+    // adaptive: lead above target + slack → skip this frame's input (the queued ones keep the room going; the lead
+    // shrinks by one tick per frame); lead under target → repeat this input for up to 3 extra ticks (grows smoothly)
+    let copies = 1;
+    if (this.opts.adaptiveDelay) {
+      const lead = t - m.tick;
+      if (lead > delay + 3) return false;
+      if (lead < delay) copies = 1 + Math.min(3, delay - lead);
+    }
     if (this.batch && this.batch.t + this.batch.d.length !== t) this.flushBatch();
     if (!this.batch) this.batch = this.idleBatch(t, 0, nl);
-    this.batch.d.push(values[0] ?? g.idle);
-    if (this.batch.x) for (let j = 1; j <= this.batch.x.length; j++) this.batch.x[j - 1]!.push(values[j] ?? g.idle);
-    this.nextTick = t + 1;
+    for (let c = 0; c < copies; c++) {
+      this.batch.d.push(values[0] ?? g.idle);
+      if (this.batch.x) for (let j = 1; j <= this.batch.x.length; j++) this.batch.x[j - 1]!.push(values[j] ?? g.idle);
+    }
+    this.nextTick = t + copies;
     this.wake(); // a move = back
     return true;
   }
@@ -505,7 +540,8 @@ export class Session<S, I, V = S> {
   private flushBatch(): void {
     if (!this.batch) return;
     const b = this.batch;
-    this.outbox.push({ body: b.x ? { k: 'in', m: this.model.match, t: b.t, d: b.d, x: b.x, n: ++this.sendN } : { k: 'in', m: this.model.match, t: b.t, d: b.d, n: ++this.sendN } });
+    const r = this.opts.adaptiveDelay && this.rtt !== null ? { r: this.rtt } : {};
+    this.outbox.push({ body: b.x ? { k: 'in', m: this.model.match, t: b.t, d: b.d, x: b.x, n: ++this.sendN, ...r } : { k: 'in', m: this.model.match, t: b.t, d: b.d, n: ++this.sendN, ...r } });
     this.batch = null;
   }
 
@@ -582,6 +618,10 @@ export class Session<S, I, V = S> {
           this.rtt = this.rtt === null ? x : Math.round(this.rtt * 0.8 + x * 0.2);
         }
       }
+      if (this.opts.adaptiveDelay && e.from !== this.self) {
+        const b = e.body as Body;
+        if (b && b.k === 'in' && typeof b.r === 'number' && b.r >= 0 && b.r < 60_000) this.peerRtt.set(e.from, b.r);
+      }
       m.self = this.self;
       if (this.game.mode === 'authority') m.simulate = m.players.length === 0 ? true : m.players[0]!.id === this.self;
       const prevMatch = m.match;
@@ -652,7 +692,7 @@ export class Session<S, I, V = S> {
     this.nextTick = 0;
     this.batch = null;
     const g = this.game;
-    const delay = this.inputDelay;
+    const delay = this.opts.adaptiveDelay ? this.targetDelay() : this.inputDelay;
     if (g.mode === 'lockstep' && !g.secret && delay > 0 && this.seat >= 0) {
       // the first `delay` ticks have no real input yet: fill them so tick 0 can run
       this.batch = this.idleBatch(0, delay, localsOf(this.model, this.self).length);
