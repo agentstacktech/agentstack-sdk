@@ -426,6 +426,7 @@ export default [
   ...simpleSubpackageRollup('src/workspace/index.ts', 'dist/workspace', ['eventemitter3', 'zod']),
   ...simpleSubpackageRollup('src/hosting/index.ts', 'dist/hosting', ['eventemitter3', 'zod']),
   ...simpleSubpackageRollup('src/diagnostics/index.ts', 'dist/diagnostics', ['eventemitter3', 'zod']),
+  ...simpleSubpackageRollup('src/genetic/index.ts', 'dist/genetic', ['eventemitter3', 'zod']),
   ...simpleSubpackageRollup('src/public/services/index.ts', 'dist/services', ['eventemitter3', 'zod']),
   ...simpleSubpackageRollup('src/admin/hubCommerce.ts', 'dist/admin/hubCommerce', ['eventemitter3', 'zod']),
   ...simpleSubpackageRollup('src/admin/hubNeurocache.ts', 'dist/admin/hubNeurocache', ['eventemitter3', 'zod']),
