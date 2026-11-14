@@ -220,6 +220,17 @@ export function hostedRooms(o: HostedRoomsOptions): RoomsApi {
       catch (e) { if (x.match || !(e instanceof NetplayError && (e.code === 'not_seated' || e.code === 'match_full'))) throw e; return once(); }
       if (m.seat < 0 && !x.match) { if (m.matchId) await api.leave(m); m = await once(); }
       if (m.seat < 0) throw new NetplayError('server', 'not_seated');
+      // Seat 0 of a match that already started = the room's sequencer is gone (its log lived in that tab): the relay
+      // room cannot run. Seen live 13.11 22:00 — the server backfills a started match whose other seat is a tab that
+      // vanished without rooms.leave. Leave and re-queue (twice); if the server keeps handing out the same dead room,
+      // say so instead of hanging on the countdown.
+      for (let i = 0; i < 2 && !x.match && m.seat === 0 && m.status === 'started'; i++) {
+        const dead = m.matchId;
+        await api.leave(m);
+        await new Promise((r) => setTimeout(r, 400 * (i + 1)));
+        m = await once();
+        if (m.matchId === dead && i === 1) { await api.leave(m); throw new NetplayError('server', 'dead_room'); }
+      }
       return m;
     },
     async status(m) { return parseMatch(await call('rooms.match_status', { script_id: o.scriptId, match_id: m.matchId }), m); },

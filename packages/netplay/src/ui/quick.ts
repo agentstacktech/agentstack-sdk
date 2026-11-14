@@ -162,7 +162,7 @@ export function mountQuickPlay<S extends SessionLike>(container: HTMLElement, o:
   const head = (t: string) => { card.replaceChildren(); const h = el('h2', '', t); card.append(h); if (o.preview) { const tag = el('span', 'npq-tag', L.preview); h.append(' ', tag); } };
   const say = (msg: string, err = false) => card.append(el('p', err ? 'npq-err' : 'npq-note', msg));
   const SEAT = new Set(['not_seated', 'not_a_participant', 'match_not_found']);
-  const BUSY = new Set(['room_table_full', 'room_create_failed', 'server_busy', 'http_503', 'http_502']);
+  const BUSY = new Set(['room_table_full', 'room_create_failed', 'server_busy', 'http_503', 'http_502', 'dead_room']);
   const msgOf = (e: unknown): string => {
     if (!(e instanceof NetplayError)) return L.offline;
     if (e.kind === 'offline') return L.offline;

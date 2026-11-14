@@ -123,3 +123,22 @@ it('wave 3: quick_match without a seat (not_seated) leaves that match and re-que
   const g = (async (_u: string, init: RequestInit) => { const a = JSON.parse(String(init.body)).params.arguments; return a.action === 'rooms.quick_match' ? reply({ data: { ok: false, error_code: 'not_seated' } }) : reply({ data: { ok: true, data: {} } }); }) as unknown as typeof fetch;
   await expect(hostedRooms({ projectId: 2141, scriptId: 's', fetch: g, session: false }).quickMatch()).rejects.toMatchObject({ code: 'not_seated' });
 });
+
+it('wave 3: seat 0 of an already started match (dead sequencer) is left and re-queued; the same dead room twice → dead_room', async () => {
+  const seen: string[] = [];
+  let n = 0;
+  const dead = { match_id: 'qm_dead', room_id: 'qm:d', seat: 0, status: 'started', seats_taken: 2 };
+  const mk = (seq: unknown[]) => (async (_u: string, init: RequestInit) => {
+    const a = JSON.parse(String(init.body)).params.arguments; seen.push(a.action);
+    if (a.action === 'rooms.quick_match') return reply({ data: { ok: true, data: seq[Math.min(n++, seq.length - 1)] } });
+    return reply({ data: { ok: true, data: {} } });
+  }) as unknown as typeof fetch;
+  const fresh = { match_id: 'qm_new', room_id: 'qm:n', seat: 0, status: 'waiting', seats_taken: 1 };
+  expect(await hostedRooms({ projectId: 1, scriptId: 's', fetch: mk([dead, fresh]), session: false }).quickMatch()).toMatchObject({ matchId: 'qm_new' });
+  expect(seen).toEqual(['rooms.quick_match', 'rooms.leave', 'rooms.quick_match']);
+  n = 0;
+  await expect(hostedRooms({ projectId: 1, scriptId: 's', fetch: mk([dead]), session: false }).quickMatch()).rejects.toMatchObject({ code: 'dead_room' });
+  const joined = { match_id: 'qm_run', room_id: 'qm:r', seat: 1, status: 'started', seats_taken: 2 };
+  n = 0;
+  expect(await hostedRooms({ projectId: 1, scriptId: 's', fetch: mk([joined]), session: false }).quickMatch()).toMatchObject({ seat: 1, status: 'started' });
+});
