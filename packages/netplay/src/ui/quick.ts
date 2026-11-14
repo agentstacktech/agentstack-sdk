@@ -246,8 +246,9 @@ export function mountQuickPlay<S extends SessionLike>(container: HTMLElement, o:
       o.rooms.listOpen().then((rs) => {
         if (my !== token) return;
         list.replaceChildren(...(rs.length ? rs.map((r) => {
-          const li = el('li', '', r.name || r.hostName || r.code || r.roomId.slice(-6));
+          const li = el('li', '', r.name || r.hostName || `${L.roomCode} ${(r.code || r.roomId.slice(-6)).slice(0, 6).toUpperCase()}`);
           li.append(el('span', '', `${r.seatsTaken}/${r.seatsNeeded}`));
+          if (r.code) li.dataset.code = r.code;
           li.setAttribute('role', 'button'); li.tabIndex = 0;
           li.onclick = () => void fromList(r);
           li.onkeydown = (ev) => { if (ev.key === 'Enter') void fromList(r); };
@@ -345,8 +346,11 @@ export function mountQuickPlay<S extends SessionLike>(container: HTMLElement, o:
       if (my !== token) return;
       const ps = present();
       const n = ps.length + (ps.some((p) => p.id === s.snapshot.self) ? 0 : 1); // I am in the room before the session lists me
-      const items = ps.map((p) => el('li', '', p.name + (p.id === s.snapshot.self ? ` (${L.you})` : '')));
-      if (!ps.some((p) => p.id === s.snapshot.self)) items.unshift(el('li', '', `${s.snapshot.players.find((p) => p.id === s.snapshot.self)?.name ?? ''} (${L.you})`.trim()));
+      // a player without a name yet (joined by code before the session listed it) reads «Вы», not a bare «(вы)»
+      const Me = L.you.charAt(0).toUpperCase() + L.you.slice(1);
+      const label = (name: string, mine: boolean) => (name ? name + (mine ? ` (${L.you})` : '') : mine ? Me : '…');
+      const items = ps.map((p) => el('li', '', label(p.name, p.id === s.snapshot.self)));
+      if (!ps.some((p) => p.id === s.snapshot.self)) items.unshift(el('li', '', label(s.snapshot.players.find((p) => p.id === s.snapshot.self)?.name ?? '', true)));
       for (let i = items.length; i < seats(); i++) items.push(el('li', 'empty', L.emptySeat));
       list.replaceChildren(...items);
       drawCode();
