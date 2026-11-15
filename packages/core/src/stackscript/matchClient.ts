@@ -1,6 +1,6 @@
 import type { HTTPClient } from '../client/http-client';
 import { unwrapFirstMcpBatchStepData } from '../mcp/batchStepData';
-import { executeHostedMcpSteps } from '../commerce/hosted/executeHostedMcpSteps';
+import { executeHostedMcpStepsWithRetry } from '../commerce/hosted/executeHostedMcpSteps';
 import { pollWithBackoff } from './pollBackoff';
 import { matchRuntimePrefix } from './runtimePaths';
 import type { createStackScriptClient } from './client';
@@ -20,6 +20,13 @@ export function buildMatchTurnIdempotencyKey(
   exportName: string,
 ): string {
   return `${matchId}:${revision}:${principalId}:${exportName}`;
+}
+
+function readMatchIdFromTurnInput(input: Record<string, unknown>): string {
+  const raw = input.matchId ?? input.match_id;
+  if (typeof raw === 'string') return raw.trim();
+  if (raw != null && raw !== '') return String(raw).trim();
+  return '';
 }
 
 export type MatchClientOptions = {
@@ -46,7 +53,7 @@ export function createStackScriptMatchClient(
     const dotted = leaves.map((leaf) => matchRuntimePrefix(matchId, leaf));
     if (readMode === 'player') {
       const row = options?.hostedMcp
-        ? await executeHostedMcpSteps(
+        ? await executeHostedMcpStepsWithRetry(
             http,
             projectId,
             [
@@ -88,22 +95,6 @@ export function createStackScriptMatchClient(
     return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   };
 
-  const submitTurn = async (args: {
-    scriptId: string;
-    export: string;
-    input?: Record<string, unknown> | unknown[];
-    idempotencyKey: string;
-    version?: string;
-  }) => {
-    return client.run({
-      script_id: args.scriptId,
-      export: args.export,
-      input: args.input,
-      idempotency_key: args.idempotencyKey,
-      version: args.version ?? 'live',
-    });
-  };
-
   const pollMatchState = async (opts: {
     matchId: string;
     leaves: string[];
@@ -132,8 +123,72 @@ export function createStackScriptMatchClient(
     });
   };
 
-  return { readMatchLeaves, submitTurn, pollMatchState };
+  const pollMatchRevision = async (opts: {
+    matchId: string;
+    targetRevision?: number;
+    onRevision?: (rev: number) => void;
+    signal?: AbortSignal;
+    maxAttempts?: number;
+  }): Promise<number | undefined> => {
+    const state = await pollMatchState({
+      matchId: opts.matchId,
+      leaves: ['revision'],
+      targetRevision: opts.targetRevision,
+      onRevision: opts.onRevision,
+      signal: opts.signal,
+      maxAttempts: opts.maxAttempts,
+    });
+    return state?.revision;
+  };
+
+  const submitTurn = async (args: {
+    scriptId: string;
+    export: string;
+    input?: Record<string, unknown> | unknown[];
+    idempotencyKey: string;
+    version?: string;
+    /** When set, merged into input as expected_revision. */
+    expectedRevision?: number;
+    /**
+     * Poll ecosystem.scripts.runtime.{matchId}.revision when input carries matchId
+     * and expectedRevision is omitted (default true).
+     */
+    pollRevision?: boolean;
+  }) => {
+    let input = args.input;
+    let expectedRevision = args.expectedRevision;
+    const matchId =
+      input && typeof input === 'object' && !Array.isArray(input)
+        ? readMatchIdFromTurnInput(input as Record<string, unknown>)
+        : '';
+    if (args.pollRevision !== false && expectedRevision == null && matchId) {
+      expectedRevision = await pollMatchRevision({ matchId });
+    }
+    if (
+      expectedRevision != null &&
+      Number.isFinite(expectedRevision) &&
+      input &&
+      typeof input === 'object' &&
+      !Array.isArray(input)
+    ) {
+      input = {
+        ...(input as Record<string, unknown>),
+        expected_revision: expectedRevision,
+      };
+    }
+    return client.run({
+      script_id: args.scriptId,
+      export: args.export,
+      input,
+      idempotency_key: args.idempotencyKey,
+      version: args.version ?? 'live',
+    });
+  };
+
+  return { readMatchLeaves, submitTurn, pollMatchState, pollMatchRevision };
 }
+
+export type StackScriptMatchClient = ReturnType<typeof createStackScriptMatchClient>;
 
 /** Games MP — cookie MCP + player reads (GAP-07). */
 export function createHostedStackScriptMatchClient(
