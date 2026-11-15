@@ -82,7 +82,8 @@ export const hostingCommands: CommandSpec[] = [
     name: 'hosting deploy',
     description: 'Deploy --dir or --zip into --bucket (publishes unless --no-publish)',
     sdkPath: 'hosting.deploySiteFiles',
-    usage: '--bucket <id> (--dir <path> | --zip <file>) [--no-publish]',
+    usage:
+      '--bucket <id> (--dir <path> | --zip <file>) [--no-publish] [--replace] [--strip auto|off]',
     examples: [
       'agentstack hosting deploy --bucket <uuid> --dir ./dist',
       'agentstack hosting deploy --bucket <uuid> --zip ./site.zip',
@@ -98,12 +99,20 @@ export const hostingCommands: CommandSpec[] = [
       const publish = !hasFlag(args, 'no-publish');
       const zip = parseFlagValue(args, 'zip');
       if (zip) {
+        const replace = hasFlag(args, 'replace');
+        const strip = (parseFlagValue(args, 'strip') || 'auto') as 'auto' | 'off';
         const buf = await readFile(zip);
         const file = new File([buf], basename(zip), { type: 'application/zip' });
-        const uploaded = await rt.sdk.hosting.importZip(projectId, bucketId, file);
-        const pub = publish
-          ? (await rt.sdk.hosting.publishBucket(bucketId, projectId)).data
-          : undefined;
+        const uploaded = await rt.sdk.hosting.importZip(projectId, bucketId, file, {
+          mode: replace ? 'replace' : 'merge',
+          confirm_site_replace: replace,
+          confirm_prune: replace,
+          strip,
+        });
+        const pub =
+          publish && !uploaded.data?.published
+            ? (await rt.sdk.hosting.publishBucket(bucketId, projectId)).data
+            : undefined;
         rt.print({ upload: uploaded.data, publish: pub });
         return;
       }

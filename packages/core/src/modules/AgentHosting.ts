@@ -511,6 +511,28 @@ export class AgentHosting {
     );
   }
 
+  importArchive(
+    projectId: number,
+    bucketId: string,
+    body: {
+      project_id: number;
+      source_url?: string;
+      content_base64?: string;
+      mode?: 'merge' | 'replace';
+      confirm_site_replace?: boolean;
+      confirm_prune?: boolean;
+      strip?: 'auto' | 'off';
+      publish?: boolean;
+      dry_run?: boolean;
+    },
+  ) {
+    return this.client.post<Record<string, unknown>>(
+      `/hosting/buckets/${bucketId}/import-archive`,
+      { ...body, project_id: projectId },
+      { skipBatching: true, skipCache: true },
+    );
+  }
+
   /**
    * Multipart ZIP import into an existing bucket.
    * Uses FormData (not JSON) — documented exception to JSON-only hygiene.
@@ -520,23 +542,31 @@ export class AgentHosting {
     projectId: number,
     bucketId: string,
     file: File,
-    options?: { signal?: AbortSignal; onProgress?: (uploaded: number, total: number) => void },
-  ): Promise<APIResponse<{ files_written: number; bytes?: number }>> {
+    options?: {
+      signal?: AbortSignal;
+      onProgress?: (uploaded: number, total: number) => void;
+      mode?: 'merge' | 'replace';
+      confirm_site_replace?: boolean;
+      confirm_prune?: boolean;
+      strip?: 'auto' | 'off';
+    },
+  ): Promise<APIResponse<Record<string, unknown>>> {
     if (file.size >= AgentHosting.RESUMABLE_ZIP_THRESHOLD_BYTES) {
       return this.importZipResumable(projectId, bucketId, file, options);
     }
     const form = new FormData();
     form.append('file', file);
-    return this.client.post<{ files_written: number; bytes?: number }>(
-      `/hosting/buckets/${bucketId}/import-zip`,
-      form,
-      {
-        params: { project_id: projectId },
-        skipBatching: true,
-        skipCache: true,
-        signal: options?.signal,
-      },
-    );
+    const params: Record<string, string | number | boolean> = { project_id: projectId };
+    if (options?.mode) params.mode = options.mode;
+    if (options?.confirm_site_replace) params.confirm_site_replace = true;
+    if (options?.confirm_prune) params.confirm_prune = true;
+    if (options?.strip) params.strip = options.strip;
+    return this.client.post<Record<string, unknown>>(`/hosting/buckets/${bucketId}/import-zip`, form, {
+      params,
+      skipBatching: true,
+      skipCache: true,
+      signal: options?.signal,
+    });
   }
 
   private async importZipResumable(
