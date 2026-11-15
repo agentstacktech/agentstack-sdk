@@ -27,20 +27,44 @@ const DEFAULT_QUICKSTART_HTML = `<!DOCTYPE html>
 </html>
 `;
 
-async function collectFiles(
-  dir: string,
-  base = dir,
-): Promise<Array<{ path: string; content: string }>> {
-  const out: Array<{ path: string; content: string }> = [];
+const BINARY_EXT = new Set([
+  '.js',
+  '.mjs',
+  '.css',
+  '.map',
+  '.woff',
+  '.woff2',
+  '.ttf',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.ico',
+  '.svg',
+  '.wasm',
+  '.avif',
+]);
+
+type DeployFileRow =
+  | { path: string; content: string }
+  | { path: string; content_base64: string };
+
+async function collectFiles(dir: string, base = dir): Promise<DeployFileRow[]> {
+  const out: DeployFileRow[] = [];
   const entries = await readdir(dir, { withFileTypes: true });
   for (const e of entries) {
     const full = join(dir, e.name);
     if (e.isDirectory()) out.push(...(await collectFiles(full, base)));
     else {
-      out.push({
-        path: relative(base, full).replace(/\\/g, '/'),
-        content: await readFile(full, 'utf8'),
-      });
+      const rel = relative(base, full).replace(/\\/g, '/');
+      const ext = rel.includes('.') ? rel.slice(rel.lastIndexOf('.')).toLowerCase() : '';
+      const buf = await readFile(full);
+      if (BINARY_EXT.has(ext) || buf.includes(0)) {
+        out.push({ path: rel, content_base64: buf.toString('base64') });
+      } else {
+        out.push({ path: rel, content: buf.toString('utf8') });
+      }
     }
   }
   return out;

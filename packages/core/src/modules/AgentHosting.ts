@@ -538,6 +538,20 @@ export class AgentHosting {
    * Uses FormData (not JSON) — documented exception to JSON-only hygiene.
    * Files ≥ {@link AgentHosting.RESUMABLE_ZIP_THRESHOLD_BYTES} use tus-lite resumable upload.
    */
+  /**
+   * POST a local ZIP to a one-time grant URL from MCP `hosting.site.upload_grant`.
+   * No Authorization header — the token is in the URL path.
+   */
+  async importZipFromGrant(
+    grantUrl: string,
+    file: File | Blob,
+    options?: { signal?: AbortSignal },
+  ): Promise<Response> {
+    const form = new FormData();
+    form.append('file', file);
+    return fetch(grantUrl, { method: 'POST', body: form, signal: options?.signal });
+  }
+
   async importZip(
     projectId: number,
     bucketId: string,
