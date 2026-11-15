@@ -646,7 +646,11 @@ export class AgentIntegrations {
     }>(`/integrations/oauth/${encodeURIComponent(provider)}/begin`, body);
   }
 
-  /** OAuth callback is handled via browser redirect to ``GET /integrations/oauth/{provider}/callback``. */
+  /**
+   * OAuth callback is a browser redirect to
+   * ``GET /integrations/oauth/{provider}/callback/{project_id}``
+   * (legacy ``.../callback`` without project_id still accepted).
+   */
 
   refreshToken(connectionId: string, force = false) {
     return this.client.post<{
@@ -707,5 +711,35 @@ export class AgentIntegrations {
       text?: string;
       sent?: boolean;
     }>(`/integrations/connections/${encodeURIComponent(connectionId)}/mailbox`, body);
+  }
+
+  /** Publish / thread / delete / draft on a connected X account (provider=x). */
+  socialPost(
+    connectionId: string,
+    body: {
+      op?: "create" | "thread" | "delete" | "draft_upsert" | "cancel";
+      provider?: "x";
+      text?: string;
+      parts?: string[];
+      media_file_ids?: string[];
+      reply_to?: string;
+      tweet_id?: string;
+      draft_id?: string;
+      status?: string;
+      idempotency_key?: string;
+      dry_run?: boolean;
+    },
+  ) {
+    return this.client.post<{
+      provider: string;
+      op: string;
+      tweet_id?: string;
+      tweet_ids?: string[];
+      draft_id?: string;
+      dry_run?: boolean;
+      deduped?: boolean;
+      deleted?: boolean;
+      provider_media_ids?: string[];
+    }>(`/integrations/connections/${encodeURIComponent(connectionId)}/social-post`, body);
   }
 }

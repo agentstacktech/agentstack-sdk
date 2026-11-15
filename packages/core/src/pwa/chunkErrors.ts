@@ -47,10 +47,18 @@ export async function probeChunkAssetAvailability(
       redirect: 'follow',
       signal: ac.signal,
     });
-    if (res.status === 404) return 'missing';
+    // Apex miss is 503 text/plain (TG 2126). That is a stale hash, not a restart blip.
+    if (res.status === 404 || res.status === 503) return 'missing';
     if (!res.ok) return 'transient';
     const contentType = (res.headers.get('content-type') || '').toLowerCase();
     if (/text\/html/i.test(contentType)) return 'missing';
+    // Apex bucket-miss is text/plain (TG 2152) — must not count as a loadable chunk.
+    if (
+      /\.(?:js|mjs|css)(?:\?|$)/i.test(url) &&
+      /text\/plain/i.test(contentType)
+    ) {
+      return 'missing';
+    }
     if (
       /\.(?:js|mjs|css)(?:\?|$)/i.test(url) &&
       !/(javascript|ecmascript|module|text\/css)/i.test(contentType)

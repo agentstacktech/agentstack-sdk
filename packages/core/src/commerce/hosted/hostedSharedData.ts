@@ -5,9 +5,11 @@
  * Gene: sdk.commerce.hosted.gen1
  */
 import type { HTTPClient } from '../../client/http-client';
-import { mcpBatchStep, unwrapFirstMcpBatchStepData } from '../../mcp/batchStepData';
-import { resolveHostedMcpUrl } from '../../mcp/urls';
+import { executeHostedMcpSteps } from './executeHostedMcpSteps';
 import { mapHostedMcpPlayerError } from './hostedMcpPlayerError';
+
+/** Server resolves digest from prior dry_run step in the same MCP batch. */
+export const HOSTED_BATCH_PREVIEW_SHA = 'from_batch_preview';
 
 export type HostedSharedDataOptions = {
   hostedApiBase?: string;
@@ -16,53 +18,30 @@ export type HostedSharedDataOptions = {
   maxCasRetries?: number;
 };
 
-function hostedMcpUrl(projectId: number, apiBase?: string): string {
-  return resolveHostedMcpUrl(projectId, apiBase);
-}
-
-async function hostedMcpStep<T>(
-  http: HTTPClient,
-  projectId: number,
-  action: string,
-  params: Record<string, unknown>,
-  options?: HostedSharedDataOptions,
-): Promise<T> {
-  const url = hostedMcpUrl(projectId, options?.hostedApiBase);
-  const res = await http.post(
-    url,
-    { steps: [mcpBatchStep(action, params, projectId)] },
-    {
-      skipCache: true,
-      signal: options?.signal,
-      skipAuthStateCheck: true,
-      cookieSessionMcp: true,
-    },
-  );
-  const row = unwrapFirstMcpBatchStepData(res);
-  if (row && typeof row === 'object' && (row as { ok?: boolean }).ok === false) {
-    throw Object.assign(new Error(String((row as { error?: string }).error || 'mcp_failed')), {
-      body: row,
-    });
-  }
-  return row as T;
-}
-
 export async function readHostedProjectLeaf(
   http: HTTPClient,
   projectId: number,
   path: string,
   options?: HostedSharedDataOptions,
 ): Promise<unknown> {
-  const row = await hostedMcpStep<Record<string, unknown>>(
+  const row = await executeHostedMcpSteps(
     http,
     projectId,
-    'projects.get_data',
-    { project_id: projectId, path },
-    options,
+    [{ id: 'step_0', action: 'projects.get_data', params: { path } }],
+    {
+      pickStepId: 'step_0',
+      hostedApiBase: options?.hostedApiBase,
+      signal: options?.signal,
+      mintCookieIfBearer: false,
+    },
   );
   return row.value ?? row.data;
 }
 
+/**
+ * Optimistic patch with `expected_sha256`. When omitted, one batch `[dry_run, commit]`
+ * uses `expected_sha256: from_batch_preview` (substrate stamps digest on context).
+ */
 export async function patchHostedProjectLeafCAS(
   http: HTTPClient,
   projectId: number,
@@ -73,36 +52,47 @@ export async function patchHostedProjectLeafCAS(
 ): Promise<Record<string, unknown>> {
   const maxRetries = Math.max(1, options?.maxCasRetries ?? 3);
   let digest = expectedSha256?.trim();
+  const baseOpts = {
+    hostedApiBase: options?.hostedApiBase,
+    signal: options?.signal,
+    mintCookieIfBearer: false,
+  };
   for (let attempt = 0; attempt < maxRetries; attempt += 1) {
-    if (!digest) {
-      const preview = await hostedMcpStep<Record<string, unknown>>(
-        http,
-        projectId,
-        'projects.patch_data',
-        {
-          project_id: projectId,
-          path,
-          value,
-          dry_run: true,
-          ...(digest ? { expected_sha256: digest } : {}),
-        },
-        options,
-      );
-      digest =
-        String(preview.previous_sha256 || preview.leaf_sha256 || '').trim() || undefined;
-    }
     try {
-      return await hostedMcpStep(
+      if (digest) {
+        return await executeHostedMcpSteps(
+          http,
+          projectId,
+          [
+            {
+              id: 'commit',
+              action: 'projects.patch_data',
+              params: { path, value, expected_sha256: digest },
+            },
+          ],
+          { ...baseOpts, pickStepId: 'commit' },
+        );
+      }
+      return await executeHostedMcpSteps(
         http,
         projectId,
-        'projects.patch_data',
-        {
-          project_id: projectId,
-          path,
-          value,
-          expected_sha256: digest,
-        },
-        options,
+        [
+          {
+            id: 'preview',
+            action: 'projects.patch_data',
+            params: { path, value, dry_run: true },
+          },
+          {
+            id: 'commit',
+            action: 'projects.patch_data',
+            params: {
+              path,
+              value,
+              expected_sha256: HOSTED_BATCH_PREVIEW_SHA,
+            },
+          },
+        ],
+        { ...baseOpts, pickStepId: 'commit' },
       );
     } catch (err) {
       const mapped = mapHostedMcpPlayerError(err);

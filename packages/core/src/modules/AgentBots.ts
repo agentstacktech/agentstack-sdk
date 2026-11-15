@@ -1,5 +1,9 @@
 /**
  * Bots Fleet SDK — genetic: ``sdk.bots.gen1``.
+ *
+ * Chat owner (AI / manager / bus agent) is MCP `bots.reply_source.get|set`.
+ * Copilot uses bot_id `workspace` and chat_key `workspace:{conversationId}`.
+ * `/release` returns orchestration and sets chat AI mode to Free.ai.
  */
 
 import { HTTPClient } from '../client/http-client';

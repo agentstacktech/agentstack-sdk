@@ -88,6 +88,8 @@ export interface ProjectHostingPlaneV1 {
     public_count: number;
     primary_public_url?: string | null;
     primary_bucket_id?: string | null;
+    primary_public_bucket_slug?: string | null;
+    changelog_feed_url?: string | null;
     any_edge_ready: boolean;
     any_pending_edge: boolean;
   };

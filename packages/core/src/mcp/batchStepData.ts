@@ -22,12 +22,55 @@ export type McpBatchPayloadLike = {
   results?: McpStepLike[];
 };
 
+/** True when a batch step envelope reports failure (CDN wire parity). */
+export function mcpStepFailed(step: McpStepLike | undefined): boolean {
+  if (!step) return true;
+  const status = typeof step.status === 'string' ? step.status : '';
+  if (status === 'error') return true;
+  if (step.ok === false) return true;
+  if (step.error) return true;
+  const cap = step.capability_result;
+  if (cap && typeof cap === 'object' && cap.ok === false) return true;
+  return false;
+}
+
 export function firstMcpBatchStep(
   payload: McpBatchPayloadLike | undefined,
 ): McpStepLike | undefined {
   if (!payload) return undefined;
   const steps = payload.steps ?? payload.results;
   return Array.isArray(steps) && steps.length ? steps[0] : undefined;
+}
+
+/** All steps from batch envelope (`steps` or `results`). */
+export function listMcpBatchSteps(raw: unknown): McpStepLike[] {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return [];
+  const row = raw as Record<string, unknown>;
+  const { data: normalized } = normalizeMcpToolEnvelope(raw);
+  const inner =
+    row.data && typeof row.data === 'object' && !Array.isArray(row.data)
+      ? (row.data as Record<string, unknown>)
+      : {};
+  const stepsRaw =
+    row.steps ?? inner.steps ?? normalized.steps ?? row.results ?? inner.results;
+  if (!Array.isArray(stepsRaw)) return [];
+  return stepsRaw.filter(
+    (s): s is McpStepLike => Boolean(s) && typeof s === 'object',
+  );
+}
+
+/** Find batch step by `id` (hosted multi-step CAS: preview → commit). */
+export function mcpBatchStepById(
+  raw: unknown,
+  stepId: string,
+): McpStepLike | undefined {
+  const want = String(stepId || '').trim();
+  if (!want) return undefined;
+  for (const step of listMcpBatchSteps(raw)) {
+    const row = step as McpStepLike & { id?: string };
+    if (String(row.id ?? '') === want) return step;
+  }
+  return undefined;
 }
 
 function unwrapMcpPayload(raw: unknown): Record<string, unknown> {
@@ -60,6 +103,22 @@ export function mcpBatchStep(
     action,
     params: { project_id: projectId, ...params },
   };
+}
+
+/** Unwrap one step payload by id; falls back to first step when id omitted. */
+export function unwrapMcpBatchStepData(
+  raw: unknown,
+  stepId?: string,
+): Record<string, unknown> {
+  const step = stepId
+    ? mcpBatchStepById(raw, stepId)
+    : firstMcpBatchStep({ steps: listMcpBatchSteps(raw) });
+  const { data: normalized } = normalizeMcpToolEnvelope(raw);
+  const fromStep = mcpStepData(step);
+  if (Object.keys(fromStep).length > 0) {
+    return { ...normalized, ...fromStep };
+  }
+  return normalized;
 }
 
 /** Unwrap MCP batch execute to the first step payload (operator + hosted). */

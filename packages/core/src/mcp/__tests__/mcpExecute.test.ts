@@ -197,6 +197,35 @@ describe('mcpExecute semantic anchor', () => {
     }
   });
 
+  it('injects execution_intent direct for script.run', async () => {
+    const calls: unknown[] = [];
+    const original = globalThis.fetch;
+    globalThis.fetch = (async (_url: RequestInfo | URL, init?: RequestInit) => {
+      calls.push(JSON.parse(String(init?.body)));
+      return new Response(
+        JSON.stringify({ result: { results: [{ id: 'step_0', ok: true }] } }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    }) as typeof fetch;
+    try {
+      await mcpExecute(
+        [
+          {
+            action: 'script.run',
+            params: { project_id: 2052, script_id: 'wt-match', export: 'wt.m.get' },
+          },
+        ],
+        { mcpUrl: 'https://agentstack.tech/mcp', token: 'tok', projectId: 2052 },
+      );
+      const body = calls[0] as {
+        params?: { arguments?: { options?: { execution_intent?: string } } };
+      };
+      expect(body.params?.arguments?.options?.execution_intent).toBe('direct');
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
   it('injects execution_intent direct for persistent script.put', async () => {
     const calls: unknown[] = [];
     const original = globalThis.fetch;

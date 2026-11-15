@@ -7,6 +7,9 @@ import {
   getStackscriptWriteSet,
   parseStackscriptMcpEnvelope,
   parseStackscriptMcpFailure,
+  parseStackscriptRoomTickError,
+  parseStackscriptRoomTickFailure,
+  roomTickRecoveryHint,
 } from '../client';
 
 describe('StackscriptMcpError', () => {
@@ -35,6 +38,32 @@ describe('StackscriptMcpError', () => {
     expect(parseStackscriptMcpFailure(err)?.error).toBe('script_test_failed');
     expect(parseStackscriptMcpFailure({ data: { hint: 'fix body' } })?.hint).toBe('fix body');
     expect(parseStackscriptMcpFailure(new Error('nope'))).toBeNull();
+  });
+
+  it('parseStackscriptRoomTickError maps room host codes', () => {
+    const err = new StackscriptMcpError('stale', {
+      error: 'bytecode_stale',
+      hint: 'script.recompile_version',
+      next_actions: [{ action: 'script.recompile_version' }],
+    });
+    const row = parseStackscriptRoomTickError(err);
+    expect(row?.code).toBe('bytecode_stale');
+    expect(row?.nextActions?.[0]?.action).toBe('script.recompile_version');
+    expect(parseStackscriptRoomTickFailure({ ok: true })).toBeNull();
+    expect(parseStackscriptRoomTickFailure({ ok: false, error: 'room_not_bound' })?.code).toBe(
+      'room_not_bound',
+    );
+    const conflict = parseStackscriptRoomTickFailure({ ok: false, error: 'revision_conflict' });
+    expect(conflict?.code).toBe('revision_conflict');
+    expect(conflict?.hint).toContain('idempotency key');
+    expect(roomTickRecoveryHint('room_not_bound')).toContain('defineRoom');
+    expect(roomTickRecoveryHint('revision_required')).toContain('pollMatchRevision');
+    const required = parseStackscriptRoomTickFailure({
+      ok: false,
+      error_code: 'revision_required',
+    });
+    expect(required?.code).toBe('revision_required');
+    expect(required?.hint).toContain('expected_revision');
   });
 
   it('parseStackscriptMcpFailure merges instruction_slice when_blocked', () => {
@@ -140,6 +169,51 @@ describe('createStackScriptClient postStep', () => {
       },
       undefined,
     );
+  });
+
+  it('dryRunEphemeral posts files[] and entry', async () => {
+    const http = {
+      post: vi.fn().mockResolvedValue({
+        success: true,
+        data: { ok: true, dry_run: true, fuel_used: 1 },
+      }),
+    };
+    const client = createStackScriptClient(http as never, 42);
+    await client.dryRunEphemeral({
+      export: 'main',
+      entry: 'main.ts',
+      files: [
+        { path: 'main.ts', content: 'export const main = 1;' },
+        { path: 'lib.ts', content: 'export const x = 1;' },
+      ],
+    });
+    expect(http.post).toHaveBeenCalledWith(
+      '/mcp',
+      expect.objectContaining({
+        action: 'script.dry_run',
+        params: expect.objectContaining({
+          script_id: 'ephemeral',
+          export: 'main',
+          entry: 'main.ts',
+          files: expect.any(Array),
+        }),
+      }),
+      expect.anything(),
+    );
+  });
+
+  it('roomLeave archive delete post thin MCP actions', async () => {
+    const http = {
+      post: vi.fn().mockResolvedValue({ success: true, data: { ok: true } }),
+    };
+    const client = createStackScriptClient(http as never, 9);
+    await client.roomLeave({ room_name: 'lobby' });
+    await client.archive('demo');
+    await client.delete('demo', { hard: true });
+    const actions = http.post.mock.calls.map(
+      (c: unknown[]) => (c[1] as { action?: string }).action,
+    );
+    expect(actions).toEqual(['script.room.leave', 'script.archive', 'script.delete']);
   });
 
   it('sends X-AgentStack-Env when generationEnvUuid is set', async () => {

@@ -2020,12 +2020,19 @@ export class AgentAuth extends SimpleEventEmitter {
   /** Passwordless sign-in: request email OTP (Mail Hub template ``email_otp``). */
   async sendEmailOtpLogin(
     email: string,
-    options?: { purpose?: string; channel?: string; destination?: string; apiKey?: string },
+    options?: {
+      purpose?: string;
+      channel?: string;
+      destination?: string;
+      apiKey?: string;
+      resend?: boolean;
+    },
   ): Promise<{
     challenge_id: string;
     masked_email: string;
     expires_in: number;
     sent: boolean;
+    delivery_channel?: string;
     needs_human?: boolean;
     ask_user?: string;
     delivery_unavailable?: boolean;
@@ -2039,10 +2046,28 @@ export class AgentAuth extends SimpleEventEmitter {
         purpose: options?.purpose || 'login',
         channel: options?.channel || 'email',
         destination: options?.destination || '',
+        ...(options?.resend ? { resend: true } : {}),
       },
       { skipAuthStateCheck: true, ...(Object.keys(headers).length ? { headers } : {}) } as any,
     );
-    return response.data;
+    const data = (response.data ?? {}) as {
+      challenge_id?: string;
+      sent?: boolean;
+      delivery_unavailable?: boolean;
+    };
+    if (data.delivery_unavailable) {
+      data.sent = false;
+      delete data.challenge_id;
+    }
+    return data as {
+      challenge_id: string;
+      masked_email: string;
+      expires_in: number;
+      sent: boolean;
+      needs_human?: boolean;
+      ask_user?: string;
+      delivery_unavailable?: boolean;
+    };
   }
 
   /** Verify email OTP and mint session (MFA second step via mfa_ticket + mfa_code). */

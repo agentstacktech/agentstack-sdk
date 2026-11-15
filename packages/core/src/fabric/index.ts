@@ -62,6 +62,8 @@ export {
   batchStepPollFields,
   isProjectionSettled,
   isCommittedPartial,
+  isPromoteSettled,
+  readMutationCommitted,
   MCC_PARTIAL_STATES,
   extractAsyncProjection,
   SETTLED_PROJECTION_STATES,

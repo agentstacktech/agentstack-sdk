@@ -5,12 +5,7 @@
 import type { HTTPClient } from '../client/http-client';
 import { normalizeMcpToolEnvelope } from '../agents/planGraph';
 import { executeHostedMcpStepsWithRetry } from '../commerce/hosted/executeHostedMcpSteps';
-import {
-  hostedMcpCookieMinted,
-  mintHostedAppSession,
-} from '../commerce/hosted/hostedAppSession';
 import { mcpBatchStep, unwrapFirstMcpBatchStepData } from '../mcp/batchStepData';
-import { hostedMcpBatchBody } from '../mcp/hostedMcpBatchBody';
 import type { RequestConfig } from '../types';
 import { resolveHostedMcpUrl } from '../mcp/urls';
 

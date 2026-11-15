@@ -34,17 +34,41 @@ function navigateWithCacheBust(): void {
   }
 }
 
-async function unregisterServiceWorkers(): Promise<void> {
+function scopeNeedle(bucketBasePath?: string): string {
+  if (typeof window === 'undefined') return '';
+  const raw = (bucketBasePath || window.location.pathname || '').trim();
+  const path = !raw || raw === '.' || raw === './' ? window.location.pathname : raw;
+  const hosted = path.match(/\/s\/\d+\/[^/]+\/?/);
+  if (hosted) return hosted[0].endsWith('/') ? hosted[0] : `${hosted[0]}/`;
+  return path.endsWith('/') ? path : `${path}/`;
+}
+
+async function unregisterServiceWorkers(bucketBasePath?: string): Promise<void> {
   if (typeof navigator === 'undefined' || !navigator.serviceWorker) return;
+  const needle = scopeNeedle(bucketBasePath);
   try {
     const regs = await navigator.serviceWorker.getRegistrations();
-    await Promise.all(regs.map((r) => r.unregister()));
+    const mine = regs.filter((reg) => {
+      try {
+        const scopePath = new URL(reg.scope).pathname;
+        if (scopePath === '/' || scopePath === '') return false;
+        return (
+          scopePath === needle ||
+          scopePath.startsWith(needle) ||
+          (scopePath.includes('/s/') && needle.startsWith(scopePath))
+        );
+      } catch {
+        return false;
+      }
+    });
+    await Promise.all(mine.map((reg) => reg.unregister()));
   } catch {
     /* ignore */
   }
   try {
     const keys = await caches.keys();
-    await Promise.all(keys.map((k) => caches.delete(k)));
+    const mine = keys.filter((key) => !needle || key.includes(needle));
+    await Promise.all(mine.map((key) => caches.delete(key)));
   } catch {
     /* ignore */
   }
@@ -81,7 +105,7 @@ export function tryRecoverFromHostedChunkFailure(
     if (sessionStorage.getItem(deepFlag) !== '1') {
       sessionStorage.setItem(deepFlag, '1');
       opts.onBeacon?.('hosted.chunk_recovery.deep', { buildId: opts.buildId });
-      void unregisterServiceWorkers().finally(() => navigateWithCacheBust());
+      void unregisterServiceWorkers(opts.bucketBasePath).finally(() => navigateWithCacheBust());
       return true;
     }
     opts.onBeacon?.('hosted.chunk_recovery.ineffective', { buildId: opts.buildId });
@@ -89,8 +113,11 @@ export function tryRecoverFromHostedChunkFailure(
       new CustomEvent('hosted:chunk_recovery_failed', { detail: { buildId: opts.buildId } }),
     );
   } catch {
-    window.location.reload();
-    return true;
+    opts.onBeacon?.('hosted.chunk_recovery.storage_failed', { buildId: opts.buildId });
+    window.dispatchEvent(
+      new CustomEvent('hosted:chunk_recovery_failed', { detail: { buildId: opts.buildId } }),
+    );
+    return false;
   }
   return false;
 }

@@ -1361,6 +1361,8 @@ export {
   getFabricCostSnapshot,
   getFabricQueueSnapshot,
   replayFabricDlqItem,
+  isPromoteSettled,
+  readMutationCommitted,
 } from './fabric';
 
 export {
@@ -1377,11 +1379,17 @@ export {
   parseStackscriptMcpFailure,
   parseStackscriptMcpEnvelope,
   getStackscriptWriteSet,
+  roomTickRecoveryHint,
+  parseStackscriptRoomTickFailure,
+  parseStackscriptRoomTickError,
 } from './stackscript';
 export type {
   ScriptPutParams,
   ScriptListItem,
   MatchPollState,
+  StackScriptMatchClient,
+  StackscriptRoomTickError,
+  StackscriptRoomTickErrorCode,
 } from './stackscript';
 
 export type {

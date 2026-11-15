@@ -4,5 +4,5 @@
 
 | File | Role |
 |------|------|
-| [types.ts](types.ts) | `EnergyBalance`, `EnergyPacksMap` |
-| [EnergyClient.ts](EnergyClient.ts) | `getBalance`, `listPacks` |
+| [types.ts](types.ts) | `EnergyBalance`, `EnergyPacksMap`, `LlmProvidersCatalog` / Free.ai `platform_supply` |
+| [EnergyClient.ts](EnergyClient.ts) | `getBalance`, `listPacks`, `listLlmProviders` (REST `/agents/llm-providers`) |

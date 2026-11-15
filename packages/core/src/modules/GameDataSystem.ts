@@ -888,19 +888,16 @@ export class GameDataSystem extends SimpleEventEmitter {
         return runResult;
       }
 
-      const result = {
-        script_id: script.id,
-        execution_time: Date.now(),
-        result: 'Script executed successfully',
-        parameters,
-        metadata: script.metadata,
-        deprecated_stub: true,
-        hint:
-          'Set metadata.runtime=stackscript and metadata.stackscript_id for real script.run',
-      };
-
-      this.emit('script:execution:success', { script, result });
-      return result;
+      const err = Object.assign(
+        new Error('stackscript_runtime_required'),
+        {
+          code: 'stackscript_runtime_required',
+          hint:
+            'Set metadata.runtime=stackscript and metadata.stackscript_id for script.run',
+        },
+      );
+      this.emit('script:execution:error', { script, error: err });
+      throw err;
     } catch (error) {
       this.emit('script:execution:error', { script, error });
       throw error;

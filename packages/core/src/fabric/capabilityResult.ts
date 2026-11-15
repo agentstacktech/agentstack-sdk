@@ -371,6 +371,46 @@ export function readMutationCommitted(input: unknown): boolean {
   return false;
 }
 
+/**
+ * MP-01 promote literacy: settled success is ``committed`` / head move — NOT ``accepted``.
+ * ``accepted=false`` on a committed receipt is normal (async accepted reserved).
+ * True refuse = ``committed=false`` with ``error_code`` like ``promote_noop``.
+ */
+export function isPromoteSettled(receipt: unknown): {
+  settled: boolean;
+  success: boolean;
+  refused: boolean;
+  errorCode?: string;
+} {
+  if (receipt == null || typeof receipt !== 'object') {
+    return { settled: false, success: false, refused: false };
+  }
+  const root = receipt as Record<string, unknown>;
+  const data =
+    root.data && typeof root.data === 'object'
+      ? (root.data as Record<string, unknown>)
+      : root;
+  const errorCode = String(
+    data.error_code || root.error_code || (root.error as { code?: string } | undefined)?.code || '',
+  );
+  const committed = readMutationCommitted(receipt);
+  const ok = root.ok === true || root.success === true || data.ok === true || data.success === true;
+  if (committed) {
+    return { settled: true, success: true, refused: false, errorCode: errorCode || undefined };
+  }
+  if (
+    errorCode.startsWith('promote_') ||
+    errorCode === 'promote_noop' ||
+    errorCode === 'promote_split_brain_unmerged'
+  ) {
+    return { settled: true, success: false, refused: true, errorCode };
+  }
+  if (ok && data.prod_head_uuid) {
+    return { settled: true, success: true, refused: false };
+  }
+  return { settled: false, success: false, refused: false, errorCode: errorCode || undefined };
+}
+
 /** Poll ``rag.collection_get`` until lifecycle projection settles (ready/deleted/failed). */
 export async function pollRagCollectionUntilReady(
   options: PollRagCollectionOptions,

@@ -1,5 +1,32 @@
 /** LLM prepaid energy (builder_energy) — genetic tag: sdk.energy.gen1 */
 
+/** Partner / Free.ai catalog row (parity with MCP ai.providers.list items). */
+export interface PartnerLlmProviderItem {
+  id: string;
+  display_name?: string;
+  debit_energy?: boolean;
+  /** Free.ai fulfills COGS — users still spend builder_energy when true. */
+  platform_supply?: boolean;
+  free_call?: boolean;
+  protocol?: string;
+  enabled?: boolean;
+  key_present?: boolean;
+}
+
+export interface LlmFreeCallsPolicy {
+  enabled?: boolean;
+  prefer?: boolean;
+  mode?: string;
+  energy_threshold?: number;
+  provider_ids?: string[] | null;
+}
+
+export interface LlmProvidersCatalog {
+  providers: string[];
+  items: PartnerLlmProviderItem[];
+  free_calls?: LlmFreeCallsPolicy;
+}
+
 export type EnergyPackTier = 'small' | 'medium' | 'large';
 
 export interface EnergyPackInfo {

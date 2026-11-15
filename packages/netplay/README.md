@@ -16,6 +16,19 @@ the same game state. The server only orders entries and stamps who/when — no g
 | `fold` | races, async boards, open-information turn games | `apply(state, seat, cmd)` for each command in log order |
 | `authority` | hidden information (cards, fog) | only seat 0 runs `apply`; others get private `view(state, seat)` |
 
+### AgentStack plane chooser (hosted)
+
+| Need | Use | Avoid |
+|------|-----|-------|
+| Coop DNA turns (Nahual `*.open`) | MCP `script.run` + revision/idempotency | `rooms.*` alone |
+| Lockstep / QM arcade | `rooms.quick_match` → `stream.relay.ws_ticket` (`room_kind`) | Relay board gate without `{np:1}` |
+| SSBC tick host | `script.room.tick` | QM poll as match rules SoT |
+| Nahual full ladder (optional) | `rooms.quick_match` → `stream.relay.ws_ticket` → `stackscriptTransport` + `script.run` coop | DNA-only `*.open` when arcade WS not needed |
+
+`stackscriptTransport(runner, { scriptId, exportPrefix })` shares one `@agentstack/sdk` hosted MCP runner — see [NAHUAL_HOSTED_IDEMPOTENCY.md](../../../docs/operations/NAHUAL_HOSTED_IDEMPOTENCY.md).
+
+See [MULTIPLAYER_AUTHORITY_DECISION_TABLE.md](../../../docs/plans/MULTIPLAYER_AUTHORITY_DECISION_TABLE.md).
+
 ## 5-minute quickstart
 
 ```ts

@@ -7,9 +7,10 @@ export interface ProjectGenomeMeta {
   updated_at?: string;
   node_count?: number;
   edge_count?: number;
-  source?: 'hosting_push' | 'mcp_reindex';
+  source?: string;
   patched?: number;
   skipped?: number;
+  next_cursor?: string;
 }
 
 export interface ProjectGenomeNode {
@@ -41,4 +42,22 @@ export interface ProjectGenomeQuery {
   detail?: 'compact' | 'full';
   limit?: number;
   cursor?: string;
+}
+
+export interface ProjectGenomeSearchHit {
+  tag: string;
+  title?: string;
+  degree?: number;
+  hay?: string;
+}
+
+export interface ProjectGenomeSearchResult {
+  hits: ProjectGenomeSearchHit[];
+  plane?: string;
+}
+
+export interface ProjectGenomeSearchQuery {
+  projectId: number;
+  query: string;
+  limit?: number;
 }

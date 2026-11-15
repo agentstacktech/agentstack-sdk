@@ -22,3 +22,11 @@ export {
   isPlanGraphChildrenExceeded,
   isPlanWipFull,
 } from './planGraphErrors';
+export {
+  EnergyInsufficientError,
+  preflightPayloadBlocksEnqueue,
+  ProviderPreflightBlockedError,
+  resolveEnergyPeekMinimum,
+  runWithEnergyPreflight,
+  type RunWithEnergyPreflightOpts,
+} from './runWithEnergyPreflight';

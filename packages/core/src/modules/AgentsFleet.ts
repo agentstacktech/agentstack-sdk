@@ -8,6 +8,8 @@
  */
 
 import { HTTPClient } from '../client/http-client';
+import { EnergyClient } from '../energy/EnergyClient';
+import type { LlmProvidersCatalog } from '../energy/types';
 import type { ProjectDataStringLeafEdit } from '../types/entities/Project';
 import type { RequestConfig } from '../types';
 
@@ -401,9 +403,11 @@ export class AgentsFleet {
   // Global catalog endpoints (UI v2 — Phase A)
   // ---------------------------------------------------------------------
 
-  async listLlmProviders(): Promise<{ providers: string[] }> {
-    const res = await this.client.get('/agents/llm-providers');
-    return res.data as { providers: string[] };
+  async listLlmProviders(opts?: {
+    signal?: AbortSignal;
+    projectId?: number;
+  }): Promise<LlmProvidersCatalog> {
+    return new EnergyClient(this.client).listLlmProviders(opts);
   }
 
   async listFapTemplates(): Promise<{ templates: FapTemplateDTO[] }> {
@@ -735,6 +739,7 @@ export class AgentsFleet {
       cursor?: string;
       limit?: number;
       include_edges?: boolean;
+      include_claimable?: boolean;
       status?: string | string[];
     },
   ): Promise<{
@@ -775,6 +780,7 @@ export class AgentsFleet {
     if (options?.cursor) params.cursor = String(options.cursor);
     if (typeof options?.limit === 'number') params.limit = String(options.limit);
     if (options?.include_edges === false) params.include_edges = 'false';
+    if (options?.include_claimable === false) params.include_claimable = 'false';
     const status = options?.status;
     const statusList = status
       ? (Array.isArray(status) ? status : [status]).map((s) => String(s).trim()).filter(Boolean)

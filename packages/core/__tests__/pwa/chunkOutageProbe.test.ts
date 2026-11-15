@@ -55,6 +55,38 @@ describe('probeChunkAssetAvailability', () => {
     ).resolves.toBe('missing');
   });
 
+  it('returns missing for text/plain on a hashed js url', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response('asset not in apex bundle', {
+            status: 200,
+            headers: { 'content-type': 'text/plain; charset=utf-8' },
+          }),
+      ),
+    );
+    await expect(
+      probeChunkAssetAvailability('https://example.com/assets/Foo-abc.js'),
+    ).resolves.toBe('missing');
+  });
+
+  it('returns missing for apex bucket-miss 503', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response('asset not in apex bundle', {
+            status: 503,
+            headers: { 'content-type': 'text/plain' },
+          }),
+      ),
+    );
+    await expect(
+      probeChunkAssetAvailability('https://example.com/assets/Foo-abc.js'),
+    ).resolves.toBe('missing');
+  });
+
   it('returns transient when fetch throws', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => {
       throw new TypeError('Failed to fetch');

@@ -12,6 +12,7 @@ export {
 
 // React Query + SDK
 export { useSDKQuery, type SDKQueryOptions } from './hooks/useSDKQuery';
+export { usePublicChangelogFeed } from './hooks/usePublicChangelogFeed';
 export { useSDKMutation, type SDKMutationOptions } from './hooks/useSDKMutation';
 export {
   useSDKInfiniteQuery,

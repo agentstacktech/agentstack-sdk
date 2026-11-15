@@ -27,4 +27,10 @@ describe('SDK publicRoutes', () => {
     expect(isSdkPublicRoute('/dev')).toBe(false);
     expect(isSdkPublicRoute('/dev/docs/build')).toBe(false);
   });
+
+  it('treats docs mirror + MCP connect paths as SDK public (TG 1778)', () => {
+    expect(isSdkPublicRoute('/docs/mcp-first-call')).toBe(true);
+    expect(isSdkPublicRoute('/mcp-docs')).toBe(true);
+    expect(isMarketingPublicRoute('/connect/cursor')).toBe(true);
+  });
 });

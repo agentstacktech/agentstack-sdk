@@ -1,6 +1,6 @@
 {
   "name": "@agentstack/sdk",
-  "version": "0.4.26",
+  "version": "0.4.27",
   "description": "AgentStack-SDK - Universal API client with modular architecture and Neural integration",
   "readme": "README.en.md",
   "type": "module",
@@ -63,6 +63,11 @@
       "import": "./dist/public/grants/index.js",
       "require": "./dist/public/grants/index.js"
     },
+    "./public/changelog": {
+      "types": "./dist/public/changelog/index.d.ts",
+      "import": "./dist/public/changelog/index.js",
+      "require": "./dist/public/changelog/index.js"
+    },
     "./services": {
       "types": "./dist/services/index.d.ts",
       "import": "./dist/services/index.esm.js",
@@ -108,6 +113,11 @@
       "types": "./dist/guidance/index.d.ts",
       "import": "./dist/guidance/index.js",
       "require": "./dist/guidance/index.js"
+    },
+    "./genetic": {
+      "types": "./dist/genetic/index.d.ts",
+      "import": "./dist/genetic/index.js",
+      "require": "./dist/genetic/index.js"
     },
     "./agents": {
       "types": "./dist/agents/index.d.ts",
@@ -219,6 +229,12 @@
       "import": "./dist/commerce/hosted/index.esm.js",
       "require": "./dist/commerce/hosted/index.js",
       "default": "./dist/commerce/hosted/index.esm.js"
+    },
+    "./games": {
+      "types": "./dist/games/index.d.ts",
+      "import": "./dist/games/index.esm.js",
+      "require": "./dist/games/index.js",
+      "default": "./dist/games/index.esm.js"
     },
     "./commerce/errors": {
       "types": "./dist/commerce/errors/index.d.ts",

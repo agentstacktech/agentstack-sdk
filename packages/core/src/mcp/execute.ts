@@ -151,6 +151,18 @@ export function ensureBatchSemanticAnchor(
   if (action === 'hosting.bucket.files.bulk_delete') {
     return withExecutionIntent(opts, 'direct');
   }
+  if (action === 'script.run') {
+    return withExecutionIntent(opts, 'direct');
+  }
+  if (
+    action === 'rooms.quick_match' ||
+    action === 'rooms.leave' ||
+    action === 'rooms.poll_events' ||
+    action === 'rooms.match_status' ||
+    action === 'stream.relay.ws_ticket'
+  ) {
+    return withExecutionIntent(opts, 'direct');
+  }
   return opts;
 }
 

@@ -67,6 +67,7 @@ export const MCP_ONBOARDING_RECIPE_IDS = [
   'mcp_hosting_quickstart',
   'mcp_integrations_checkout_crm',
   'mcp_agents_run_approve',
+  'mcp_ai_providers_connect',
   'mcp_agents_fleet_orient',
   'mcp_agents_create_from_template',
   'mcp_knowledge_ingest',
@@ -259,7 +260,7 @@ export interface McpSessionSetupLadderPhase {
 
 /** Mandatory session order (auth → project → context → work). Parity with ``session_setup_ladder_steps``. */
 export function sessionSetupLadderPhases(): McpSessionSetupLadderPhase[] {
-                                                                                                                                                                                                                                                                                                                return [
+                                                                                                                                                                                                                                                                                                                            return [
     { phase: 1, id: 'authenticate', title: 'Authenticate' },
     { phase: 2, id: 'project', title: 'Select or create project', recipeId: 'mcp_session_setup' },
     { phase: 3, id: 'bind_context', title: 'Bind context.project_id' },
@@ -290,7 +291,7 @@ export interface McpClosedLoopLadderStep {
 
 /** Parity with onboarding bundle ``closed_loop_ladder``. */
 export function closedLoopLadderSteps(): McpClosedLoopLadderStep[] {
-                                                                                                                                                                                                                                                                                                                                                          return [
+                                                                                                                                                                                                                                                                                                                                                                      return [
     {
       step: 0,
       stepId: 'session',
@@ -397,6 +398,7 @@ export const WORK_GRAPH_WHEN_BLOCKED = {
   verification_failed: "agents.plan_recovery_scan → plan_propose mode=repair_plan",
   fully_provisionable: "ensure_agent create=false (H5) then create=true (preferred over create_from_template)",
   generation_fork_required: "auto_generation_mode on — call generation.fork (or omit env_uuid for MCP auto-fork), then retry with env_uuid from receipt on home=project",
+  work_next_hydrate_failed: "Work-graph hydrate failed — run agents.work_next with repair=true and detail=compact; on preflight failures narrow batch targets; on discovery failures narrow scope or defer hydrate.",
   supersede_in_progress: "agents.plan_get then wait/retry — in-progress node cannot be superseded without options.force_supersede_in_progress (retryable)",
   unknown_skill_id: "Fix node skill_ids to ecosystem catalog (agents.skills_list); use rag.retrieval / rag.ingest_acceptance — not MCP action names; re-run plan_propose after enrich",
   missing_required_dependency: "agents.plan_propose mode=decompose_node or repair_plan — facet DAG edge missing (storage→knowledge, logic→scheduler); inspect dependencies_to_add",
@@ -473,6 +475,8 @@ export const WORK_GRAPH_WHEN_BLOCKED = {
   run_mismatch: "run_id does not belong to the supplied agent_id — omit agent_id or fix the pair.",
   agent_not_found: "agent_id not in project fleet — use agents.team or plan_get before run_get.",
   waiting_for_approval: "Run status waiting_for_approval — agents.approve_run with approval_artifact_hash from run_detail.",
+  energy_denied: "Insufficient builder_energy before agents.run — energy.get_balance then payments.create intent=energy_pack; follow packet.next_action.",
+  agent_daily_cap: "Agent per_day_cap hit — patch AgentSpec.energy or wait for UTC day rollover.",
   batch_project_scope_leak: "A failed MCP batch step with params.project_id does not retarget later steps — only auth.switch_project may promote batch context.project_id. Re-bind context.project_id before mutations if a step used a probe pid.",
   workflow_batch_bind_failed: "agents.reconcile_binding repair=true — guidance bind failed; check member row / session",
   workflow_batch_context_bind_failed: "agents.reconcile_binding repair=true — batch context bind failed",
@@ -803,7 +807,7 @@ export function httpBootstrapLadderSteps(apiBase = ''): McpHttpBootstrapLadderSt
 
 /** Parity with onboarding bundle ``discovery_ladder`` (relative paths). */
 export function discoveryLadderSteps(): McpDiscoveryLadderStep[] {
-                                                                                                                                                                                                                                                                                                                return [
+                                                                                                                                                                                                                                                                                                                            return [
     {
       step: 0,
       label: 'Session probe',
