@@ -8,11 +8,15 @@ export type HostedMcpPlayerError = {
 
 function detailCode(body: unknown): string {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return '';
-  const detail = (body as { detail?: unknown }).detail;
+  const row = body as Record<string, unknown>;
+  const top = row.code ?? row.error_code;
+  if (typeof top === 'string' && top.trim()) return top.trim();
+  const detail = row.detail;
   if (typeof detail === 'string') return detail;
   if (detail && typeof detail === 'object' && !Array.isArray(detail)) {
-    const code = (detail as { code?: unknown }).code;
-    return typeof code === 'string' ? code : '';
+    const d = detail as { code?: unknown; error_code?: unknown };
+    const pick = d.error_code ?? d.code;
+    return typeof pick === 'string' ? pick.trim() : '';
   }
   return '';
 }
@@ -20,9 +24,12 @@ function detailCode(body: unknown): string {
 /** Extract machine code + comfort copy from fetch/MCP errors. */
 export function mapHostedMcpPlayerError(err: unknown): HostedMcpPlayerError {
   const row = err && typeof err === 'object' ? (err as Record<string, unknown>) : {};
+  const fromAssign =
+    typeof row.code === 'string' && row.code.trim() ? row.code.trim() : '';
   const fromBody = detailCode(row.body ?? row.data ?? row);
   const raw = String(row.error ?? row.message ?? err ?? '').trim();
   const code =
+    fromAssign ||
     fromBody ||
     (raw.includes('hosted_cookie_missing') ? 'hosted_cookie_missing' : '') ||
     (raw.includes('service_cap_denied') ? 'service_cap_denied' : '') ||
@@ -43,6 +50,11 @@ export function mapHostedMcpPlayerError(err: unknown): HostedMcpPlayerError {
     'export_not_public',
     'text_revision_conflict',
     'hosted_shared_data_denied',
+    'db_unavailable',
+    'revision_prefetch_failed',
+    'revision_conflict',
+    'run_in_progress',
+    'run_lock_timeout',
   ]).has(code);
   const message =
     code === 'hosted_cookie_missing'
@@ -59,6 +71,14 @@ export function mapHostedMcpPlayerError(err: unknown): HostedMcpPlayerError {
             ? 'Someone else updated the room — refresh and retry.'
           : code === 'not_a_member'
             ? 'You need write access on this project to play online.'
+          : code === 'auth_required'
+            ? 'Sign in to this hosted game before saving multiplayer state.'
+          : code === 'db_unavailable'
+            ? 'Database or match state is busy — wait and retry the same action.'
+          : code === 'revision_conflict' || code === 'text_revision_conflict'
+            ? 'Match revision moved — refresh lobby state and retry.'
+          : code === 'run_in_progress' || code === 'run_lock_timeout'
+            ? 'Another script.run is in flight — wait a moment and retry.'
             : raw || code;
   return { code, message, recoverable };
 }

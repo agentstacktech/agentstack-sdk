@@ -13,7 +13,12 @@ Universal hosted commerce runtime for **any** tenant `/s/{pid}/` surface (showca
 | `checkoutIntent.ts` | `createHostedCheckoutIntent` → `/api/commerce/intents` (`navigate?: boolean`) |
 | `sessionProbe.ts` | `probeHostedSession` → `GET /api/auth/me` with vault headers |
 | `hostedAppSession.ts` | `mintHostedAppSession` → `POST /api/hosted-apps/{pid}/session` after REST login |
+| `executeHostedMcpSteps.ts` | DRY `POST /s/{pid}/mcp` batch transport (cookie mint, step assert, player errors) |
+| `hostedSharedData.ts` | Lane A journal — `readHostedProjectLeaf`, `patchHostedProjectLeafCAS`, `HOSTED_BATCH_PREVIEW_SHA` |
+| `hostedMcpPlayerError.ts` | `mapHostedMcpPlayerError` — `error_code` / CAS / prefix / membership UX copy |
 
-**Import:** `@agentstack/sdk/commerce/hosted`
+**Import:** `@agentstack/sdk/commerce/hosted` · batch helpers `@agentstack/sdk` → `mcp/batchStepData`
+
+**Games MP:** `stackscript/matchClient.ts` hosted reads route through `executeHostedMcpSteps` (`projects.get_my_data`); shared lobby journal → `patchHostedProjectLeafCAS`.
 
 **Pairs with:** `frontend.commerce.hosted_storefront.gen1` · `hosted-sdk-cdn` `hostedCommerceRuntime.ts` · `hostedWireCore.ts`
