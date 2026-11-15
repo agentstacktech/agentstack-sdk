@@ -28,6 +28,8 @@ export { probeHostedSession, type ProbeHostedSessionOptions } from './sessionPro
 export {
   bootstrapHostedPlayerSession,
   ensureHostedPlayerMcpReady,
+  hostedMcpCookieMinted,
+  markHostedMcpCookieMinted,
   isHostedTenantPath,
   mintHostedAppSession,
   type HostedPlayerBootstrapDeps,
@@ -37,10 +39,19 @@ export {
 export { mapHostedMcpPlayerError, type HostedMcpPlayerError } from './hostedMcpPlayerError';
 
 export {
+  HOSTED_BATCH_PREVIEW_SHA,
   patchHostedProjectLeafCAS,
   readHostedProjectLeaf,
   type HostedSharedDataOptions,
 } from './hostedSharedData';
+
+export {
+  executeHostedMcpSteps,
+  executeHostedMcpStepsWithRetry,
+  type ExecuteHostedMcpStepsOptions,
+  type ExecuteHostedMcpStepsRetryOptions,
+  type HostedMcpStepSpec,
+} from './executeHostedMcpSteps';
 
 export { warmHostedCsrfCookie } from './csrfWarmup';
 

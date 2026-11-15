@@ -4,8 +4,13 @@
  */
 import type { HTTPClient } from '../client/http-client';
 import { normalizeMcpToolEnvelope } from '../agents/planGraph';
-import { mintHostedAppSession } from '../commerce/hosted/hostedAppSession';
+import { executeHostedMcpStepsWithRetry } from '../commerce/hosted/executeHostedMcpSteps';
+import {
+  hostedMcpCookieMinted,
+  mintHostedAppSession,
+} from '../commerce/hosted/hostedAppSession';
 import { mcpBatchStep, unwrapFirstMcpBatchStepData } from '../mcp/batchStepData';
+import { hostedMcpBatchBody } from '../mcp/hostedMcpBatchBody';
 import type { RequestConfig } from '../types';
 import { resolveHostedMcpUrl } from '../mcp/urls';
 
@@ -17,6 +22,23 @@ export type StackscriptMcpNextActionRow = {
   kind?: string;
   paths?: unknown;
 };
+
+export type StackscriptSourceFile = { path: string; content: string };
+
+/** Merge editor main file into a multi-file list (ephemeral dry_run / script.test). */
+export function mergeStackscriptEphemeralFiles(
+  entry: string,
+  mainContent: string,
+  files: StackscriptSourceFile[] = [],
+): StackscriptSourceFile[] {
+  const normalizedEntry = entry.trim() || 'main.ts';
+  if (!files.length) {
+    return [{ path: normalizedEntry, content: mainContent }];
+  }
+  return files.map((f) =>
+    f.path === normalizedEntry ? { path: f.path, content: mainContent } : f,
+  );
+}
 
 export interface ScriptPutParams {
   script_id: string;
@@ -62,6 +84,54 @@ export interface ScriptDryRunReceipt {
   events?: Array<Record<string, unknown>>;
   data?: { value?: unknown };
   cost?: { fuel?: number; usd_est?: number };
+  timings?: {
+    fuel_ms?: number;
+    vm_ms?: number;
+    bundle_ms?: number;
+    commit_ms?: number;
+  };
+}
+
+/** MCP `script.room.tick` success payload (presence smoke + optional host VM). */
+export interface ScriptRoomTickReceipt {
+  ok?: boolean;
+  error?: string;
+  hint?: string;
+  next_actions?: StackscriptMcpNextActionRow[];
+  fuel_used?: number;
+  idempotency_key?: string;
+  idempotent_replay?: boolean;
+  room_host_bound?: boolean;
+  tick?: number;
+  skipped?: boolean;
+  reason?: string;
+  write_set?: Array<{ path?: string[]; value?: unknown }>;
+  room_host_value?: unknown;
+  vm_ms?: number;
+  dna_committed?: boolean;
+  write_set_applied?: number;
+  dna_repair_path?: string;
+  cost?: { fuel?: number; usd_est?: number };
+  timings?: ScriptDryRunReceipt['timings'];
+}
+
+export interface ScriptArchiveReceipt {
+  ok?: boolean;
+  error?: string;
+  script_id?: string;
+}
+
+export interface ScriptDeleteReceipt {
+  ok?: boolean;
+  error?: string;
+  script_id?: string;
+  deleted?: boolean;
+}
+
+export interface ScriptRoomLeaveReceipt {
+  ok?: boolean;
+  error?: string;
+  room_name?: string;
 }
 
 /** MCP success=false still carries compiler/VM payload on `data`. */
@@ -93,6 +163,105 @@ export function stackscriptMcpErrorKey(err: string | undefined): string {
   if (!s) return '';
   const idx = s.indexOf(':');
   return idx > 0 ? s.slice(0, idx) : s;
+}
+
+/** Typed room-host tick failures (`script.room.tick` when_blocked). */
+export const STACKSCRIPT_ROOM_TICK_ERROR_CODES = [
+  'room_not_bound',
+  'bytecode_stale',
+  'stale_artifact',
+  'revision_conflict',
+  'revision_required',
+] as const;
+
+export type StackscriptRoomTickErrorCode =
+  (typeof STACKSCRIPT_ROOM_TICK_ERROR_CODES)[number];
+
+export type StackscriptRoomTickError = {
+  code: StackscriptRoomTickErrorCode;
+  message: string;
+  hint?: string;
+  nextActions?: StackscriptMcpNextActionRow[];
+  data: Record<string, unknown>;
+};
+
+export function isStackscriptRoomTickErrorCode(
+  code: string,
+): code is StackscriptRoomTickErrorCode {
+  return (STACKSCRIPT_ROOM_TICK_ERROR_CODES as readonly string[]).includes(code);
+}
+
+function roomTickErrorFromPayload(
+  payload: Record<string, unknown>,
+): StackscriptRoomTickError | null {
+  const rawErr = String(payload.error ?? payload.error_code ?? '').trim();
+  const key = stackscriptMcpErrorKey(rawErr) || rawErr;
+  if (!isStackscriptRoomTickErrorCode(key)) return null;
+  const hint =
+    (typeof payload.hint === 'string' && payload.hint.trim()
+      ? payload.hint.trim()
+      : undefined) ??
+    (typeof payload.instruction_hint === 'string' && payload.instruction_hint.trim()
+      ? payload.instruction_hint.trim()
+      : undefined);
+  const nextActions = Array.isArray(payload.next_actions)
+    ? (payload.next_actions as StackscriptMcpNextActionRow[])
+    : undefined;
+  return {
+    code: key,
+    message: hint || rawErr || key,
+    hint,
+    nextActions,
+    data: payload,
+  };
+}
+
+/** Map thrown MCP errors from script.room.tick to a narrow error shape. */
+export function parseStackscriptRoomTickError(err: unknown): StackscriptRoomTickError | null {
+  if (isStackscriptMcpError(err)) {
+    return roomTickErrorFromPayload(err.data);
+  }
+  const payload = parseStackscriptMcpFailure(err);
+  return payload ? roomTickErrorFromPayload(payload) : null;
+}
+
+/** Map ok:false script.room.tick envelopes (no throw). */
+export function parseStackscriptRoomTickFailure(
+  body: Record<string, unknown> | null | undefined,
+): StackscriptRoomTickError | null {
+  if (!body || body.ok !== false) return null;
+  const merged = parseStackscriptMcpEnvelope(body) ?? body;
+  const row = roomTickErrorFromPayload(merged);
+  if (row && !row.hint) {
+    const recovery = roomTickRecoveryHint(row.code);
+    if (recovery) {
+      return { ...row, hint: recovery, message: recovery };
+    }
+  }
+  return row;
+}
+
+/** Fill Comfort recovery copy for hosted room ticks (distinct from turn `script.run`). */
+export function roomTickRecoveryHint(code: StackscriptRoomTickErrorCode): string | undefined {
+  switch (code) {
+    case 'revision_conflict':
+      return (
+        'Server revision leaf changed — poll ecosystem.scripts.runtime.{room}.revision ' +
+        'and retry script.room.tick with the same idempotency key room:{pid}:{room}:{tick}.'
+      );
+    case 'revision_required':
+      return (
+        'Pass expected_revision from ecosystem.scripts.runtime.{matchId}.revision on script.run ' +
+        '(poll via createStackScriptMatchClient().pollMatchRevision).'
+      );
+    case 'bytecode_stale':
+    case 'stale_artifact':
+      return 'script.recompile_version then script.publish live before room ticks resume.';
+    case 'room_not_bound':
+      return 'script.put defineRoom + script.publish live; room_name must match export name.';
+    default:
+      return undefined;
+  }
 }
 
 export function isStackscriptMcpError(err: unknown): err is StackscriptMcpError {
@@ -294,19 +463,28 @@ export function createStackScriptClient(
       ? { skipAuthStateCheck: true, skipCache: true, cookieSessionMcp: true }
       : undefined;
     let res: unknown;
+    let hostedStepPayload: Record<string, unknown> | undefined;
     if (options?.hostedMcp) {
-      const httpClient = http as HTTPClient;
-      const bearer = httpClient.getAuthToken?.();
-      if (bearer) {
-        await mintHostedAppSession(projectId, bearer, {
-          apiBase: options?.hostedApiBase,
-        });
-      }
-      res = await http.post(
-        mcpPath,
-        { steps: [mcpBatchStep(action, params as Record<string, unknown>, projectId)] },
-        { ...extraConfig },
-      );
+      hostedStepPayload = (await executeHostedMcpStepsWithRetry(
+        http,
+        projectId,
+        [
+          {
+            id: 'step_0',
+            action,
+            params: params as Record<string, unknown>,
+          },
+        ],
+        {
+          pickStepId: 'step_0',
+          hostedApiBase: options?.hostedApiBase,
+          mintCookieIfBearer: true,
+        },
+      )) as Record<string, unknown>;
+      res = {
+        steps: [{ id: 'step_0', data: hostedStepPayload }],
+        ok: hostedStepPayload.ok !== false,
+      };
     } else {
       res = await http.post(
         mcpPath,
@@ -315,7 +493,9 @@ export function createStackScriptClient(
       );
     }
     const { success, data: envelopeData } = normalizeMcpToolEnvelope(res);
-    const stepPayload = options?.hostedMcp ? unwrapFirstMcpBatchStepData(res) : envelopeData;
+    const stepPayload = options?.hostedMcp
+      ? (hostedStepPayload ?? unwrapFirstMcpBatchStepData(res))
+      : envelopeData;
     const rawRow =
       res && typeof res === 'object' ? (res as Record<string, unknown>) : {};
     const row = {
@@ -430,24 +610,56 @@ export function createStackScriptClient(
         test_input?: Record<string, unknown> | unknown[];
         export?: string;
         expect_value?: StackscriptExpectValue;
+        /** Ephemeral compile — omit script_id when files[] only. */
+        files?: StackscriptSourceFile[];
+        entry?: string;
       },
     ) =>
       postStep('script.test', {
-        script_id,
+        ...(script_id.trim() ? { script_id } : {}),
         version,
         ...(options?.test_input !== undefined ? { test_input: options.test_input } : {}),
         ...(options?.export ? { export: options.export } : {}),
         ...(options?.expect_value !== undefined
           ? { expect_value: options.expect_value }
           : {}),
+        ...(options?.files?.length ? { files: options.files } : {}),
+        ...(options?.entry ? { entry: options.entry } : {}),
       }),
     profile: (script_id: string) => postStep('script.profile', { script_id }),
     dryRun: (params: {
-      script_id: string;
+      script_id?: string;
       export: string;
       input?: Record<string, unknown> | unknown[];
       version?: string;
-    }) => postStep<ScriptDryRunReceipt>('script.dry_run', params),
+      files?: StackscriptSourceFile[];
+      entry?: string;
+    }) =>
+      postStep<ScriptDryRunReceipt>('script.dry_run', {
+        export: params.export,
+        ...(params.script_id?.trim() ? { script_id: params.script_id } : {}),
+        ...(params.input !== undefined ? { input: params.input } : {}),
+        ...(params.version ? { version: params.version } : {}),
+        ...(params.files?.length ? { files: params.files } : {}),
+        ...(params.entry ? { entry: params.entry } : {}),
+      }),
+    /** Ephemeral multi-file dry_run without script.put (same wire as dryRun). */
+    dryRunEphemeral: (params: {
+      export: string;
+      entry: string;
+      files: StackscriptSourceFile[];
+      input?: Record<string, unknown> | unknown[];
+      script_id?: string;
+      version?: string;
+    }) =>
+      postStep<ScriptDryRunReceipt>('script.dry_run', {
+        export: params.export,
+        entry: params.entry,
+        files: params.files,
+        ...(params.script_id?.trim() ? { script_id: params.script_id } : { script_id: 'ephemeral' }),
+        ...(params.input !== undefined ? { input: params.input } : {}),
+        ...(params.version ? { version: params.version } : {}),
+      }),
     run: (params: {
       script_id: string;
       export: string;
@@ -463,8 +675,19 @@ export function createStackScriptClient(
       }),
     roomJoin: (params: { room_name: string }) =>
       postStep('script.room.join', { room_name: params.room_name }),
+    roomLeave: (params: { room_name: string }) =>
+      postStep<ScriptRoomLeaveReceipt>('script.room.leave', {
+        room_name: params.room_name,
+      }),
     roomTick: (params: { room_name: string }) =>
-      postStep('script.room.tick', { room_name: params.room_name }),
+      postStep<ScriptRoomTickReceipt>('script.room.tick', { room_name: params.room_name }),
+    archive: (script_id: string) =>
+      postStep<ScriptArchiveReceipt>('script.archive', { script_id }),
+    delete: (script_id: string, options?: { hard?: boolean }) =>
+      postStep<ScriptDeleteReceipt>('script.delete', {
+        script_id,
+        ...(options?.hard != null ? { hard: options.hard } : {}),
+      }),
     roomStatus: (params: { room_name: string }) =>
       postStep<Record<string, unknown>>('script.room.status', {
         room_name: params.room_name,
