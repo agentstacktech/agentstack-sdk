@@ -58,6 +58,12 @@ export interface ResumableUploadTarget {
   scope?: 'user' | 'project';
   category?: string;
   projectId?: number;
+  /** Hosting ingress parity (files_endpoints hosting finalize). */
+  hostingMode?: 'merge' | 'replace';
+  hostingStrip?: 'auto' | 'off';
+  hostingPublish?: boolean;
+  hostingConfirmReplace?: boolean;
+  hostingConfirmPrune?: boolean;
 }
 
 export interface ResumableUploadInput {
@@ -148,6 +154,11 @@ export function buildTargetHeaders(target?: ResumableUploadTarget): Record<strin
   if (target.target === 'hosting') {
     out['X-Upload-Target'] = 'hosting';
     if (target.bucketId) out['X-Upload-Bucket-Id'] = target.bucketId;
+    if (target.hostingMode) out['X-Upload-Hosting-Mode'] = target.hostingMode;
+    if (target.hostingStrip) out['X-Upload-Hosting-Strip'] = target.hostingStrip;
+    if (target.hostingPublish) out['X-Upload-Hosting-Publish'] = 'true';
+    if (target.hostingConfirmReplace) out['X-Upload-Hosting-Confirm-Replace'] = 'true';
+    if (target.hostingConfirmPrune) out['X-Upload-Hosting-Confirm-Prune'] = 'true';
   }
   if (target.folder) out['X-Upload-Folder'] = target.folder;
   if (target.scope) out['X-Upload-Scope'] = target.scope;

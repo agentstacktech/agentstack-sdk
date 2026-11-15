@@ -540,16 +540,25 @@ export class AgentHosting {
    */
   /**
    * POST a local ZIP to a one-time grant URL from MCP `hosting.site.upload_grant`.
-   * No Authorization header — the token is in the URL path.
+   * Prefer header `X-Ingress-Grant` (MCP returns `headers` + `url` without path token).
    */
   async importZipFromGrant(
     grantUrl: string,
     file: File | Blob,
-    options?: { signal?: AbortSignal },
+    options?: {
+      signal?: AbortSignal;
+      grantToken?: string;
+      headers?: Record<string, string>;
+    },
   ): Promise<Response> {
     const form = new FormData();
     form.append('file', file);
-    return fetch(grantUrl, { method: 'POST', body: form, signal: options?.signal });
+    const hdrs: Record<string, string> = { ...(options?.headers ?? {}) };
+    const token = options?.grantToken ?? hdrs['X-Ingress-Grant'];
+    if (token && !hdrs['X-Ingress-Grant']) {
+      hdrs['X-Ingress-Grant'] = token;
+    }
+    return fetch(grantUrl, { method: 'POST', body: form, headers: hdrs, signal: options?.signal });
   }
 
   async importZip(
@@ -587,7 +596,15 @@ export class AgentHosting {
     projectId: number,
     bucketId: string,
     file: File,
-    options?: { signal?: AbortSignal; onProgress?: (uploaded: number, total: number) => void },
+    options?: {
+      signal?: AbortSignal;
+      onProgress?: (uploaded: number, total: number) => void;
+      mode?: 'merge' | 'replace';
+      confirm_site_replace?: boolean;
+      confirm_prune?: boolean;
+      strip?: 'auto' | 'off';
+      publish?: boolean;
+    },
   ): Promise<APIResponse<{ files_written: number; bytes?: number }>> {
     const cfg = this.client.getConfig();
     const apiOrigin = (cfg.apiBase || cfg.baseUrl || '')
@@ -604,7 +621,16 @@ export class AgentHosting {
         mime: file.type || 'application/zip',
         name: file.name || 'site.zip',
         source: blobChunkSource(file),
-        target: { target: 'hosting', projectId, bucketId },
+        target: {
+          target: 'hosting',
+          projectId,
+          bucketId,
+          hostingMode: options?.mode,
+          hostingStrip: options?.strip ?? 'auto',
+          hostingPublish: options?.publish,
+          hostingConfirmReplace: options?.confirm_site_replace,
+          hostingConfirmPrune: options?.confirm_prune,
+        },
       },
       {
         baseUrl: apiOrigin,
