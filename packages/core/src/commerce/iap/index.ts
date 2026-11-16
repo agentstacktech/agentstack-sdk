@@ -379,6 +379,10 @@ export async function createIapCheckoutWithRetry(
         const key = `${input.idempotencyKey}:retry:${Date.now()}`;
         return createIapCheckout({ ...input, idempotencyKey: key }, fetchFn, auth);
       }
+      if (requiresNewIdempotencyKey(err.code)) {
+        const key = `${input.idempotencyKey}:retry:${Date.now()}`;
+        return createIapCheckout({ ...input, idempotencyKey: key }, fetchFn, auth);
+      }
     }
     throw err;
   }

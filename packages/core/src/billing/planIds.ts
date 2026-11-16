@@ -40,6 +40,7 @@ export function limitsTierForPlan(raw: string | null | undefined): string {
     professional: 'pro',
     premium: 'premium',
     corporate: 'premium',
+    spotlight: 'spotlight',
     vip: 'vip',
     enterprise: 'enterprise',
     unlimited: 'enterprise',
@@ -54,6 +55,10 @@ export function isLaunchOrAbovePlan(tier: string | null | undefined): boolean {
 export function isScaleOrAbovePlan(tier: string | null | undefined): boolean {
   return SCALE_OR_ABOVE.has(String(tier ?? '').trim().toLowerCase());
 }
+
+/** SPA twin: agentstack-frontend planUpgradePath PERSONAL_SPOTLIGHT_PRICING_URL */
+export const PERSONAL_SPOTLIGHT_PRICING_PATH =
+  '/pricing?plane=personal&cycle=yearly&tier=spotlight';
 
 export function accountTierFromPayload(
   sub: Record<string, unknown> | null | undefined,
