@@ -6,10 +6,49 @@ export type HostedMcpPlayerError = {
   recoverable: boolean;
 };
 
+/** Machine codes that may use executeHostedMcpStepsWithRetry (G6b / Nahual open). */
+export const HOSTED_MCP_RECOVERABLE_CODES = [
+  'hosted_cookie_missing',
+  'hosted_app_required',
+  'auth_required',
+  'export_not_public',
+  'text_revision_conflict',
+  'hosted_shared_data_denied',
+  'db_unavailable',
+  'revision_prefetch_failed',
+  'revision_conflict',
+  'run_in_progress',
+  'run_lock_timeout',
+  'neural_flush',
+  'neural_flush_backlog',
+] as const;
+
+function bodyFailurePhase(body: unknown): string {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return '';
+  const row = body as Record<string, unknown>;
+  const direct = row.failure_phase;
+  if (typeof direct === 'string' && direct.trim()) return direct.trim();
+  const data = row.data;
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    const fp = (data as Record<string, unknown>).failure_phase;
+    if (typeof fp === 'string' && fp.trim()) return fp.trim();
+  }
+  const timings = row.timings;
+  if (timings && typeof timings === 'object' && !Array.isArray(timings)) {
+    if ((timings as Record<string, unknown>).neural_flush_backlog === true) {
+      return 'neural_flush_backlog';
+    }
+  }
+  if (row.runtime_neural_staged === true && row.dna_persisted === false) {
+    return 'neural_flush';
+  }
+  return '';
+}
+
 function detailCode(body: unknown): string {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return '';
   const row = body as Record<string, unknown>;
-  const top = row.code ?? row.error_code;
+  const top = row.code ?? row.error_code ?? row.error;
   if (typeof top === 'string' && top.trim()) return top.trim();
   const detail = row.detail;
   if (typeof detail === 'string') return detail;
@@ -43,21 +82,20 @@ export function mapHostedMcpPlayerError(err: unknown): HostedMcpPlayerError {
     (raw.includes('not_a_member') ? 'not_a_member' : '') ||
     raw.split(':', 1)[0] ||
     'hosted_mcp_error';
-  const recoverable = new Set([
-    'hosted_cookie_missing',
-    'hosted_app_required',
-    'auth_required',
-    'export_not_public',
-    'text_revision_conflict',
-    'hosted_shared_data_denied',
-    'db_unavailable',
-    'revision_prefetch_failed',
-    'revision_conflict',
-    'run_in_progress',
-    'run_lock_timeout',
-  ]).has(code);
+  const bodyBlob = row.body ?? row.data ?? row;
+  const failurePhase = bodyFailurePhase(bodyBlob);
+  let resolvedCode = code;
+  if (
+    (code === 'db_unavailable' || code === 'commit_failed') &&
+    (failurePhase === 'neural_flush' || failurePhase === 'neural_flush_backlog')
+  ) {
+    resolvedCode = failurePhase;
+  }
+  const recoverable = new Set<string>(HOSTED_MCP_RECOVERABLE_CODES).has(resolvedCode);
   const message =
-    code === 'hosted_cookie_missing'
+    resolvedCode === 'neural_flush' || resolvedCode === 'neural_flush_backlog'
+      ? 'Match state is syncing to the server — keep the same action; we will retry shortly.'
+      : code === 'hosted_cookie_missing'
       ? 'Session cookie missing — sign in again or refresh the page.'
       : code === 'hosted_app_required'
         ? 'This action requires a hosted game session.'
@@ -80,5 +118,25 @@ export function mapHostedMcpPlayerError(err: unknown): HostedMcpPlayerError {
           : code === 'run_in_progress' || code === 'run_lock_timeout'
             ? 'Another script.run is in flight — wait a moment and retry.'
             : raw || code;
-  return { code, message, recoverable };
+  return { code: resolvedCode, message, recoverable };
+}
+
+export function isHostedMcpRetryableError(err: unknown): boolean {
+  const mapped = mapHostedMcpPlayerError(err);
+  return mapped.recoverable;
+}
+
+/** Success-path hosted script.run: show «syncing» until DNA flush completes (neural defer). */
+export type HostedRunPhase = 'syncing' | 'ready' | 'error';
+
+export function hostedRunPhase(row: Record<string, unknown> | null | undefined): HostedRunPhase {
+  if (!row || typeof row !== 'object') return 'error';
+  if (row.ok === false) return 'error';
+  if (row.runtime_neural_staged === true && row.dna_persisted === false) return 'syncing';
+  const timings = row.timings;
+  if (timings && typeof timings === 'object' && !Array.isArray(timings)) {
+    const t = timings as Record<string, unknown>;
+    if (t.neural_defer === true || t.neural_flush_backlog === true) return 'syncing';
+  }
+  return 'ready';
 }

@@ -330,6 +330,23 @@ describe('isCommittedPartial (MCC v6)', () => {
   });
 });
 
+describe('batchStepPollFields StackScript MP', () => {
+  it('hoists neural timings for script.run', () => {
+    const fields = batchStepPollFields(
+      {
+        data: { value: 1 },
+        timings: { neural_defer: true, commit_ms: 3 },
+        dna_persisted: false,
+        runtime_neural_staged: true,
+      },
+      'script.run',
+    );
+    expect(fields.timings).toEqual({ neural_defer: true, commit_ms: 3 });
+    expect(fields.dna_persisted).toBe(false);
+    expect(fields.runtime_neural_staged).toBe(true);
+  });
+});
+
 describe('resolveMcpProjectScope', () => {
   it('prefers home_project_id from params', () => {
     expect(

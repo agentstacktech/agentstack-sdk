@@ -10,6 +10,7 @@ export interface McpCatalogDeltaPayload {
   delta?: boolean;
   since_etag?: string;
   catalog_etag?: string;
+  delta_fallback?: string;
 }
 
 export function buildMcpCatalogActionsUrl(
@@ -46,6 +47,27 @@ export function mergeMcpCatalogDelta<T extends { action: string }>(
 export function isCatalogDeltaPayload(payload: unknown): boolean {
   if (!payload || typeof payload !== 'object') return false;
   const p = payload as McpCatalogDeltaPayload;
+  if (p.delta_fallback) return false;
   if (p.delta === true) return true;
   return Boolean(p.domains && (p.removed_actions || p.since_etag));
+}
+
+export function isMcpCatalogDeltaFallbackFull(payload: unknown): boolean {
+  if (!payload || typeof payload !== 'object') return false;
+  return Boolean((payload as McpCatalogDeltaPayload).delta_fallback);
+}
+
+export function resolveMcpCatalogActionsAfterFetch<T extends { action: string }>(
+  existing: T[],
+  responseBody: McpCatalogDeltaPayload,
+  flattenFull: (body: unknown) => T[],
+): T[] {
+  if (isMcpCatalogDeltaFallbackFull(responseBody)) {
+    return flattenFull(responseBody);
+  }
+  if (responseBody.delta === true || isCatalogDeltaPayload(responseBody)) {
+    return mergeMcpCatalogDelta(existing, responseBody);
+  }
+  const flat = flattenFull(responseBody);
+  return flat.length ? flat : existing;
 }

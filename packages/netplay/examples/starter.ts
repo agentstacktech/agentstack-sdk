@@ -47,8 +47,10 @@ export function startStarter(root: HTMLElement, lang: 'ru' | 'en' | 'pt' = 'en',
     const keys = [1, 2, 3].map((n) => Object.assign(document.createElement('button'), { className: 'np-key', textContent: `+${n}`, onclick: () => session.input(n) }));
     keys.forEach((k) => (k.dataset.test = 'add')); $('.np-keys').append(...keys);
     root.append(board);
+    // Canvas / Nahual-style: use mountNetDock + DOCK_LABELS from '@agentstack/netplay/ui' (corner FAB; see packages/netplay/src/ui/dock.ts).
     const bar = mountMatchBar(session, {
       labels: MATCH_BAR_LABELS[lang],
+      quiet: false,
       done: (seat, s) => { const st = s.state as S21 | null; return st ? seat !== st.turn : undefined; }, // on turn = «thinking…»
       onNewRoom: () => { bar.destroy(); board.remove(); session.leave(); lobby.create(); ui.show(); }, // fresh code, lobby again
     });

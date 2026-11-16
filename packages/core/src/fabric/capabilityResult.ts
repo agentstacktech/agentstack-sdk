@@ -3,6 +3,7 @@
  */
 import { z } from 'zod';
 
+import { MCP_STACKSCRIPT_MP_HOIST_KEYS } from '../mcp/batchStepData';
 import { contextCitationSchema } from './contextBundle';
 
 export const capabilityErrorSchema = z.object({
@@ -83,7 +84,10 @@ function mergedPollHintSources(client: Record<string, unknown>): Record<string, 
 }
 
 /** Hoist poll/retry hints for batch success steps (Python: batch_step_poll_fields). */
-export function batchStepPollFields(client: Record<string, unknown>): Record<string, unknown> {
+export function batchStepPollFields(
+  client: Record<string, unknown>,
+  action = '',
+): Record<string, unknown> {
   const merged = mergedPollHintSources(client);
   const out: Record<string, unknown> = {};
   if (merged.retryable === true) {
@@ -97,6 +101,16 @@ export function batchStepPollFields(client: Record<string, unknown>): Record<str
   ] as const) {
     if (hintKey in merged) {
       out[hintKey] = merged[hintKey];
+    }
+  }
+  const wantStackscript =
+    action === 'script.run' ||
+    MCP_STACKSCRIPT_MP_HOIST_KEYS.some((key) => key in merged);
+  if (wantStackscript) {
+    for (const key of MCP_STACKSCRIPT_MP_HOIST_KEYS) {
+      if (key in merged) {
+        out[key] = merged[key];
+      }
     }
   }
   return out;

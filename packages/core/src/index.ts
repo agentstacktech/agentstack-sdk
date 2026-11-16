@@ -275,6 +275,8 @@ export type {
   PublicShowcaseCatalogEntry,
   PublicShowcaseCatalogResponse,
   PublicShowcaseEntryKind,
+  ChangelogFeedV1,
+  ChangelogFeedItemV1,
 } from './public';
 export { AdminGrantsClient } from './admin/grants';
 export type {
@@ -1156,6 +1158,11 @@ export {
   optraceLog
 } from './utils/optrace';
 export type { OpTraceLevel } from './utils/optrace';
+
+export { submitReport } from './diagnostics/submitReport';
+export type { ReportPrefill } from './diagnostics/submitReport';
+export { buildErrorReportContext } from './diagnostics/errorReportContext';
+export type { ErrorReportContext } from './diagnostics/errorReportContext';
 
 // Re-export all utilities
 export * from './utils';

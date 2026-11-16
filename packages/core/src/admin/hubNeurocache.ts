@@ -17,11 +17,18 @@ export interface GeneTagMemoryRow {
   bytes: number;
 }
 
+export interface McpCatalogDeltaCounters {
+  hit?: number;
+  miss?: number;
+  fallback_revision_unknown?: number;
+}
+
 export interface NeuroCacheStats {
   total_entries: number;
   total_bytes: number;
   memory_by_ns: Record<string, NamespaceMemoryDetail>;
   named_hit_rates: Record<string, number>;
+  mcp_catalog_delta?: McpCatalogDeltaCounters;
   gene_tag_rows: GeneTagMemoryRow[];
   worker_id?: string;
   as_of?: string | null;

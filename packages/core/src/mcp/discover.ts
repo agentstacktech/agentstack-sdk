@@ -12,6 +12,10 @@ export interface McpDiscoverOptions {
   projectId?: number;
   /** BCP-47 locale for localized instruction slices (en-US, pt-BR, ru-RU). */
   locale?: string;
+  /** Conditional fetch — server may return delta-only catalog (D2.3). */
+  sinceEtag?: string;
+  /** Default true for catalog clients. */
+  delta?: boolean;
 }
 
 export interface McpActionEffect {
@@ -176,8 +180,10 @@ export async function mcpDiscoverByIntent(
 /** GET /mcp/discovery — API key capability context. */
 export async function mcpGetDiscovery(opts: McpDiscoverOptions): Promise<unknown> {
   const locale = opts.locale?.trim();
-  const path = locale
-    ? `/mcp/discovery?locale=${encodeURIComponent(locale)}&verbose=1`
-    : '/mcp/discovery?verbose=1';
-  return mcpRestJson(opts.apiBase, path, { method: 'GET' }, opts);
+  const params = new URLSearchParams({ verbose: '1' });
+  const useDelta = opts.delta !== false;
+  if (useDelta) params.set('delta', '1');
+  if (opts.sinceEtag?.trim()) params.set('since_etag', opts.sinceEtag.trim());
+  if (locale) params.set('locale', locale);
+  return mcpRestJson(opts.apiBase, `/mcp/discovery?${params.toString()}`, { method: 'GET' }, opts);
 }

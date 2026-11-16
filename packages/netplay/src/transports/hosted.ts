@@ -12,16 +12,23 @@
  * With `token()` a 401 first re-mints the hosted-app cookie (`POST /api/hosted-apps/{pid}/session`) and retries once.
  */
 import { errorKind, NetplayError } from '../errors.js';
+import {
+  hostedMcpRecoverableCode,
+  hostedMcpRetryDelayMs,
+  sleepMs,
+} from './hostedRetry.js';
 import type { ScriptRunner } from './stackscript.js';
 
 export interface HostedMcpOptions {
   projectId: number;
+  /** script.run recoverable retries (db_unavailable, neural_flush, run_lock…). Default 3. */
+  maxAttempts?: number;
   /** '' (default) = same origin as the page; e.g. 'https://agentstack.tech' from elsewhere. */
   origin?: string;
   /** Bearer token source (signed-in player). Without it the cookie session is used. */
   token?: () => string | null | undefined;
   fetch?: typeof fetch;
-  /** Abort a request that hangs (ms). Default 15000 — the session then re-sends. */
+  /** Abort a request that hangs (ms). Default 45000 — hosted open/commit may defer DNA. */
   timeoutMs?: number;
 }
 
@@ -54,7 +61,7 @@ export function hostedMcpRunner(o: HostedMcpOptions): ScriptRunner {
   const f = o.fetch ?? ((...a: Parameters<typeof fetch>) => fetch(...a));
   const base = (o.origin ?? '').replace(/\/+$/, '');
   let id = 0;
-  const timeout = (): AbortSignal | undefined => (typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(o.timeoutMs ?? 15_000) : undefined);
+  const timeout = (): AbortSignal | undefined => (typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(o.timeoutMs ?? 45_000) : undefined);
   const headers = (): Record<string, string> => {
     const h: Record<string, string> = { 'content-type': 'application/json', accept: 'application/json', 'x-project-id': String(o.projectId) };
     const t = o.token?.();
@@ -77,26 +84,56 @@ export function hostedMcpRunner(o: HostedMcpOptions): ScriptRunner {
     // Browsers cap keepalive bodies at 64 kB in flight, so only small requests (all of ours in practice) ask for it.
     return f(`${base}/s/${o.projectId}/mcp`, { method: 'POST', credentials: 'include', headers: headers(), signal: timeout(), body, keepalive: body.length < KEEPALIVE_MAX });
   };
+  const maxAttempts = Math.max(1, o.maxAttempts ?? 3);
+
+  async function runOnce(p: Json): Promise<Json> {
+    let r: Response;
+    try {
+      r = await once(p);
+      if (r.status === 401 && (await mint())) r = await once(p);
+    } catch (err) {
+      throw new NetplayError('offline', 'network', String((err as Error)?.message ?? err));
+    }
+    let j: unknown = null;
+    try { j = await r.json(); } catch { /* empty / html error page */ }
+    if (!r.ok) {
+      const code = codeOf(obj(j)) || `http_${r.status}`;
+      const retry = Number(obj(j)?.retry_after_ms ?? Number(r.headers.get('retry-after') ?? 0) * 1000) || undefined;
+      throw new NetplayError(errorKind(code, r.status), code, String(obj(j)?.message ?? ''), retry);
+    }
+    const payload = unwrapHostedReply(j);
+    const code = payload.ok === false || payload.error ? codeOf(payload) || 'error' : '';
+    if (code) {
+      throw new NetplayError(
+        errorKind(code),
+        code,
+        String(payload.message ?? payload.hint ?? ''),
+        Number(payload.retry_after_ms) || undefined,
+      );
+    }
+    return payload;
+  }
+
   return {
     async run(p) {
-      let r: Response;
-      try {
-        r = await once(p as unknown as Json);
-        if (r.status === 401 && (await mint())) r = await once(p as unknown as Json);
-      } catch (err) {
-        throw new NetplayError('offline', 'network', String((err as Error)?.message ?? err));
+      const params = p as unknown as Json;
+      let last: NetplayError | undefined;
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        try {
+          return await runOnce(params);
+        } catch (err) {
+          if (!(err instanceof NetplayError)) throw err;
+          last = err;
+          const noRetry =
+            err.kind === 'auth' || err.kind === 'not-published' || err.kind === 'full' || err.kind === 'rate';
+          if (noRetry || !hostedMcpRecoverableCode(err.code) || attempt >= maxAttempts) {
+            throw err;
+          }
+          const delay = hostedMcpRetryDelayMs(err.retryAfterMs);
+          await sleepMs(delay);
+        }
       }
-      let j: unknown = null;
-      try { j = await r.json(); } catch { /* empty / html error page */ }
-      if (!r.ok) {
-        const code = codeOf(obj(j)) || `http_${r.status}`;
-        const retry = Number(obj(j)?.retry_after_ms ?? Number(r.headers.get('retry-after') ?? 0) * 1000) || undefined;
-        throw new NetplayError(errorKind(code, r.status), code, String(obj(j)?.message ?? ''), retry);
-      }
-      const payload = unwrapHostedReply(j);
-      const code = payload.ok === false || payload.error ? codeOf(payload) || 'error' : '';
-      if (code) throw new NetplayError(errorKind(code), code, String(payload.message ?? payload.hint ?? ''), Number(payload.retry_after_ms) || undefined);
-      return payload;
+      throw last ?? new NetplayError('offline', 'error', 'hosted run failed');
     },
   };
 }

@@ -249,6 +249,7 @@ export default [
     ],
     plugins: [
       resolve({ browser: true, preferBuiltins: false }),
+      json(),
       commonjs(),
       typescript({ tsconfig: './tsconfig.json', declaration: false, declarationMap: false }),
       terser(),

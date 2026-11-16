@@ -146,6 +146,46 @@ export interface PromoteBuildBody {
   branch?: string;
 }
 
+export interface HostingImportArchiveResponse {
+  success?: boolean;
+  job_id?: string | null;
+  live_changed?: boolean;
+  kind?: string;
+  ingress_kind?: string;
+  files_written?: number;
+  url?: string;
+  next_action?: Record<string, unknown>;
+  next_actions?: Array<Record<string, unknown>>;
+  [key: string]: unknown;
+}
+
+/** MCP `hosting.site.upload_grant` contract — multipart POST follows (no bytes in JSON). */
+export interface HostingUploadGrantResponse {
+  success?: boolean;
+  url: string;
+  method?: string;
+  headers?: Record<string, string>;
+  form_field?: string;
+  max_bytes?: number;
+  expires_at?: number;
+  bucket_id?: string;
+  publish?: boolean;
+  state?: string;
+  agent_completion?: { done?: boolean; message?: string };
+  [key: string]: unknown;
+}
+
+export type DeliverSiteZipOptions = {
+  mode?: 'merge' | 'replace';
+  confirm_site_replace?: boolean;
+  confirm_prune?: boolean;
+  strip?: 'auto' | 'off';
+  publish?: boolean;
+  bucket_id?: string;
+  bucket_name?: string;
+  signal?: AbortSignal;
+};
+
 export class AgentHosting {
   /** Use tus-lite resumable upload for ZIPs at or above this size (GA-16). */
   static readonly RESUMABLE_ZIP_THRESHOLD_BYTES = 4 * 1024 * 1024;
@@ -526,7 +566,7 @@ export class AgentHosting {
       dry_run?: boolean;
     },
   ) {
-    return this.client.post<Record<string, unknown>>(
+    return this.client.post<HostingImportArchiveResponse>(
       `/hosting/buckets/${bucketId}/import-archive`,
       { ...body, project_id: projectId },
       { skipBatching: true, skipCache: true },
@@ -542,6 +582,60 @@ export class AgentHosting {
    * POST a local ZIP to a one-time grant URL from MCP `hosting.site.upload_grant`.
    * Prefer header `X-Ingress-Grant` (MCP returns `headers` + `url` without path token).
    */
+  mintUploadGrant(
+    projectId: number,
+    body: {
+      bucket_id?: string;
+      bucket_name?: string;
+      mode?: 'merge' | 'replace';
+      strip?: 'auto' | 'off';
+      publish?: boolean;
+      confirm_site_replace?: boolean;
+      confirm_prune?: boolean;
+    },
+  ) {
+    return this.client.post<HostingUploadGrantResponse>('/mcp/execute', {
+      action: 'hosting.site.upload_grant',
+      params: { project_id: projectId, ...body },
+    });
+  }
+
+  /**
+   * Mint grant (unless pre-supplied) then POST ZIP to the one-time ingress URL.
+   */
+  async deliverSiteZip(
+    projectId: number,
+    bucketId: string,
+    file: File | Blob,
+    options?: DeliverSiteZipOptions & { grant?: HostingUploadGrantResponse },
+  ): Promise<Response> {
+    let grant = options?.grant;
+    if (!grant?.url) {
+      const res = await this.mintUploadGrant(projectId, {
+        bucket_id: bucketId,
+        bucket_name: options?.bucket_name,
+        mode: options?.mode,
+        strip: options?.strip,
+        publish: options?.publish,
+        confirm_site_replace: options?.confirm_site_replace,
+        confirm_prune: options?.confirm_prune,
+      });
+      grant = res.data;
+    }
+    if (!grant?.url) {
+      throw new Error('hosting.site.upload_grant did not return url');
+    }
+    const cfg = this.client.getConfig();
+    const apiOrigin = (cfg.apiBase || cfg.baseUrl || '')
+      .replace(/\/+$/, '')
+      .replace(/\/api\/?$/, '');
+    const grantUrl = grant.url.startsWith('http') ? grant.url : `${apiOrigin}${grant.url}`;
+    return this.importZipFromGrant(grantUrl, file, {
+      signal: options?.signal,
+      headers: grant.headers,
+    });
+  }
+
   async importZipFromGrant(
     grantUrl: string,
     file: File | Blob,
@@ -572,6 +666,7 @@ export class AgentHosting {
       confirm_site_replace?: boolean;
       confirm_prune?: boolean;
       strip?: 'auto' | 'off';
+      publish?: boolean;
     },
   ): Promise<APIResponse<Record<string, unknown>>> {
     if (file.size >= AgentHosting.RESUMABLE_ZIP_THRESHOLD_BYTES) {
@@ -584,6 +679,7 @@ export class AgentHosting {
     if (options?.confirm_site_replace) params.confirm_site_replace = true;
     if (options?.confirm_prune) params.confirm_prune = true;
     if (options?.strip) params.strip = options.strip;
+    if (options?.publish) params.publish = true;
     return this.client.post<Record<string, unknown>>(`/hosting/buckets/${bucketId}/import-zip`, form, {
       params,
       skipBatching: true,
@@ -605,7 +701,7 @@ export class AgentHosting {
       strip?: 'auto' | 'off';
       publish?: boolean;
     },
-  ): Promise<APIResponse<{ files_written: number; bytes?: number }>> {
+  ): Promise<APIResponse<HostingImportArchiveResponse>> {
     const cfg = this.client.getConfig();
     const apiOrigin = (cfg.apiBase || cfg.baseUrl || '')
       .replace(/\/+$/, '')
@@ -625,7 +721,7 @@ export class AgentHosting {
           target: 'hosting',
           projectId,
           bucketId,
-          hostingMode: options?.mode,
+          hostingMode: options?.mode ?? 'merge',
           hostingStrip: options?.strip ?? 'auto',
           hostingPublish: options?.publish,
           hostingConfirmReplace: options?.confirm_site_replace,
@@ -641,10 +737,21 @@ export class AgentHosting {
       },
     );
     const payload = result.response;
+    const jobRaw = payload.job_id;
+    const jobId =
+      typeof jobRaw === 'string' && jobRaw.trim()
+        ? jobRaw.trim()
+        : jobRaw != null
+          ? String(jobRaw).trim() || undefined
+          : undefined;
     return {
       data: {
         files_written: Number(payload.files_written ?? 0),
         bytes: payload.bytes != null ? Number(payload.bytes) : undefined,
+        job_id: jobId ?? null,
+        live_changed:
+          typeof payload.live_changed === 'boolean' ? payload.live_changed : undefined,
+        kind: typeof payload.kind === 'string' ? payload.kind : undefined,
       },
       status: 200,
       statusText: 'OK',

@@ -23,6 +23,39 @@ describe('mcp urls', () => {
 });
 
 describe('mcpExecute', () => {
+  it('agentstack.read sets _mcp_read_tool and tools/call name', async () => {
+    const calls: unknown[] = [];
+    const original = globalThis.fetch;
+    globalThis.fetch = (async (_url: RequestInfo | URL, init?: RequestInit) => {
+      calls.push(JSON.parse(String(init?.body)));
+      return new Response(
+        JSON.stringify({
+          result: { results: [{ id: 'step_0', ok: true, result: { actions: [] } }] },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    }) as typeof fetch;
+
+    try {
+      await mcpExecute([{ action: 'discovery.list', params: {} }], {
+        mcpUrl: 'https://agentstack.tech/mcp',
+        token: 'tok',
+        projectId: 1,
+        mcpTool: 'agentstack.read',
+      });
+      const body = calls[0] as {
+        params?: {
+          name?: string;
+          arguments?: { options?: { _mcp_read_tool?: boolean } };
+        };
+      };
+      expect(body.params?.name).toBe('agentstack.read');
+      expect(body.params?.arguments?.options?._mcp_read_tool).toBe(true);
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
   it('posts JSON-RPC tools/call and parses results', async () => {
     const calls: unknown[] = [];
     const original = globalThis.fetch;

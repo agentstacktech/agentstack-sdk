@@ -52,6 +52,8 @@ export interface McpExecuteOptions {
   stopOnError?: boolean;
   timeoutMs?: number;
   maxAttempts?: number;
+  /** JSON-RPC tools/call name; read tool sets server-side read-only guard. */
+  mcpTool?: 'agentstack.execute' | 'agentstack.read';
 }
 
 /** Ensure mutating batches carry options.goal when the caller omitted it. */
@@ -392,6 +394,10 @@ export async function mcpExecute(
   }
   const locale = String(effectiveOpts.locale ?? '').trim();
   if (locale) context.locale = locale;
+  const mcpTool =
+    effectiveOpts.mcpTool === 'agentstack.read' ? 'agentstack.read' : 'agentstack.execute';
+  const readGuard =
+    mcpTool === 'agentstack.read' ? ({ _mcp_read_tool: true as const } as const) : {};
   const argumentsBody = {
     steps: steps.map((s, i) => ({
       id: s.id ?? `step_${i}`,
@@ -401,6 +407,7 @@ export async function mcpExecute(
     context,
     options: {
       stopOnError: effectiveOpts.stopOnError !== false,
+      ...readGuard,
       ...(effectiveOpts.idempotencyKey ? { idempotency_key: effectiveOpts.idempotencyKey } : {}),
       ...(effectiveOpts.recipeId ? { recipe_id: effectiveOpts.recipeId } : {}),
       ...(effectiveOpts.recipeParams ? { recipe_params: effectiveOpts.recipeParams } : {}),
@@ -421,7 +428,7 @@ export async function mcpExecute(
     id: 1,
     method: 'tools/call',
     params: {
-      name: 'agentstack.execute',
+      name: mcpTool,
       arguments: argumentsBody,
     },
   };

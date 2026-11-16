@@ -7,3 +7,6 @@ export { applyTheme, themeCss, type ThemeOptions } from './theme.js';
 export { bindVisibility } from './visibility.js';
 
 export { mountQuickPlay, guessSignedIn, QUICK_LABELS, type QuickLabels, type QuickPlayOptions, type QuickPlayUi } from './quick.js';
+export {
+  mountNetDock, DOCK_LABELS, type MountNetDockOptions, type NetDockUi, type NetDockCorner, type NetDockPlayingPolicy, type MountNetDockLabels,
+} from './dock.js';

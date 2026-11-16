@@ -15,6 +15,7 @@
 | [src/testing/index.ts](src/testing/index.ts) | `createTable` e2e harness |
 | [src/lobby.ts](src/lobby.ts) | room codes, invite links, headless `createLobby` |
 | [src/ui/lobby.ts](src/ui/lobby.ts) | optional DOM `mountLobby` (`/ui` entry) |
+| [src/ui/dock.ts](src/ui/dock.ts) | in-game `mountNetDock` (collapsible corner net UI) |
 
 ## Docs
 
@@ -24,3 +25,4 @@
 
 - Parent SDK: [../../AI_INDEX.md](../../AI_INDEX.md) · [../../AGENTS.md](../../AGENTS.md)
 - StackScript client used as transport: `sdk.stackscript(projectId, { hostedMcp? })` (`packages/core/src/stackscript/client.ts`)
+- Hosted MP retry: [src/transports/hostedRetry.ts](src/transports/hostedRetry.ts) · `hostedMcpRunner` (`maxAttempts`, no auth/rate retry)

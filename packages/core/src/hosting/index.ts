@@ -30,10 +30,17 @@ export {
 } from './workspace';
 export {
   buildSiteAsync,
+  hostingGitMigrate,
   HostingBuildError,
   type BuildSiteAsyncParams,
   type BuildSiteAsyncOptions,
 } from './buildSiteAsync';
+export {
+  agentFileDeliver,
+  type AgentFileDeliverIntent,
+  type AgentFileDeliverOptions,
+  type AgentDeliverReceipt,
+} from './agentFileDeliver';
 export {
   deploySyncPlan,
   fetchHostingSyncPlan,

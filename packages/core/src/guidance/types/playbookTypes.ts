@@ -56,6 +56,7 @@ export const PlaybookIdSchema = z.enum([
   'showcase-vps-publish',
   'hosting-workspace-edit',
   'explore-mcp-catalog',
+  'report-platform-issue',
   'setup-reachability',
   'setup-business-assistant',
 ]);

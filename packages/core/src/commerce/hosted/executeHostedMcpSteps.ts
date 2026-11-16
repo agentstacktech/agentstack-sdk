@@ -16,7 +16,7 @@ import {
   hostedMcpCookieMinted,
   mintHostedAppSession,
 } from './hostedAppSession';
-import { mapHostedMcpPlayerError } from './hostedMcpPlayerError';
+import { isHostedMcpRetryableError, mapHostedMcpPlayerError } from './hostedMcpPlayerError';
 
 export type HostedMcpStepSpec = {
   id: string;
@@ -148,16 +148,7 @@ export async function executeHostedMcpStepsWithRetry(
       return await executeHostedMcpSteps(http, projectId, steps, options);
     } catch (err) {
       last = err;
-      const mapped = mapHostedMcpPlayerError(err);
-      const retryable =
-        mapped.recoverable &&
-        [
-          'db_unavailable',
-          'run_in_progress',
-          'run_lock_timeout',
-          'revision_prefetch_failed',
-        ].includes(mapped.code);
-      if (!retryable || attempt >= maxAttempts) {
+      if (!isHostedMcpRetryableError(err) || attempt >= maxAttempts) {
         throw err;
       }
       const delay = hostedMcpRetryDelayMs(err, maxRetryDelayMs, defaultRetryDelayMs);

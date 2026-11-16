@@ -22,6 +22,17 @@ export type McpBatchPayloadLike = {
   results?: McpStepLike[];
 };
 
+/** Parity with shared/mcp/wire_hoist_keys.MCP_STACKSCRIPT_MP_HOIST_KEYS (hosted MP wire). */
+export const MCP_STACKSCRIPT_MP_HOIST_KEYS = [
+  'timings',
+  'dna_persisted',
+  'runtime_neural_staged',
+  'neural_pending_paths',
+  'failure_phase',
+  'write_set_applied',
+  'idempotent_replay',
+] as const;
+
 /** True when a batch step envelope reports failure (CDN wire parity). */
 export function mcpStepFailed(step: McpStepLike | undefined): boolean {
   if (!step) return true;
@@ -84,11 +95,18 @@ function unwrapMcpPayload(raw: unknown): Record<string, unknown> {
 
 export function mcpStepData(step: McpStepLike | undefined): Record<string, unknown> {
   if (!step) return {};
-  const direct = unwrapMcpPayload(step.result ?? step.data);
-  if (Object.keys(direct).length > 0) return direct;
-  const cap = step.capability_result;
-  if (cap && typeof cap === 'object') return unwrapMcpPayload(cap.data);
-  return {};
+  const row = step as Record<string, unknown>;
+  let out = unwrapMcpPayload(step.result ?? step.data);
+  if (Object.keys(out).length === 0) {
+    const cap = step.capability_result;
+    if (cap && typeof cap === 'object') out = unwrapMcpPayload(cap.data);
+  }
+  for (const key of MCP_STACKSCRIPT_MP_HOIST_KEYS) {
+    if (key in row && row[key] !== undefined && !(key in out)) {
+      out[key] = row[key];
+    }
+  }
+  return out;
 }
 
 /** Build one MCP batch step — ``project_id`` required for hosted ingress guard. */

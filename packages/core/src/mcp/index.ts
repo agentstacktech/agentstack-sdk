@@ -10,6 +10,12 @@ export {
   resolvePublicOrigin,
 } from './urls';
 export {
+  MCP_CLIENT_HEAVY_SYNC_TIMEOUT_MS,
+  readMcpExecuteBudget,
+  type McpExecuteBudget,
+  type McpExecuteBudgetAsync,
+} from './budgets';
+export {
   mcpExecute,
   withSemanticAnchor,
   runInverseWorkflowLoop,
@@ -31,6 +37,20 @@ export {
   type McpStepResult,
   type InverseEnvelope,
 } from './execute';
+export {
+  parseMcpExecuteUiOutcome,
+  extractFirstMcpStepPayload,
+  type McpBatchUiOutcome,
+  type McpBatchUiState,
+} from './parseMcpExecuteUiOutcome';
+export {
+  extractMcpAsyncJobId,
+  unwrapMcpJobStatusRecord,
+  extractMcpJobTerminalStepData,
+  pollMcpAsyncJobUntilTerminal,
+  type McpAsyncJobPollClient,
+  type PollMcpAsyncJobOptions,
+} from './pollMcpAsyncJob';
 export {
   simulatePatAction,
   simulatePatActionWithToken,
@@ -140,6 +160,8 @@ export {
   buildMcpCatalogActionsUrl as buildCatalogActionsUrl,
   mergeMcpCatalogDelta as mergeCatalogDelta,
   isCatalogDeltaPayload,
+  isMcpCatalogDeltaFallbackFull,
+  resolveMcpCatalogActionsAfterFetch,
   type McpCatalogDeltaPayload,
 } from './catalogDelta';
 export {
@@ -244,7 +266,12 @@ export class AgentMcp {
       mcpUrl: overrides?.mcpUrl ?? this.resolveUrl(),
       idempotencyKey: overrides?.idempotencyKey,
       recipeId: overrides?.recipeId,
+      recipeParams: overrides?.recipeParams,
       goal: overrides?.goal,
+      focusNodeId: overrides?.focusNodeId,
+      planExecuteMode: overrides?.planExecuteMode,
+      executionIntent: overrides?.executionIntent,
+      routedGoal: overrides?.routedGoal,
       observed: overrides?.observed,
       workflowRunId: overrides?.workflowRunId,
       density: overrides?.density,
@@ -253,6 +280,7 @@ export class AgentMcp {
       timeoutMs: overrides?.timeoutMs,
       maxAttempts: overrides?.maxAttempts,
       async: overrides?.async,
+      mcpTool: overrides?.mcpTool,
     });
   }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { mapHostedMcpPlayerError } from './hostedMcpPlayerError';
+import { hostedRunPhase, mapHostedMcpPlayerError } from './hostedMcpPlayerError';
 
 describe('mapHostedMcpPlayerError journal lane', () => {
   it('maps hosted_shared_data_denied', () => {
@@ -17,6 +17,25 @@ describe('mapHostedMcpPlayerError journal lane', () => {
     });
     expect(row.code).toBe('auth_required');
     expect(row.message).toContain('Sign in');
+  });
+
+  it('maps db_unavailable + neural_flush failure_phase', () => {
+    const row = mapHostedMcpPlayerError({
+      body: {
+        error: 'db_unavailable',
+        failure_phase: 'neural_flush',
+        retry_after_ms: 2000,
+      },
+    });
+    expect(row.code).toBe('neural_flush');
+    expect(row.recoverable).toBe(true);
+    expect(row.message).toMatch(/syncing/i);
+  });
+
+  it('hostedRunPhase detects neural defer success', () => {
+    expect(hostedRunPhase({ ok: true, runtime_neural_staged: true, dna_persisted: false })).toBe('syncing');
+    expect(hostedRunPhase({ ok: true, dna_persisted: true })).toBe('ready');
+    expect(hostedRunPhase({ ok: false })).toBe('error');
   });
 
   it('maps text_revision_conflict', () => {

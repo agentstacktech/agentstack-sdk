@@ -36,7 +36,14 @@ export {
   type MintHostedAppSessionOptions,
 } from './hostedAppSession';
 
-export { mapHostedMcpPlayerError, type HostedMcpPlayerError } from './hostedMcpPlayerError';
+export {
+  HOSTED_MCP_RECOVERABLE_CODES,
+  hostedRunPhase,
+  isHostedMcpRetryableError,
+  mapHostedMcpPlayerError,
+  type HostedMcpPlayerError,
+  type HostedRunPhase,
+} from './hostedMcpPlayerError';
 
 export {
   HOSTED_BATCH_PREVIEW_SHA,
@@ -52,6 +59,13 @@ export {
   type ExecuteHostedMcpStepsRetryOptions,
   type HostedMcpStepSpec,
 } from './executeHostedMcpSteps';
+
+export {
+  createHostedWire,
+  type CreateHostedWireOptions,
+  type HostedScriptRunParams,
+  type HostedWire,
+} from './hostedScriptRun';
 
 export { warmHostedCsrfCookie } from './csrfWarmup';
 

@@ -13,8 +13,10 @@ import {
 } from './execute';
 import {
   mergeMcpCatalogDelta,
+  resolveMcpCatalogActionsAfterFetch,
   type McpCatalogDeltaPayload,
 } from './catalogDelta';
+import { flattenMcpActionsCatalog } from './catalogFlatten';
 
 export const MCP_GUIDANCE_PROMPTS = {
   system: 'agentstack_system_instructions',
@@ -260,7 +262,7 @@ export interface McpSessionSetupLadderPhase {
 
 /** Mandatory session order (auth → project → context → work). Parity with ``session_setup_ladder_steps``. */
 export function sessionSetupLadderPhases(): McpSessionSetupLadderPhase[] {
-                                                                                                                                                                                                                                                                                                                            return [
+                                                                                                                                                                                                                                                                                                                              return [
     { phase: 1, id: 'authenticate', title: 'Authenticate' },
     { phase: 2, id: 'project', title: 'Select or create project', recipeId: 'mcp_session_setup' },
     { phase: 3, id: 'bind_context', title: 'Bind context.project_id' },
@@ -291,7 +293,7 @@ export interface McpClosedLoopLadderStep {
 
 /** Parity with onboarding bundle ``closed_loop_ladder``. */
 export function closedLoopLadderSteps(): McpClosedLoopLadderStep[] {
-                                                                                                                                                                                                                                                                                                                                                                      return [
+                                                                                                                                                                                                                                                                                                                                                                        return [
     {
       step: 0,
       stepId: 'session',
@@ -807,7 +809,7 @@ export function httpBootstrapLadderSteps(apiBase = ''): McpHttpBootstrapLadderSt
 
 /** Parity with onboarding bundle ``discovery_ladder`` (relative paths). */
 export function discoveryLadderSteps(): McpDiscoveryLadderStep[] {
-                                                                                                                                                                                                                                                                                                                            return [
+                                                                                                                                                                                                                                                                                                                              return [
     {
       step: 0,
       label: 'Session probe',
@@ -1285,8 +1287,12 @@ export async function refreshMcpCatalogWithDelta(
   };
   if (!res.ok) throw new Error(JSON.stringify(data));
   const etag = data.catalog_etag ?? opts.sinceEtag;
-  const merged = mergeMcpCatalogDelta(opts.existing, data);
-  return { actions: merged, catalogEtag: etag };
+  const actions = resolveMcpCatalogActionsAfterFetch(
+    opts.existing,
+    data,
+    (body) => flattenMcpActionsCatalog(body) as McpCatalogActionRow[],
+  );
+  return { actions, catalogEtag: etag };
 }
 
 export interface RunMcpPreflightOptions {
