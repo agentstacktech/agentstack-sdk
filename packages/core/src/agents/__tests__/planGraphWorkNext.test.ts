@@ -16,7 +16,30 @@ import {
   recoveryNodeIdForBlockedWork,
   runWorkGraphLoop,
   clampPlanGetDispatchDetail,
+  planSummaryExecutionReadyLeaves,
+  planSummaryExecutionReadyUnknown,
+  planSummaryFleetEligibilitySkipped,
 } from '../planGraph';
+
+describe('planSummary fleet_scope', () => {
+  it('treats skipped fleet rollup as unknown execution_ready', () => {
+    const summary = {
+      fleet_scope: 'skipped',
+      eligibility_rollup_skipped: true,
+      execution_ready_leaves: null,
+      execution_ready_unknown: true,
+    };
+    expect(planSummaryFleetEligibilitySkipped(summary)).toBe(true);
+    expect(planSummaryExecutionReadyUnknown(summary)).toBe(true);
+    expect(planSummaryExecutionReadyLeaves(summary)).toBeNull();
+  });
+
+  it('returns numeric leaves when fleet was evaluated', () => {
+    const summary = { execution_ready_leaves: 2, fleet_scope: 'evaluated' };
+    expect(planSummaryExecutionReadyUnknown(summary)).toBe(false);
+    expect(planSummaryExecutionReadyLeaves(summary)).toBe(2);
+  });
+});
 
 describe('clampPlanGetDispatchDetail', () => {
   it('downgrades body without node scope to cards', () => {

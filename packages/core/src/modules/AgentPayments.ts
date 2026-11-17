@@ -176,6 +176,23 @@ export class AgentPayments {
   /**
    * Получение статуса платежа (GET /payments/{id} — без суффикса /status)
    */
+  /**
+   * Poll GET /payments/{id} until wallet_credit=ok (Stripe confirm, SBP redirect return).
+   */
+  async waitForWalletCredit(
+    paymentId: string,
+    options?: import('../commerce/settlement/pollWalletCredit').WalletCreditPollOptions,
+  ): Promise<boolean> {
+    const { pollUntilWalletCredit } = await import('../commerce/settlement/pollWalletCredit');
+    return pollUntilWalletCredit(async () => {
+      const { payment } = await this.getPaymentStatus(paymentId);
+      return {
+        wallet_credit: payment.wallet_credit,
+        status: payment.status,
+      };
+    }, options);
+  }
+
   async getPaymentStatus(paymentId: string): Promise<{
     payment: Payment;
     transactions: Transaction[];

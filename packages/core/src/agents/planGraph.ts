@@ -752,9 +752,50 @@ export type ExpandWarning = {
 /** Rollup from ``agents.work_next`` diagnostics.readiness (RC-05). */
 export type WorkNextReadinessRollup = {
   dependency_ready_leaves?: number;
-  execution_ready_leaves?: number;
+  execution_ready_leaves?: number | null;
   claimable_leaves?: number;
+  fleet_scope?: 'skipped' | 'evaluated' | string;
+  eligibility_rollup_skipped?: boolean;
+  execution_ready_unknown?: boolean;
 };
+
+/** Compact/full plan_summary readiness projection (WG-T008). */
+export type WorkNextPlanSummary = Record<string, unknown> & {
+  scoped_to_goal?: boolean;
+  fleet_scope?: 'skipped' | 'evaluated' | string;
+  eligibility_rollup_skipped?: boolean;
+  execution_ready_unknown?: boolean;
+  execution_ready_leaves?: number | null;
+};
+
+export function planSummaryFleetEligibilitySkipped(
+  planSummary?: Record<string, unknown> | null,
+): boolean {
+  if (!planSummary || typeof planSummary !== 'object') return false;
+  if (planSummary.eligibility_rollup_skipped === true) return true;
+  return String(planSummary.fleet_scope ?? '').toLowerCase() === 'skipped';
+}
+
+export function planSummaryExecutionReadyUnknown(
+  planSummary?: Record<string, unknown> | null,
+): boolean {
+  if (!planSummary || typeof planSummary !== 'object') return false;
+  if (planSummary.execution_ready_unknown === true) return true;
+  if (!planSummaryFleetEligibilitySkipped(planSummary)) return false;
+  const raw = planSummary.execution_ready_leaves;
+  return raw === null || raw === undefined;
+}
+
+/** Null when fleet rollup was skipped — do not treat as zero ready agents. */
+export function planSummaryExecutionReadyLeaves(
+  planSummary?: Record<string, unknown> | null,
+): number | null {
+  if (!planSummary || typeof planSummary !== 'object') return null;
+  if (planSummaryExecutionReadyUnknown(planSummary)) return null;
+  const raw = planSummary.execution_ready_leaves;
+  if (raw === null || raw === undefined) return 0;
+  return typeof raw === 'number' && Number.isFinite(raw) ? raw : Number(raw) || 0;
+}
 
 export type WorkNextPacket = {
   goal?: { id?: string; title?: string; progress?: unknown };
@@ -789,7 +830,7 @@ export type WorkNextPacket = {
     items?: WorkNextBlockedRow[];
     next_cursor?: string | null;
   };
-  plan_summary?: Record<string, unknown> & { scoped_to_goal?: boolean };
+  plan_summary?: WorkNextPlanSummary;
   goal_summary?: Record<string, unknown> & {
     progress_pct?: number;
     critical_path?: unknown;
