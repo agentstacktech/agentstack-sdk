@@ -101,3 +101,44 @@ export function quorumMet(
   if (!approvalGateRequired(settings)) return true;
   return approverIds(settings).length >= quorumNeeded(settings, eligibleOperators);
 }
+
+/** Fork / env_snapshot catalog coherence (core.generation_flow.gen1). */
+export type ForkCatalogProjection = {
+  apply_ready?: boolean;
+  catalog_projection_state?: string;
+  recovery_code?: string;
+  committed_without_list_hit?: boolean;
+};
+
+export function forkCatalogProjection(
+  forkData?: Record<string, unknown> | null,
+): ForkCatalogProjection {
+  if (!forkData || typeof forkData !== 'object') return {};
+  const coherence = forkData.catalog_coherence;
+  const cc =
+    coherence && typeof coherence === 'object'
+      ? (coherence as Record<string, unknown>)
+      : {};
+  const gate = forkData.sandbox_gate;
+  const sg =
+    gate && typeof gate === 'object' ? (gate as Record<string, unknown>) : {};
+  return {
+    apply_ready: Boolean(
+      cc.apply_ready ?? sg.apply_ready ?? forkData.apply_ready,
+    ),
+    catalog_projection_state: String(
+      cc.catalog_projection_state ??
+        forkData.catalog_projection_state ??
+        '',
+    ).trim() || undefined,
+    recovery_code: String(cc.recovery_code ?? forkData.recovery_code ?? '').trim() || undefined,
+    committed_without_list_hit: Boolean(cc.committed_without_list_hit),
+  };
+}
+
+/** diff_vs_prod success does not imply Gate A — check catalog_bypass. */
+export function diffImpliesApplyReady(diff?: Record<string, unknown> | null): boolean {
+  if (!diff || typeof diff !== 'object') return false;
+  if (diff.catalog_bypass === true) return false;
+  return Boolean(diff.sandbox_head_uuid);
+}

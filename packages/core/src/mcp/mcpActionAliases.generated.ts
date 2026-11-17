@@ -24,6 +24,7 @@ export const MCP_ACTION_ALIASES: Record<string, string> = {
   "ai_builder.build": "ai_builder.build.enqueue",
   "ai_builder.build.publish": "ai_builder.publish",
   "ai_builder.build.run": "ai_builder.build.enqueue",
+  "ai_builder.create": "ai_builder.compose.apply",
   "ai_builder.preflight": "preflight.check",
   "ai_builder.project.list": "ai_builder.source.list",
   "ai_builder.run": "ai_builder.build.enqueue",

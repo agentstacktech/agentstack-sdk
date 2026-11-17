@@ -262,7 +262,7 @@ export interface McpSessionSetupLadderPhase {
 
 /** Mandatory session order (auth → project → context → work). Parity with ``session_setup_ladder_steps``. */
 export function sessionSetupLadderPhases(): McpSessionSetupLadderPhase[] {
-                                                                                                                                                                                                                                                                                                                              return [
+                                                                                                                                                                                                                                                                                                                                    return [
     { phase: 1, id: 'authenticate', title: 'Authenticate' },
     { phase: 2, id: 'project', title: 'Select or create project', recipeId: 'mcp_session_setup' },
     { phase: 3, id: 'bind_context', title: 'Bind context.project_id' },
@@ -293,7 +293,7 @@ export interface McpClosedLoopLadderStep {
 
 /** Parity with onboarding bundle ``closed_loop_ladder``. */
 export function closedLoopLadderSteps(): McpClosedLoopLadderStep[] {
-                                                                                                                                                                                                                                                                                                                                                                        return [
+                                                                                                                                                                                                                                                                                                                                                                              return [
     {
       step: 0,
       stepId: 'session',
@@ -467,7 +467,7 @@ export const WORK_GRAPH_WHEN_BLOCKED = {
   env_uuid_project_only: "Omit env_uuid or set home=project and retry. self and project_self are the session row and cannot take a sandbox slice.",
   graph_home_unknown: "home must be project, self, or project_self. Retry agents.plan_get or agents.plan_patch with one of those values.",
   graph_home_address_required: "Personal home needs a resolved session address. Pass home on the tool and ensure the operator session has user_id before patch.",
-  plan_ops_parent_missing: "add_child parent_id is not in the graph — create the parent first or fix parent_id.",
+  plan_ops_parent_missing: "add_child parent_id is not in the graph — create the parent first or fix parent_id. On an empty project graph (revision 0, no tasks), omit parent_id and send {op:add_child, node:{id, title, kind}} with if_match_revision:0 from plan_get; do not use op set for new ids.",
   plan_graph_children_exceeded: "Direct children per parent are capped (32). Flat parent_id storage counts siblings under each parent_id — not total graph nodes. Split into sub-groups or use agents.plan_propose decompose_node.",
   plan_graph_too_large: "The merged graph does not fit the JSON leaf (see graph_limits.inline_write_hard_limit_bytes, typically 512 KiB). Bodies spill near chunk_spill_target_bytes (~400 KiB). For huge prose use node.prompt/detail (not only meta.description), append_storage_ref (stubs inline text), reorder_children {parent_id,child_ids}, or storage file maps in meta.storage_refs. Cards keep ~200-char stubs after spill. Read one node with plan_get detail=body and node_id. Archive completed nodes (op archive) if titles/meta still overflow. Do not retry the same blob. Leaf heal ladder: agents.plan_compaction_preview → agents.plan_heal_leaf dry_run=true → apply.",
   plan_graph_oversize: "Plan graph exceeds size budget — agents.plan_compaction_preview then agents.plan_heal_leaf (dry_run then apply); archive completed subtrees or split objectives.",
@@ -809,7 +809,7 @@ export function httpBootstrapLadderSteps(apiBase = ''): McpHttpBootstrapLadderSt
 
 /** Parity with onboarding bundle ``discovery_ladder`` (relative paths). */
 export function discoveryLadderSteps(): McpDiscoveryLadderStep[] {
-                                                                                                                                                                                                                                                                                                                              return [
+                                                                                                                                                                                                                                                                                                                                    return [
     {
       step: 0,
       label: 'Session probe',
