@@ -99,6 +99,7 @@ export const MCP_ACTION_ALIASES: Record<string, string> = {
   "discovery.health": "system.ping",
   "discovery.list_actions": "discovery.list",
   "discovery.list_recipes": "integrations.list_recipes",
+  "discovery.mcp.list": "discovery.list",
   "discovery.search_actions": "discovery.search",
   "dna.data.get": "projects.get_data",
   "dna.data.set": "projects.patch_data",
