@@ -158,6 +158,8 @@ export const MCP_ACTION_ALIASES: Record<string, string> = {
   "hosting.release.pin": "hosting.release.patch",
   "hosting.release.prune": "hosting.release.delete",
   "hosting.rollback": "hosting.release.promote",
+  "hosting.site.asset": "hosting.bucket.file.get",
+  "hosting.site.asset.get": "hosting.bucket.file.get",
   "hosting.site.build.poll": "hosting.site.build_status",
   "hosting.site.build.status": "hosting.site.build_status",
   "hosting.site.create": "hosting.site.quick_start",
