@@ -6,6 +6,7 @@
 
 import { canonicalMcpAction } from './mcpActionAliases.generated';
 import { stepNeedsSemanticAnchor } from './batchParamAnchorEval';
+import { parseMcpExecuteUiOutcome } from './parseMcpExecuteUiOutcome';
 import { MCP_WORK_GRAPH_HOIST_KEYS, normalizeMcpWorkGraphPayload } from './workGraphHoist';
 
 export interface McpStep {
@@ -752,23 +753,43 @@ export function summarizeMcpBatchOutcome(result: McpExecuteResult): {
   succeededCount?: number;
   failedStepIds?: string[];
 } {
-  if (result.partial_success || batchEnvelopeHasWorkGraphBlock(result.raw)) {
-    const n = result.succeeded_count ?? 0;
-    const failed = result.failed_step_ids ?? [];
+  const root =
+    result.raw && typeof result.raw === 'object'
+      ? {
+          ...(result.raw as Record<string, unknown>),
+          ok: result.ok,
+          partial_success: result.partial_success,
+          succeeded_count: result.succeeded_count,
+          failed_step_ids: result.failed_step_ids,
+          error_code: result.error_code,
+        }
+      : {
+          ok: result.ok,
+          partial_success: result.partial_success,
+          succeeded_count: result.succeeded_count,
+          failed_step_ids: result.failed_step_ids,
+          error: result.error,
+          error_code: result.error_code,
+        };
+  const ui = parseMcpExecuteUiOutcome(root);
+  const failed = ui.failedStepIds ?? result.failed_step_ids;
+  const n = ui.succeededCount ?? result.succeeded_count;
+  if (ui.state === 'partial_success') {
+    const failedLen = failed?.length ?? 0;
     return {
       state: 'partial_success',
-      message: `Partial success: ${n} step(s) ok, ${failed.length} failed`,
+      message: `Partial success: ${n ?? 0} step(s) ok, ${failedLen} failed`,
       succeededCount: n,
       failedStepIds: failed,
     };
   }
-  if (result.ok) {
-    return { state: 'success', message: 'All steps succeeded' };
+  if (ui.state === 'success') {
+    return { state: 'success', message: 'All steps succeeded', succeededCount: n, failedStepIds: failed };
   }
   return {
     state: 'error',
     message: result.error ?? 'MCP execute failed',
-    failedStepIds: result.failed_step_ids,
+    failedStepIds: failed,
   };
 }
 

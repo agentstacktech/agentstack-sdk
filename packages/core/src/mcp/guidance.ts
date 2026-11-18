@@ -262,7 +262,7 @@ export interface McpSessionSetupLadderPhase {
 
 /** Mandatory session order (auth → project → context → work). Parity with ``session_setup_ladder_steps``. */
 export function sessionSetupLadderPhases(): McpSessionSetupLadderPhase[] {
-                                                                                                                                                                                                                                                                                                                                    return [
+                                                                                                                                                                                                                                                                                                                                      return [
     { phase: 1, id: 'authenticate', title: 'Authenticate' },
     { phase: 2, id: 'project', title: 'Select or create project', recipeId: 'mcp_session_setup' },
     { phase: 3, id: 'bind_context', title: 'Bind context.project_id' },
@@ -293,7 +293,7 @@ export interface McpClosedLoopLadderStep {
 
 /** Parity with onboarding bundle ``closed_loop_ladder``. */
 export function closedLoopLadderSteps(): McpClosedLoopLadderStep[] {
-                                                                                                                                                                                                                                                                                                                                                                              return [
+                                                                                                                                                                                                                                                                                                                                                                                return [
     {
       step: 0,
       stepId: 'session',
@@ -480,6 +480,7 @@ export const WORK_GRAPH_WHEN_BLOCKED = {
   energy_denied: "Insufficient builder_energy before agents.run — energy.get_balance then payments.create intent=energy_pack; follow packet.next_action.",
   agent_daily_cap: "Agent per_day_cap hit — patch AgentSpec.energy or wait for UTC day rollover.",
   batch_project_scope_leak: "A failed MCP batch step with params.project_id does not retarget later steps — only auth.switch_project may promote batch context.project_id. Re-bind context.project_id before mutations if a step used a probe pid.",
+  workflow_scope_leak: "Batch step params.project_id disagrees with MCP context.project_id — fix the batch, not the work graph: ecosystem bus uses project_id=1 on bots.bus.* while context may be a tenant pin; StackScript/generation steps carry the subject tenant in params; omit duplicate project_id on global reads or align context via auth.switch_project. Run preflight.check — do not plan_heal_leaf or repair_plan for this error.",
   workflow_batch_bind_failed: "agents.reconcile_binding repair=true — guidance bind failed; check member row / session",
   workflow_batch_context_bind_failed: "agents.reconcile_binding repair=true — batch context bind failed",
   workflow_state_key_stamp_failed: "agents.reconcile_binding repair=true — workflow_state_key stamp failed",
@@ -809,7 +810,7 @@ export function httpBootstrapLadderSteps(apiBase = ''): McpHttpBootstrapLadderSt
 
 /** Parity with onboarding bundle ``discovery_ladder`` (relative paths). */
 export function discoveryLadderSteps(): McpDiscoveryLadderStep[] {
-                                                                                                                                                                                                                                                                                                                                    return [
+                                                                                                                                                                                                                                                                                                                                      return [
     {
       step: 0,
       label: 'Session probe',
