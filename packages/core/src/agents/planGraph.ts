@@ -1963,6 +1963,23 @@ function syntheticWorkGraphPacketFromCode(
   const nodeId = String(params.node_id ?? data.node_id ?? ctx?.nodeId ?? '').trim();
   const projectId = params.project_id ?? data.project_id ?? ctx?.projectId;
 
+  if (code === 'registry_warming') {
+    const retryMs = Number(data.retry_after_ms ?? 1500);
+    const retry = Number.isFinite(retryMs) && retryMs > 0 ? retryMs : 1500;
+    return parseWorkNextPacket({
+      state: 'waiting',
+      reason: 'registry_warming',
+      retry_after_ms: retry,
+      next_action: stepNa?.action
+        ? applyWorkGraphErrorContext(stepNa, ctx)
+        : {
+            action: 'agents.work_next',
+            params: {
+              ...(projectId != null ? { project_id: projectId } : {}),
+            },
+          },
+    });
+  }
   if (code === 'plan_claim_required') {
     const base = stepNa?.action
       ? stepNa

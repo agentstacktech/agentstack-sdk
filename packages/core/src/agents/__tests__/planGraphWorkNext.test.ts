@@ -983,6 +983,16 @@ describe('parseWorkNextFromMcpExecute', () => {
 });
 
 describe('workGraphErrorToPacket', () => {
+  it('synthesizes registry_warming waiting packet with retry_after_ms', () => {
+    const packet = workGraphErrorToPacket(
+      { error_code: 'registry_warming', retry_after_ms: 2200 },
+      { projectId: 1 },
+    );
+    expect(packet?.state).toBe('waiting');
+    expect(packet?.reason).toBe('registry_warming');
+    expect((packet as { retry_after_ms?: number })?.retry_after_ms).toBe(2200);
+  });
+
   it('synthesizes plan_claim from error_code with env stamp', () => {
     const packet = workGraphErrorToPacket(
       { error_code: 'plan_claim_required' },
