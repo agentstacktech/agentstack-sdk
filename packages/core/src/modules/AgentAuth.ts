@@ -1440,6 +1440,8 @@ export class AgentAuth extends SimpleEventEmitter {
         skipBatching: true,
         skipCache: true,
         signal: ac.signal,
+        // Cold start after deploy: default 15s client timeout is too tight vs bootstrap BFF.
+        timeout: 35_000,
       });
       if (ac.signal.aborted) {
         throw new Error('Session bootstrap aborted (stale jti discarded)');

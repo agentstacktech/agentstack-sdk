@@ -112,6 +112,11 @@ describe('classifyAuthFailure', () => {
     expect(isTransientSessionBootstrapError(err)).toBe(true);
   });
 
+  it('isTransientSessionBootstrapError covers client HTTP timeout', () => {
+    const err = { name: 'TimeoutError', message: 'Request timeout' };
+    expect(isTransientSessionBootstrapError(err)).toBe(true);
+  });
+
   it('isNonRetryableAuthOrShed allows RQ retry on transient session_not_found', () => {
     const err = new UnauthorizedError('miss', {
       status: 401,

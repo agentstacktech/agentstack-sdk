@@ -123,9 +123,18 @@ export function sessionBootstrapRetryDelayMs(round: number): number {
   return ladder[Math.min(Math.max(0, round), ladder.length - 1)] ?? 2_500;
 }
 
+/** Client abort / slow VPS boot — retry bootstrap without vault purge. */
+export function isHttpClientTimeout(err: unknown): boolean {
+  const { name, message } = extractAuthErrorFields(err);
+  if (name === 'TimeoutError') return true;
+  const msg = message.toLowerCase();
+  return msg.includes('request timeout') || msg.includes('http timeout');
+}
+
 /** True when bootstrap should retry without clearing local auth. */
 export function isTransientSessionBootstrapError(err: unknown): boolean {
   const { status, apiCode, sessionMissReason } = extractAuthErrorFields(err);
+  if (isHttpClientTimeout(err)) return true;
   if (apiCode === 'authz_generation_stale') return true;
   if (status === 503 && apiCode === 'session_resolve_busy') return true;
   if (apiCode === 'session_not_found' && isTransientSessionMissReason(sessionMissReason)) {
