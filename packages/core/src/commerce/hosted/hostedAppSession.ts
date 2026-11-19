@@ -17,6 +17,42 @@ export type MintHostedAppSessionOptions = {
 };
 
 const mintedHostedMcpPids = new Set<number>();
+const GUEST_KEY_STORAGE_PREFIX = 'agentstack:guest_key:';
+
+export function readGuestApiKey(projectId: number): string {
+  if (typeof globalThis === 'undefined' || !('sessionStorage' in globalThis)) {
+    return '';
+  }
+  try {
+    return String(
+      (globalThis as { sessionStorage: Storage }).sessionStorage.getItem(
+        `${GUEST_KEY_STORAGE_PREFIX}${Number(projectId)}`,
+      ) || '',
+    ).trim();
+  } catch {
+    return '';
+  }
+}
+
+export function storeGuestApiKey(projectId: number, apiKey: string): void {
+  if (typeof globalThis === 'undefined' || !('sessionStorage' in globalThis)) {
+    return;
+  }
+  const key = String(apiKey || '').trim();
+  if (!key) return;
+  try {
+    (globalThis as { sessionStorage: Storage }).sessionStorage.setItem(
+      `${GUEST_KEY_STORAGE_PREFIX}${Number(projectId)}`,
+      key,
+    );
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+function isEphemeralGuestKey(apiKey: string): boolean {
+  return String(apiKey || '').startsWith('eph_ask_');
+}
 
 /** Skip redundant POST /hosted-apps/.../session when already minted this tab. */
 export function hostedMcpCookieMinted(projectId: number): boolean {
@@ -78,7 +114,10 @@ export async function mintHostedAppSession(
  * Caller must pass an SDK/config with auth.loginByKey + anonymousProvision.
  */
 export type HostedPlayerBootstrapDeps = {
-  anonymousProvision: (args: { project_id: number }) => Promise<{ api_key: string }>;
+  anonymousProvision: (args: {
+    project_id: number;
+    api_key?: string;
+  }) => Promise<{ api_key: string; access_token?: string }>;
   loginByKey: (args: { api_key: string; project_id: number }) => Promise<{ access_token: string }>;
 };
 
@@ -117,13 +156,28 @@ export async function bootstrapHostedPlayerSession(
   deps: HostedPlayerBootstrapDeps,
   options?: MintHostedAppSessionOptions,
 ): Promise<void> {
-  const prov = await deps.anonymousProvision({ project_id: projectId });
-  const login = await deps.loginByKey({
-    api_key: prov.api_key,
+  const reuse = readGuestApiKey(projectId);
+  const prov = await deps.anonymousProvision({
     project_id: projectId,
+    ...(reuse ? { api_key: reuse } : {}),
   });
-  storeHostedSession(login.access_token, projectId);
-  await mintHostedAppSession(projectId, login.access_token, options);
+  const apiKey = String(prov.api_key || reuse || '').trim();
+  if (apiKey) {
+    storeGuestApiKey(projectId, apiKey);
+  }
+  let accessToken = String(prov.access_token || '').trim();
+  if (!accessToken) {
+    const login = await deps.loginByKey({
+      api_key: apiKey,
+      project_id: projectId,
+    });
+    accessToken = String(login.access_token || '').trim();
+  }
+  if (!accessToken) {
+    throw new Error('hosted_player_missing_access_token');
+  }
+  storeHostedSession(accessToken, projectId);
+  await mintHostedAppSession(projectId, accessToken, options);
 }
 
 export function isHostedTenantPath(locationLike?: { pathname?: string }): boolean {

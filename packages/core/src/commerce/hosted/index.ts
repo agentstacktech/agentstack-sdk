@@ -32,6 +32,8 @@ export {
   markHostedMcpCookieMinted,
   isHostedTenantPath,
   mintHostedAppSession,
+  readGuestApiKey,
+  storeGuestApiKey,
   type HostedPlayerBootstrapDeps,
   type MintHostedAppSessionOptions,
 } from './hostedAppSession';

@@ -1173,15 +1173,23 @@ export class AgentAuth extends SimpleEventEmitter {
    * Optional ``anonBootstrapKey`` becomes header ``X-Anon-Bootstrap-Key`` when set.
    */
   async anonymousProvision(
-    body: { project_id: number },
-    options?: { anonBootstrapKey?: string },
+    body: { project_id: number; api_key?: string },
+    options?: { anonBootstrapKey?: string; guestApiKey?: string },
   ): Promise<Record<string, unknown>> {
     return this.errorHandler.executeWithErrorHandling(async () => {
       const headers: Record<string, string> = {};
       if (options?.anonBootstrapKey) {
         headers['X-Anon-Bootstrap-Key'] = options.anonBootstrapKey;
       }
-      const response = await this.client.post('/auth/anonymous/provision', body, {
+      const reuse = String(options?.guestApiKey || body.api_key || '').trim();
+      if (reuse) {
+        headers['X-Guest-Key'] = reuse;
+      }
+      const payload = { ...body };
+      if (reuse && !payload.api_key) {
+        payload.api_key = reuse;
+      }
+      const response = await this.client.post('/auth/anonymous/provision', payload, {
         skipAuthStateCheck: true,
         ...(Object.keys(headers).length ? { headers } : {}),
       } as any);
