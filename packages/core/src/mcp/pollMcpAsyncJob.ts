@@ -22,6 +22,8 @@ function jobIdFromRecord(rec: Record<string, unknown> | null): string | null {
   if (direct) return direct;
   const taskId = jobIdString(asRecord(rec.task)?.taskId);
   if (taskId) return taskId;
+  const fromPoll = jobIdString(asRecord(asRecord(rec.poll)?.params)?.job_id);
+  if (fromPoll) return fromPoll;
   const data = asRecord(rec.data);
   if (data && data !== rec) {
     const nested = jobIdString(data.job_id) ?? jobIdString(asRecord(data.task)?.taskId);
@@ -34,11 +36,34 @@ function jobIdFromRecord(rec: Record<string, unknown> | null): string | null {
   return null;
 }
 
+function jobIdFromToolsCallText(rec: Record<string, unknown>): string | null {
+  const result = asRecord(rec.result) ?? rec;
+  const content = result.content;
+  if (!Array.isArray(content)) return null;
+  for (const block of content) {
+    const text = asRecord(block)?.text;
+    if (typeof text !== 'string' || !text.trim()) continue;
+    try {
+      const parsed = jobIdFromRecord(asRecord(JSON.parse(text) as unknown));
+      if (parsed) return parsed;
+    } catch {
+      /* not JSON */
+    }
+  }
+  return null;
+}
+
 export function extractMcpAsyncJobId(envelope: unknown): string | null {
   const root = asRecord(envelope);
   if (!root) return null;
   const data = asRecord(root.data) ?? root;
-  return jobIdFromRecord(data) ?? jobIdFromRecord(root);
+  const fromData = jobIdFromRecord(data);
+  if (fromData) return fromData;
+  return (
+    jobIdFromRecord(root) ??
+    jobIdFromRecord(asRecord(root.result)) ??
+    jobIdFromToolsCallText(root)
+  );
 }
 
 function looksLikeJobStatus(rec: Record<string, unknown>): boolean {

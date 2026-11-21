@@ -149,6 +149,33 @@ describe('pollingTransport', () => {
     expect(status.at(-1)).toBe('offline');
     await expect(link.send({ k: 'clock' })).rejects.toThrow(/closed/);
   });
+
+  it('rttMs floors idle poll stretch (coop Nahual)', async () => {
+    vi.useFakeTimers();
+    const polls: number[] = [];
+    const api: RoomApi = {
+      privateEntries: true,
+      async join() {
+        return { self: 'me' };
+      },
+      async append() {},
+      async poll(_r, after) {
+        polls.push(Date.now());
+        return [];
+      },
+    };
+    const link = await pollingTransport(api, {
+      intervalMs: 50,
+      idleMaxMs: 500,
+      rttMs: 400,
+    }).connect('r', { afterSeq: 0, onEntries: () => {} });
+    await vi.advanceTimersByTimeAsync(350);
+    link.close();
+    expect(polls.length).toBeGreaterThanOrEqual(1);
+    if (polls.length >= 2) {
+      expect(polls[1]! - polls[0]!).toBeGreaterThanOrEqual(300);
+    }
+  });
 });
 
 describe('wssTransport', () => {

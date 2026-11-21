@@ -40,6 +40,13 @@ export {
 
 export {
   HOSTED_MCP_RECOVERABLE_CODES,
+  hostedMcpRetryDelayMs,
+  isHostedMcpRecoverableCode,
+  sleepMs,
+  type HostedMcpRecoverableCode,
+} from './hostedRecoverable';
+
+export {
   hostedRunPhase,
   isHostedMcpRetryableError,
   mapHostedMcpPlayerError,

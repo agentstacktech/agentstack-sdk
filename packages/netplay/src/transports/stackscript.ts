@@ -112,6 +112,16 @@ export function stackscriptRoomApi(runner: ScriptRunner, o: StackscriptRoomOptio
   };
 }
 
+/** Recommended opts for scalar coop relay (~20 Hz target) — `stackscriptTransport(runner, { ...COOP_STACKSCRIPT_POLLING_OPTS })`. */
+export const COOP_STACKSCRIPT_POLLING_OPTS: Pick<
+  StackscriptRoomOptions,
+  'intervalMs' | 'idleMaxMs' | 'sendEveryMs'
+> = {
+  intervalMs: 50,
+  idleMaxMs: 500,
+  sendEveryMs: 100,
+};
+
 /** Defaults for the hosted room: inputs batched every 100 ms, entries piggybacked on appends, poll 400 ms stretching to 2 s in a quiet room (presence beats and hash checks do not count as activity). */
 export function stackscriptTransport(runner: ScriptRunner, o: StackscriptRoomOptions): Transport {
   return pollingTransport(stackscriptRoomApi(runner, o), { sendEveryMs: 100, idleMaxMs: 2000, ...o });

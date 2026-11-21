@@ -6,6 +6,7 @@ import type { HTTPClient } from '../client/http-client';
 
 export const DEPLOY_RECIPES = {
   siteGrowth: 'mcp_site_growth_v1',
+  gitJournal: 'mcp_hosting_git_journal_v1',
   workspaceBuild: 'mcp_hosting_workspace_build_v1',
   surfaceRoute: 'mcp_deploy_surface_route_v1',
   appStudioCreate: 'mcp_app_studio_create_v1',

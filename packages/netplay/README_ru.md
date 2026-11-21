@@ -37,3 +37,12 @@ commit–reveal, приватные `view` в `authority`) · input delay и `co
 Раннер — клиент из основного SDK: `new AgentStackSDK({...}).stackscript(projectId, { hostedMcp: true })`
 (для игроков на hosted-странице; без `hostedMcp` — с API-ключом для агентов/серверов). Скрипт комнаты:
 `generateRoomScript(game, { prefix })` или `npm run gen:room -- <id> <min> <max>`; публикация — только инструментами платформы.
+
+### Выбор транспорта (Nahual vs War Tactics)
+
+| Сценарий | Транспорт | Опции |
+|----------|-----------|--------|
+| Скалярный кооп (Nahual `nhl.*`) | `createHostedWire` / точечный `script.run` | `hostedRunPhase` при defer |
+| Журнал комнаты (WT, lockstep) | `stackscriptTransport` | `COOP_STACKSCRIPT_POLLING_OPTS` или `intervalMs: 50`, `rttMs` |
+| Локальные тесты | `memoryHub().transport` | — |
+| QM + WSS (THERMO) | `rooms.quick_match` → `wssTransport` | не подменять DNA coop |

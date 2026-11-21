@@ -151,7 +151,8 @@ export function createStackScriptMatchClient(
     expectedRevision?: number;
     /**
      * Poll ecosystem.scripts.runtime.{matchId}.revision when input carries matchId
-     * and expectedRevision is omitted (default true).
+     * and expectedRevision is omitted. Default false — pass true or supply expectedRevision
+     * (Nahual scalar coop should skip extra MCP before each scan).
      */
     pollRevision?: boolean;
   }) => {
@@ -161,7 +162,7 @@ export function createStackScriptMatchClient(
       input && typeof input === 'object' && !Array.isArray(input)
         ? readMatchIdFromTurnInput(input as Record<string, unknown>)
         : '';
-    if (args.pollRevision !== false && expectedRevision == null && matchId) {
+    if (args.pollRevision === true && expectedRevision == null && matchId) {
       expectedRevision = await pollMatchRevision({ matchId });
     }
     if (

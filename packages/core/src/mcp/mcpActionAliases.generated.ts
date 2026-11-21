@@ -71,6 +71,7 @@ export const MCP_ACTION_ALIASES: Record<string, string> = {
   "bots.mailbox.list": "bots.bus.inbox",
   "bots.mailbox.poll": "bots.bus.inbox",
   "bots.mailbox.reply": "bots.staff_reply",
+  "buffs.list": "buffs.list_active_buffs",
   "buffs.revoke": "buffs.cancel_buff",
   "capabilities.effective": "permissions.effective",
   "catalog.search": "discovery.search",

@@ -5,16 +5,13 @@
 import { isTransientSessionMissReason } from '../../utils/classifyAuthFailure';
 import { buildHostedCommerceHeaders } from './requestHeaders';
 import { isHostedPostLoginGraceActive, readHostedSessionToken } from './sessionVault';
+import { sleepMs } from './hostedRecoverable';
 
 export type ProbeHostedSessionOptions = {
   projectId: number;
   apiBase?: string;
   fetchFn?: typeof fetch;
 };
-
-function sleepMs(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 async function readAuthDetailCode(res: Response): Promise<string> {
   try {

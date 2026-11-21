@@ -34,6 +34,8 @@ export interface PollingOptions {
   sendEveryMs?: number;
   /** Quiet room: each empty poll stretches the period ×1.5 up to this (ms); new entries or our own send reset it. Default = intervalMs. */
   idleMaxMs?: number;
+  /** When set, never poll faster than ~0.8× measured MCP/relay RTT (coop Nahual: avoids idle-stretch below network floor). */
+  rttMs?: number;
 }
 
 /** Same curve as `pollBackoffMs` in @agentstack/sdk stackscript (base·2^n, capped). */
@@ -46,6 +48,10 @@ const active = (e: { body: Body }): boolean => { const k = (e.body as { k?: stri
 
 export function pollingTransport(api: RoomApi, o: PollingOptions = {}): Transport {
   const interval = o.intervalMs ?? 400;
+  const rttFloor =
+    o.rttMs != null && Number.isFinite(o.rttMs) && o.rttMs > 0
+      ? Math.round(o.rttMs * 0.8)
+      : 0;
   const cap = o.maxBackoffMs ?? 5000;
   const maxErrors = o.maxErrors ?? 6;
   return {
@@ -65,13 +71,13 @@ export function pollingTransport(api: RoomApi, o: PollingOptions = {}): Transpor
       let chain: Promise<unknown> = Promise.resolve();
       // after a failed append nothing later may reach the server first (the session re-sends from the failure, in order)
       let broken = false;
-      let period = interval;
+      let period = Math.max(interval, rttFloor);
       let floor = 0; // background tab: poll no faster than this (Link.pace)
       const deliver = (es: readonly Entry[]): void => {
         const fresh = es.filter((e) => e.seq > cursor);
         if (!fresh.length) return;
         // heartbeats / hash checks are not activity: a room where both players think keeps stretching its poll
-        if (fresh.some(active)) period = interval;
+        if (fresh.some(active)) period = Math.max(interval, rttFloor);
         cursor = fresh[fresh.length - 1]!.seq;
         opts.onEntries(fresh);
       };
@@ -93,7 +99,10 @@ export function pollingTransport(api: RoomApi, o: PollingOptions = {}): Transpor
           rateHits = 0;
           const before = cursor;
           deliver(es);
-          if (cursor === before) period = Math.min(o.idleMaxMs ?? interval, Math.round(period * 1.5));
+          if (cursor === before) {
+            period = Math.min(o.idleMaxMs ?? interval, Math.round(period * 1.5));
+            period = Math.max(period, rttFloor);
+          }
           opts.onStatus?.('online');
         } catch (err) {
           const kind = err instanceof NetplayError ? err.kind : 'offline';
@@ -134,7 +143,7 @@ export function pollingTransport(api: RoomApi, o: PollingOptions = {}): Transpor
         close() { alive = false; if (timer) clearTimeout(timer); },
       };
       const enqueue = (items: readonly { body: Body; to?: string }[]): Promise<void> => {
-          if (items.some((it) => active(it))) period = interval; // we are active: look for answers at the normal pace
+          if (items.some((it) => active(it))) period = Math.max(interval, rttFloor);
           if (!alive || broken) return Promise.reject(new Error('polling: link closed'));
           // serialize appends so the server sees them in call order
           const p = chain.then(async () => {

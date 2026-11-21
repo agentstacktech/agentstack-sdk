@@ -17,6 +17,7 @@ import {
   mintHostedAppSession,
 } from './hostedAppSession';
 import { isHostedMcpRetryableError, mapHostedMcpPlayerError } from './hostedMcpPlayerError';
+import { sleepMs } from './hostedRecoverable';
 
 export type HostedMcpStepSpec = {
   id: string;
@@ -114,22 +115,6 @@ function hostedMcpRetryDelayMs(err: unknown, capMs: number, fallbackMs: number):
     return Math.min(capMs, Math.max(0, Math.floor(n)));
   }
   return Math.min(capMs, fallbackMs);
-}
-
-function sleepMs(ms: number, signal?: AbortSignal): Promise<void> {
-  if (ms <= 0) return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(new DOMException('Aborted', 'AbortError'));
-      return;
-    }
-    const timer = setTimeout(resolve, ms);
-    const onAbort = () => {
-      clearTimeout(timer);
-      reject(new DOMException('Aborted', 'AbortError'));
-    };
-    signal?.addEventListener('abort', onAbort, { once: true });
-  });
 }
 
 /** Hosted script.run transport with db_unavailable / run_lock retry (same steps + idempotency). */

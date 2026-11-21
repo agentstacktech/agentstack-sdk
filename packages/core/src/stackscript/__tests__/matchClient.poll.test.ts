@@ -51,6 +51,7 @@ describe('createStackScriptMatchClient', () => {
       export: 'applyTurn',
       input: { matchId: 'm1', move: 1 },
       idempotencyKey: 'm1:2:p:applyTurn',
+      pollRevision: true,
     });
     expect(http.post).toHaveBeenCalledWith(
       '/mcp',

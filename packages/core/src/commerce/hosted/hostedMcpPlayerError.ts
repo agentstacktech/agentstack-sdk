@@ -1,27 +1,12 @@
 /** Map hosted player MCP failures for game UX (G6b W5-2). Gene: sdk.commerce.hosted.gen1 */
 
+import { HOSTED_MCP_RECOVERABLE_CODES } from './hostedRecoverable';
+
 export type HostedMcpPlayerError = {
   code: string;
   message: string;
   recoverable: boolean;
 };
-
-/** Machine codes that may use executeHostedMcpStepsWithRetry (G6b / Nahual open). */
-export const HOSTED_MCP_RECOVERABLE_CODES = [
-  'hosted_cookie_missing',
-  'hosted_app_required',
-  'auth_required',
-  'export_not_public',
-  'text_revision_conflict',
-  'hosted_shared_data_denied',
-  'db_unavailable',
-  'revision_prefetch_failed',
-  'revision_conflict',
-  'run_in_progress',
-  'run_lock_timeout',
-  'neural_flush',
-  'neural_flush_backlog',
-] as const;
 
 function bodyFailurePhase(body: unknown): string {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return '';
@@ -91,7 +76,9 @@ export function mapHostedMcpPlayerError(err: unknown): HostedMcpPlayerError {
   ) {
     resolvedCode = failurePhase;
   }
-  const recoverable = new Set<string>(HOSTED_MCP_RECOVERABLE_CODES).has(resolvedCode);
+  const recoverable = (HOSTED_MCP_RECOVERABLE_CODES as readonly string[]).includes(
+    resolvedCode,
+  );
   const message =
     resolvedCode === 'neural_flush' || resolvedCode === 'neural_flush_backlog'
       ? 'Match state is syncing to the server — keep the same action; we will retry shortly.'

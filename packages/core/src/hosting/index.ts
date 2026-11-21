@@ -58,6 +58,23 @@ export {
   type HostingDeployReceipt,
 } from './hostingDeployReceipt';
 export { workspacePathsToPush } from './workspacePathsToPush';
+export { pollBuildUntilTerminal, type BuildStatusPollResult, type PollBuildOptions } from './pollBuildUntilTerminal';
+export {
+  journalBuildReceiptSchema,
+  parseJournalBuildReceipt,
+  type JournalBuildReceipt,
+} from './journalBuildReceipt';
+export {
+  pollPreviewUntilReady,
+  readJournalShipPlane,
+  type JournalShipClient,
+} from './journalShip';
+export {
+  getHostingGitStatus,
+  getHostingBuildJobStatus,
+  promoteHostingGitBranch,
+  type HostingGitStatus,
+} from './gitJournal';
 export {
   routeDeploySurface,
   DEPLOY_RECIPES,
