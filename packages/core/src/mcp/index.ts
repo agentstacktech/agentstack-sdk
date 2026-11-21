@@ -11,7 +11,10 @@ export {
 } from './urls';
 export {
   MCP_CLIENT_HEAVY_SYNC_TIMEOUT_MS,
+  MCP_SYNC_BATCH_CLIENT_TIMEOUT_MS,
+  MCP_SYNC_BATCH_LANE_MS_DEFAULT,
   readMcpExecuteBudget,
+  resolveMcpSyncBatchClientTimeoutMs,
   type McpExecuteBudget,
   type McpExecuteBudgetAsync,
 } from './budgets';

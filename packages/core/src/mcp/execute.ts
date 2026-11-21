@@ -7,6 +7,7 @@
 import { canonicalMcpAction } from './mcpActionAliases.generated';
 import { stepNeedsSemanticAnchor } from './batchParamAnchorEval';
 import { parseMcpExecuteUiOutcome } from './parseMcpExecuteUiOutcome';
+import { MCP_SYNC_BATCH_CLIENT_TIMEOUT_MS } from './budgets';
 import { MCP_WORK_GRAPH_HOIST_KEYS, normalizeMcpWorkGraphPayload } from './workGraphHoist';
 
 export interface McpStep {
@@ -434,6 +435,7 @@ export async function mcpExecute(
     },
   };
 
+  const requestTimeoutMs = opts.timeoutMs ?? MCP_SYNC_BATCH_CLIENT_TIMEOUT_MS;
   const maxAttempts = Math.max(1, opts.maxAttempts ?? 4);
   let delayMs = 1000;
   let lastRaw: unknown = null;
@@ -441,10 +443,9 @@ export async function mcpExecute(
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const timer =
-      controller && opts.timeoutMs
-        ? setTimeout(() => controller.abort(), opts.timeoutMs)
-        : null;
+    const timer = controller
+      ? setTimeout(() => controller.abort(), requestTimeoutMs)
+      : null;
     try {
       const headers: Record<string, string> = {
         Authorization: `Bearer ${effectiveOpts.token}`,

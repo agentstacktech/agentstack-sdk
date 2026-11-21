@@ -262,7 +262,7 @@ export interface McpSessionSetupLadderPhase {
 
 /** Mandatory session order (auth → project → context → work). Parity with ``session_setup_ladder_steps``. */
 export function sessionSetupLadderPhases(): McpSessionSetupLadderPhase[] {
-                                                                                                                                                                                                                                                                                                                                          return [
+                                                                                                                                                                                                                                                                                                                                            return [
     { phase: 1, id: 'authenticate', title: 'Authenticate' },
     { phase: 2, id: 'project', title: 'Select or create project', recipeId: 'mcp_session_setup' },
     { phase: 3, id: 'bind_context', title: 'Bind context.project_id' },
@@ -293,7 +293,7 @@ export interface McpClosedLoopLadderStep {
 
 /** Parity with onboarding bundle ``closed_loop_ladder``. */
 export function closedLoopLadderSteps(): McpClosedLoopLadderStep[] {
-                                                                                                                                                                                                                                                                                                                                                                                    return [
+                                                                                                                                                                                                                                                                                                                                                                                      return [
     {
       step: 0,
       stepId: 'session',
@@ -385,7 +385,7 @@ export const WORK_GRAPH_WHEN_BLOCKED = {
   join_not_allowed: "Project is not open-join — request invite or projects.add_user from an owner.",
   provision_required: "ensure_agent create=false (H5) then create=true then plan_claim",
   no_compatible_agent: "agents.ensure_agent create=false (H5) then create=true, or plan_propose mode=repair_plan",
-  operator_closure: "Platform ops leaf — no required_role: close with agents.plan_patch (set_meta gates_passed + gate_evidence, FSM in_progress→verifying→completed). discovery.describe agents.plan_patch for ops_compact.",
+  operator_closure: "operator_closure: tell the user in chat (operator_gate.messages) and ask yes/no. agents.plan_patch gates_passed only after an explicit yes. terminal means wait, not skip the leaf.",
   planning_required: "agents.plan_propose mode=create_plan or decompose_node — strategic/decomposition node, not execution",
   planning_blocked: "agents.plan_propose mode=decompose_node or plan_process_backlog — finish planner plane first",
   dependency_blocked: "agents.plan_get to inspect upstream deps; do not ensure_agent; do not claim",
@@ -531,9 +531,9 @@ export const WORK_GRAPH_WHEN_BLOCKED_LOCALES = {
     "pt-BR": "Sem agente na frota — agents.ensure_agent create=false (H5) depois create=true ou repair_plan",
   },
   "operator_closure": {
-    "en-US": "Platform ops leaf — close via agents.plan_patch (gates_passed + gate_evidence); not ensure_agent",
-    "ru-RU": "Платформенная ops-задача без роли — закрыть agents.plan_patch (gates_passed + gate_evidence), не ensure_agent",
-    "pt-BR": "Tarefa ops de plataforma — fechar com agents.plan_patch (gates_passed + gate_evidence), não ensure_agent",
+    "en-US": "operator_closure: tell the user in chat (operator_gate.messages) and ask yes/no. agents.plan_patch gates_passed only after an explicit yes. terminal means wait, not skip the leaf.",
+    "ru-RU": "operator_closure: скажи пользователю в чате (operator_gate.messages) и спроси да/нет. agents.plan_patch (gates_passed) только после явного «да». terminal = ждать, не пропускать узел.",
+    "pt-BR": "operator_closure: diga ao usuário no chat (operator_gate.messages) e peça sim/não. agents.plan_patch só depois do sim. terminal significa esperar, não pular o nó.",
   },
   "idle": {
     "en-US": "Empty graph at revision 0 is idle — agents.plan_propose to seed work; compact work_next skips fleet load",
@@ -810,7 +810,7 @@ export function httpBootstrapLadderSteps(apiBase = ''): McpHttpBootstrapLadderSt
 
 /** Parity with onboarding bundle ``discovery_ladder`` (relative paths). */
 export function discoveryLadderSteps(): McpDiscoveryLadderStep[] {
-                                                                                                                                                                                                                                                                                                                                          return [
+                                                                                                                                                                                                                                                                                                                                            return [
     {
       step: 0,
       label: 'Session probe',

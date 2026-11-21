@@ -30,7 +30,9 @@ function agentsSandboxPostOptions(
   return { ...base, headers };
 }
 import type { RunErrorV1 } from '../agents/runError';
-import { extractBatchMeta } from '../mcp/execute';
+import { extractBatchMeta, extractResults, mcpExecute } from '../mcp/execute';
+import { MCP_SYNC_BATCH_CLIENT_TIMEOUT_MS } from '../mcp/budgets';
+import { resolveMcpUrl } from '../mcp/urls';
 import {
   isPersonalGraphHome,
   isSandboxEnvAllowedForGraphHome,
@@ -1403,17 +1405,27 @@ export class AgentsFleet {
     if (locale) {
       context.locale = locale;
     }
-    const res = await this.client.post('/mcp', {
-      steps: [
+    const token = this.client.getAuthToken?.() ?? undefined;
+    if (!token) {
+      throw new Error('MCP: missing auth token');
+    }
+    const apiBase = this.client.getConfig().apiBase ?? '';
+    const mcpUrl = resolveMcpUrl(apiBase);
+    const envelope = (await mcpExecute(
+      [
         {
           id: action,
           action,
           params: { project_id: projectId, ...params },
         },
       ],
-      context,
-    });
-    const envelope = res.data as {
+      {
+        token,
+        projectId,
+        mcpUrl,
+        timeoutMs: MCP_SYNC_BATCH_CLIENT_TIMEOUT_MS,
+      },
+    )) as {
       ok?: boolean;
       error_code?: string;
       results?: Array<{
@@ -1425,7 +1437,6 @@ export class AgentsFleet {
       }>;
       data?: Record<string, unknown>;
     };
-    const { extractResults } = await import('../mcp/execute');
     const steps = extractResults(envelope);
     const step = steps[0];
     const batchMeta = extractBatchMeta(envelope);

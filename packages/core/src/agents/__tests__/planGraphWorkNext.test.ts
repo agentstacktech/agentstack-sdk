@@ -66,6 +66,22 @@ describe('parseWorkNextPacket', () => {
     expect(packet.next_work?.suggested_agent_id).toBe('test-fleet-agent');
   });
 
+  it('preserves operator_gate on compact operator_closure packets', () => {
+    const packet = parseWorkNextPacket({
+      state: 'blocked',
+      blocked_reason_code: 'operator_closure',
+      operator_gate: {
+        required: true,
+        ask_user_in_chat: true,
+        node_id: 'ep-art-04',
+        project_id: 897583,
+        messages: { en: 'Ask in chat', ru: 'Спроси в чате' },
+      },
+    });
+    expect(packet.operator_gate?.ask_user_in_chat).toBe(true);
+    expect(packet.operator_gate?.messages?.ru).toContain('чате');
+  });
+
   it('parses execution block from harness-shaped next_work', () => {
     const raw = {
       state: 'blocked',

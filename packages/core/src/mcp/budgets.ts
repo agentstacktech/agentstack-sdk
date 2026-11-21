@@ -26,6 +26,28 @@ export interface McpExecuteBudget {
 /** Client default for lone heavy sync — headroom over server `ai_stream` lane. */
 export const MCP_CLIENT_HEAVY_SYNC_TIMEOUT_MS = 195_000;
 
+/** Default sync batch lane when discovery omits execute_budget (mirrors LANE_CAPS_MS.mcp_batch). */
+export const MCP_SYNC_BATCH_LANE_MS_DEFAULT = 120_000;
+
+/** HTTP client timeout for agentstack.execute sync batches: lane + 10s slack. */
+export const MCP_SYNC_BATCH_CLIENT_TIMEOUT_MS = MCP_SYNC_BATCH_LANE_MS_DEFAULT + 10_000;
+
+/** Resolve sync batch client timeout from published execute_budget (Compass / sdk.protocol). */
+export function resolveMcpSyncBatchClientTimeoutMs(
+  discoveryOrActions: Record<string, unknown> | null | undefined,
+): number {
+  const budget = readMcpExecuteBudget(discoveryOrActions);
+  const laneMs =
+    (typeof budget?.timeout_ms === 'number' && budget.timeout_ms > 0
+      ? budget.timeout_ms
+      : undefined) ??
+    (typeof budget?.sync_lane_ms === 'number' && budget.sync_lane_ms > 0
+      ? budget.sync_lane_ms
+      : undefined) ??
+    MCP_SYNC_BATCH_LANE_MS_DEFAULT;
+  return laneMs + 10_000;
+}
+
 export function readMcpExecuteBudget(
   discoveryOrActions: Record<string, unknown> | null | undefined,
 ): McpExecuteBudget | undefined {

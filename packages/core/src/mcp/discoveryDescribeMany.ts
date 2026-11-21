@@ -5,7 +5,9 @@
 
 import type { HTTPClient } from '../client/http-client';
 import { normalizeMcpToolEnvelope } from '../agents/planGraph';
-import { extractResults } from './execute';
+import { extractResults, mcpExecute } from './execute';
+import { MCP_SYNC_BATCH_CLIENT_TIMEOUT_MS } from './budgets';
+import { resolveMcpUrl } from './urls';
 
 export type DescribeWireMode = 'slim' | 'default' | 'full';
 
@@ -74,13 +76,18 @@ function parseDescribeManyPayload(payload: unknown): DescribeManyResult {
 }
 
 /**
- * POST /mcp batch with a single discovery.describe_many step (browser / HTTPClient transport).
+ * MCP batch with a single discovery.describe_many step (budget-aware client timeout).
  */
 export async function discoveryDescribeMany(
   client: HTTPClient,
   params: DiscoveryDescribeManyParams,
 ): Promise<DescribeManyResult> {
   const actions = dedupeActions(params.actions);
+  const token = client.getAuthToken?.() ?? undefined;
+  if (!token) {
+    throw new Error('MCP: missing auth token');
+  }
+  const apiBase = client.getConfig().apiBase ?? '';
   const context: Record<string, unknown> = { project_id: params.projectId };
   const locale = String(params.locale ?? '').trim();
   if (locale) {
@@ -94,22 +101,21 @@ export async function discoveryDescribeMany(
   if (params.expand?.length) {
     mcpParams.expand = params.expand;
   }
-  const res = await client.post('/mcp', {
-    steps: [
+  const envelope = await mcpExecute(
+    [
       {
         id: 'discovery.describe_many',
         action: 'discovery.describe_many',
         params: mcpParams,
       },
     ],
-    context,
-  });
-  const envelope = res.data as {
-    ok?: boolean;
-    error_code?: string;
-    results?: Array<Record<string, unknown>>;
-    data?: Record<string, unknown>;
-  };
+    {
+      token,
+      projectId: params.projectId,
+      mcpUrl: resolveMcpUrl(apiBase),
+      timeoutMs: MCP_SYNC_BATCH_CLIENT_TIMEOUT_MS,
+    },
+  );
   const steps = extractResults(envelope);
   const step = steps[0];
   const failed =
@@ -118,9 +124,7 @@ export async function discoveryDescribeMany(
     Boolean(step?.error || step?.error_code);
   if (failed) {
     const code = String(step?.error_code || step?.error || envelope.error_code || 'mcp_error');
-    const err = new Error(code) as Error & { error_code?: string };
-    err.error_code = code;
-    throw err;
+    throw new Error(code);
   }
   const rawPayload = step?.result ?? step?.data ?? envelope.data ?? envelope;
   const { data: normalized } = normalizeMcpToolEnvelope(rawPayload);

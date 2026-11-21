@@ -797,6 +797,18 @@ export function planSummaryExecutionReadyLeaves(
   return typeof raw === 'number' && Number.isFinite(raw) ? raw : Number(raw) || 0;
 }
 
+/** operator_closure human gate — mirrors ``build_operator_closure_gate`` wire. */
+export type WorkNextOperatorGate = {
+  required?: boolean;
+  ask_user_in_chat?: boolean;
+  node_id?: string;
+  project_id?: number;
+  messages?: Record<string, string>;
+  recovery_hint?: string;
+  agent_must_speak?: boolean;
+  silence_is_failure?: boolean;
+};
+
 export type WorkNextPacket = {
   goal?: { id?: string; title?: string; progress?: unknown };
   /** Server instruction focus (may differ from URL focus_node_id). */
@@ -862,6 +874,8 @@ export type WorkNextPacket = {
   recovery?: Record<string, unknown>;
   /** Localized operator hint when state=blocked (mcp_recovery). */
   recovery_hint?: string;
+  /** Speak-first operator gate when blocked_reason is operator_closure. */
+  operator_gate?: WorkNextOperatorGate;
   locale?: string;
   instruction_packet?: Record<string, unknown>;
   /** Goal-root pin inventory. Pointers survive step changes; bodies stay on the full packet skills. */
@@ -1577,6 +1591,9 @@ export function parseWorkNextPacket(raw: unknown): WorkNextPacket {
     ...(recovery ? { recovery } : {}),
     ...(typeof row.recovery_hint === 'string' && row.recovery_hint.trim()
       ? { recovery_hint: row.recovery_hint.trim() }
+      : {}),
+    ...(row.operator_gate && typeof row.operator_gate === 'object'
+      ? { operator_gate: row.operator_gate as WorkNextOperatorGate }
       : {}),
     ...(typeof row.locale === 'string' && row.locale.trim()
       ? { locale: row.locale.trim() }
