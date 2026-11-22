@@ -214,6 +214,7 @@ describe('AgentsFleet approvals', () => {
         blocked_limit: '16',
         detail: 'full',
       }),
+      timeout: 130_000,
     });
   });
 
@@ -227,6 +228,7 @@ describe('AgentsFleet approvals', () => {
 
     expect(get).toHaveBeenCalledWith('/api/projects/9/orchestrator/work-next', {
       params: expect.objectContaining({ env_uuid: 'sandbox-env-1' }),
+      timeout: 130_000,
     });
   });
 
@@ -244,6 +246,7 @@ describe('AgentsFleet approvals', () => {
 
     expect(get).toHaveBeenCalledWith('/api/projects/9/orchestrator/work-next', {
       params: expect.objectContaining({ home: 'project_self' }),
+      timeout: 130_000,
     });
     const params = get.mock.calls[0][1]?.params as Record<string, unknown>;
     expect(params.env_uuid).toBeUndefined();

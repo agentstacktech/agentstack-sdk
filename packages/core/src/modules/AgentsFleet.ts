@@ -1220,6 +1220,7 @@ export class AgentsFleet {
       }
       const res = await this.client.get(`${this.orchestratorBase(projectId)}/work-next`, {
         params: query,
+        timeout: MCP_SYNC_BATCH_CLIENT_TIMEOUT_MS,
       });
       const data = res.data as Record<string, unknown>;
       return parseWorkNextPacket(data as Record<string, unknown>);
@@ -1253,6 +1254,7 @@ export class AgentsFleet {
       const res = await this.client.post(
         `${this.orchestratorBase(projectId)}/work-next`,
         postBody,
+        { timeout: MCP_SYNC_BATCH_CLIENT_TIMEOUT_MS },
       );
       const data = res.data as Record<string, unknown>;
       return parseWorkNextPacket(data as Record<string, unknown>);

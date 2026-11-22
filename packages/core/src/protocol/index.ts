@@ -12,6 +12,7 @@ export {
   type DiscoveryDescribeManyParams,
 } from './discovery';
 export { SerialMutationQueue } from './command-queue';
+export { executeBatchSplit, splitMcpBatchByScope, type McpBatchPayload, type McpBatchStep } from './mcpBatchSplit';
 export {
   parsePath,
   getPath,

@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "genetic_tag": "shared.mcp.batch_scope.gen1",
+  "source": "shared.mcp.batch_scope_policy.BATCH_STEP_ECOSYSTEM_HUB_PID",
+  "actions": [
+    "bots.bus.ack",
+    "bots.bus.ask",
+    "bots.bus.deliver",
+    "bots.bus.handle.list",
+    "bots.bus.handle.set",
+    "bots.bus.inbox",
+    "bots.bus.reply",
+    "bots.bus.send",
+    "bots.bus.whoami"
+  ]
+}
