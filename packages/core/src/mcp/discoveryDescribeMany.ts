@@ -126,7 +126,9 @@ export async function discoveryDescribeMany(
     const code = String(step?.error_code || step?.error || envelope.error_code || 'mcp_error');
     throw new Error(code);
   }
-  const rawPayload = step?.result ?? step?.data ?? envelope.data ?? envelope;
+  const envRecord = envelope as unknown as Record<string, unknown>;
+  const rawPayload =
+    step?.result ?? (step as Record<string, unknown> | undefined)?.data ?? envRecord.data ?? envelope.raw ?? envelope;
   const { data: normalized } = normalizeMcpToolEnvelope(rawPayload);
   const payload =
     normalized && Object.keys(normalized).length > 0

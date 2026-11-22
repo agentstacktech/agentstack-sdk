@@ -14,8 +14,11 @@ export async function fetchPlatformSnapshot(
   sdk: AgentStackSDK,
   params?: PlatformSnapshotParams,
 ): Promise<unknown> {
-  return sdk.mcp.execute({
-    action: 'analytics.platform_snapshot',
-    params: params ?? { period: '30d' },
-  });
+  const batch = await sdk.mcp.execute([
+    {
+      action: 'analytics.platform_snapshot',
+      params: params ?? { period: '30d' },
+    },
+  ]);
+  return batch.results[0]?.result ?? batch.raw;
 }
