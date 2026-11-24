@@ -5,6 +5,7 @@
 
 import type { HTTPClient } from '../client/http-client';
 import { mcpExecute } from '../mcp/execute';
+import { resolveMcpUrl } from '../mcp/urls';
 
 export type ReportListRow = {
   report_id: string;
@@ -23,17 +24,55 @@ export type ReportBacklogSummary = {
 
 type McpOpts = { projectId?: number; http: HTTPClient };
 
+async function runMcpData<T>(
+  http: HTTPClient,
+  projectId: number,
+  action: string,
+  params: Record<string, unknown>,
+): Promise<T> {
+  const token = http.getAuthToken?.() ?? undefined;
+  if (!token) throw new Error('MCP: missing auth token');
+  const apiBase = http.getConfig().apiBase ?? '';
+  const res = await mcpExecute([{ action, params: { project_id: projectId, ...params } }], {
+    token,
+    projectId,
+    mcpUrl: resolveMcpUrl(apiBase),
+  });
+  if (!res.ok) throw new Error(res.error ?? action);
+  const step = res.results?.[0];
+  const raw = (step?.result ?? step?.data) as Record<string, unknown> | undefined;
+  if (raw?.data !== undefined) return raw.data as T;
+  return (raw ?? {}) as T;
+}
+
+async function runMcpBatch(
+  http: HTTPClient,
+  projectId: number,
+  action: string,
+  params: Record<string, unknown>,
+) {
+  const token = http.getAuthToken?.() ?? undefined;
+  if (!token) throw new Error('MCP: missing auth token');
+  const apiBase = http.getConfig().apiBase ?? '';
+  return mcpExecute([{ action, params: { project_id: projectId, ...params } }], {
+    token,
+    projectId,
+    mcpUrl: resolveMcpUrl(apiBase),
+  });
+}
+
 /** MCP `diagnostics.report_list` compact rows. */
 export async function diagnosticsReportList(
   opts: McpOpts,
   params?: { limit?: number; severity?: string; status?: string },
 ): Promise<ReportListRow[]> {
   const projectId = opts.projectId ?? 1;
-  const batch = await mcpExecute(
-    [{ action: 'diagnostics.report_list', params: { limit: params?.limit ?? 50, ...params } }],
-    { http: opts.http, projectId },
+  const data = await runMcpData<{ reports?: ReportListRow[] }>(
+    opts.http,
+    projectId,
+    'diagnostics.report_list',
+    { limit: params?.limit ?? 50, ...params },
   );
-  const data = batch?.steps?.[0]?.data as { reports?: ReportListRow[] } | undefined;
   return Array.isArray(data?.reports) ? data.reports : [];
 }
 
@@ -43,16 +82,12 @@ export async function diagnosticsReportBacklogSummary(
   limit = 200,
 ): Promise<ReportBacklogSummary> {
   const projectId = opts.projectId ?? 1;
-  const batch = await mcpExecute(
-    [
-      {
-        action: 'diagnostics.reports.backlog_summary',
-        params: { project_id: projectId, limit },
-      },
-    ],
-    { http: opts.http, projectId },
+  return runMcpData<ReportBacklogSummary>(
+    opts.http,
+    projectId,
+    'diagnostics.reports.backlog_summary',
+    { limit },
   );
-  return (batch?.steps?.[0]?.data as ReportBacklogSummary) ?? {};
 }
 
 /** MCP `agents.plan_ingest` from report id(s). */
@@ -62,20 +97,11 @@ export async function diagnosticsReportIngestOrphans(
   params?: { limit?: number; dryRun?: boolean; envUuid?: string },
 ) {
   const projectId = opts.projectId ?? 1;
-  return mcpExecute(
-    [
-      {
-        action: 'diagnostics.reports.ingest_orphans',
-        params: {
-          project_id: projectId,
-          limit: params?.limit ?? 20,
-          dry_run: params?.dryRun ?? true,
-          env_uuid: params?.envUuid,
-        },
-      },
-    ],
-    { http: opts.http, projectId },
-  );
+  return runMcpBatch(opts.http, projectId, 'diagnostics.reports.ingest_orphans', {
+    limit: params?.limit ?? 20,
+    dry_run: params?.dryRun ?? true,
+    env_uuid: params?.envUuid,
+  });
 }
 
 export async function planIngestFromReport(
@@ -84,19 +110,10 @@ export async function planIngestFromReport(
   bridgeOpts?: { parentId?: string; envUuid?: string },
 ) {
   const projectId = opts.projectId ?? 1;
-  return mcpExecute(
-    [
-      {
-        action: 'agents.plan_ingest',
-        params: {
-          project_id: projectId,
-          report_ids: reportIds,
-          intake_mode: 'work',
-          parent_id: bridgeOpts?.parentId ?? 'arch-mcp-platform',
-          env_uuid: bridgeOpts?.envUuid,
-        },
-      },
-    ],
-    { http: opts.http, projectId },
-  );
+  return runMcpBatch(opts.http, projectId, 'agents.plan_ingest', {
+    report_ids: reportIds,
+    intake_mode: 'work',
+    parent_id: bridgeOpts?.parentId ?? 'arch-mcp-platform',
+    env_uuid: bridgeOpts?.envUuid,
+  });
 }
