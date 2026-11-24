@@ -22,6 +22,14 @@ export {
   type PathSegKind,
 } from './pathAtom';
 export {
+  diagnosticsReportBacklogSummary,
+  diagnosticsReportIngestOrphans,
+  diagnosticsReportList,
+  planIngestFromReport,
+  type ReportBacklogSummary,
+  type ReportListRow,
+} from './diagnosticsReportBridge';
+export {
   ProteinDraftJournal,
   newProteinOpId,
   buildProteinDeltaExecuteBody,
