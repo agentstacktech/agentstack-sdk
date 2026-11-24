@@ -23,10 +23,13 @@ export {
 } from './pathAtom';
 export {
   diagnosticsReportBacklogSummary,
+  diagnosticsReportGet,
   diagnosticsReportIngestOrphans,
   diagnosticsReportList,
   planIngestFromReport,
+  reportDetailNeedsSpillHydrate,
   type ReportBacklogSummary,
+  type ReportDetail,
   type ReportListRow,
 } from './diagnosticsReportBridge';
 export {
