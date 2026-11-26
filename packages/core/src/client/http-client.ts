@@ -1841,76 +1841,25 @@ export class HTTPClient extends SimpleEventEmitter {
         this.lastRetryTime.clear();
         this.refreshRetryDepth.clear(); // ✅ CRITICAL FIX: Очищаем счетчик глубины рекурсии
         
-        // Сначала пытаемся найти сохраненные credentials для перелогинивания
-        // Note: login_email, login_password, login_project_id are not stored in storage-utils for security
-        // These are only in sessionStorage for auto-login fallback
-        const savedEmail = sessionStorage.getItem('login_email');
-        const savedPassword = sessionStorage.getItem('login_password');
-        const savedProjectId = sessionStorage.getItem('login_project_id') || '1';
-
-        // ✅ Fix: Don't attempt auto-login if credentials are missing
-        if (!savedEmail || !savedPassword) {
-          logger.debug('🚫 No saved credentials found, skipping auto-login');
-          return false;
-        }
-
-        if (savedEmail && savedPassword) {
-          logger.debug('Attempting automatic re-login with saved credentials...');
-
-          const loginResult = await attemptSavedCredentialRelogin({
-            email: savedEmail,
-            password: savedPassword,
-            project_id: parseInt(savedProjectId, 10),
-          });
-
-          if (loginResult?.access_token) {
-            logger.info('Automatic re-login successful');
-
-            // CRITICAL: Обновляем токены в httpClient после успешного логина
-            this.setAuthToken(loginResult.access_token);
-
-            // API key должен быть получен из ответа, используем refresh_token как API key (согласно логике SDK)
-            const apiKeyFromResponse = loginResult.refresh_token || loginResult.access_token;
-            this.setApiKey(apiKeyFromResponse);
-
-            // Также обновляем storage для консистентности
-            if (typeof window !== 'undefined') {
-              setStorageItem('access_token', loginResult.access_token);
-              setStorageItem('refresh_token', loginResult.refresh_token || '');
-              setStorageItem('api_key', apiKeyFromResponse);
-            }
-
-            // CRITICAL: Полностью сбрасываем все retry счетчики после успешного перелогинивания
-            logger.debug('🔄 Resetting all retry counters after successful re-login');
-            this.urlRetryCounts.clear();
-            this.urlRetryDelays.clear();
-            this.lastRetryTime.clear();
-            this.refreshRetryDepth.clear(); // ✅ CRITICAL FIX: Очищаем счетчик глубины рекурсии
-            this.refreshAttempts = 0; // Сбрасываем счетчик при успехе
-            this.globalRefreshAttempts = 0; // ✅ MEMORY LEAK FIX: Сбрасываем глобальный счетчик при успехе
-            this.globalRefreshAttemptsResetTime = Date.now();
-            this.globalRefreshDepth = 0; // ✅ MEMORY LEAK FIX: Сбрасываем глобальную глубину при успехе
-            this.retryRecursionDepth = 0; // ✅ MEMORY LEAK FIX: Сбрасываем счетчик глубины retry при успехе
-
-            // ✅ MEMORY LEAK FIX: Повторяем все ожидающие запросы после успешного refresh
-            this.retryPendingRequests(true);
-
-            return true;
-          }
-        }
-
-        // Если credentials не найдены, пытаемся использовать refresh token (fallback)
         const refreshToken = getStorageItem('refresh_token') || sessionStorage.getItem('refresh_token');
         if (!refreshToken) {
           return false;
         }
 
+        const apiKeyHdr = this.getApiKey?.() || getStorageItem('api_key') || '';
+        const mintId =
+          typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : `mint-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
         const response = await fetch(`${this.config.baseUrl}/auth/refresh`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Idempotency-Key': mintId,
+            'X-Mint-Id': mintId,
+            ...(apiKeyHdr ? { 'X-API-Key': apiKeyHdr } : {}),
           },
-          body: JSON.stringify({ refresh_token: refreshToken })
+          body: JSON.stringify({ refresh_token: refreshToken, mint_id: mintId }),
         });
 
         if (response.ok) {
@@ -1920,16 +1869,16 @@ export class HTTPClient extends SimpleEventEmitter {
           if (getStorageItem('access_token')) {
             setStorageItem('access_token', data.access_token);
             setStorageItem('refresh_token', data.refresh_token);
-            setStorageItem('api_key', data.access_token);
+            if (data.api_key) setStorageItem('api_key', data.api_key);
           } else {
             sessionStorage.setItem('access_token', data.access_token);
             sessionStorage.setItem('refresh_token', data.refresh_token);
-            sessionStorage.setItem('api_key', data.access_token);
+            if (data.api_key) sessionStorage.setItem('api_key', data.api_key);
           }
 
           // Обновляем токены в SDK
           this.setAuthToken(data.access_token);
-          this.setApiKey(data.access_token);
+          if (data.api_key) this.setApiKey(data.api_key);
 
           // ✅ CRITICAL FIX: Сбрасываем счетчик попыток refresh при успехе
           this.refreshAttempts = 0;
@@ -1951,6 +1900,21 @@ export class HTTPClient extends SimpleEventEmitter {
 
         if (response.status === 401) {
           terminalRefreshFailure = true;
+        } else if (response.status === 400) {
+          let bodyText = '';
+          try {
+            bodyText = (await response.text()).toLowerCase();
+          } catch {
+            bodyText = '';
+          }
+          const missingApiKey =
+            bodyText.includes('x-api-key') ||
+            bodyText.includes('api_key') ||
+            bodyText.includes('api key');
+          if (missingApiKey && !apiKeyHdr) {
+            this.refreshAttempts = Math.max(0, this.refreshAttempts - 1);
+            return false;
+          }
         } else if (isBackendReconnectingError({ status: response.status })) {
           this.refreshAttempts = Math.max(0, this.refreshAttempts - 1);
           dispatchBackendReconnectingEvent();

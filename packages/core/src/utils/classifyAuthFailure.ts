@@ -168,6 +168,9 @@ const TRANSIENT_SESSION_MISS_REASONS = new Set([
   'server_busy',
   'session_resolve_busy',
   'cache_epoch_stale',
+  'session_row_missing',
+  'no_user',
+  'project_mismatch',
 ]);
 
 /** True when a session miss is likely transient (deploy recycle, L1/DNA race). */

@@ -1288,7 +1288,7 @@ export class AgentAuth extends SimpleEventEmitter {
   /**
    * Выход из системы
    */
-  async logout(): Promise<void> {
+  async logout(options?: { everywhere?: boolean }): Promise<void> {
     this.invalidateSessionBootstrap('logout');
     this.getCurrentUserInFlight = null;
     try {
@@ -1300,7 +1300,8 @@ export class AgentAuth extends SimpleEventEmitter {
           apiKey: this.client.getApiKey()
         }
       });
-      await this.client.post('/auth/logout', undefined, { skipAuthStateCheck: true });
+      const body = options?.everywhere ? { everywhere: true } : undefined;
+      await this.client.post('/auth/logout', body, { skipAuthStateCheck: true });
       // Clear tokens both in client and storage
       this.client.setAuthToken(null);
       this.client.setApiKey(null);
