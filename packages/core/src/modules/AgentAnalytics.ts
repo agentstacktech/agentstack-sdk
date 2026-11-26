@@ -73,7 +73,43 @@ export type AnalyticsSliceName =
   | 'integrations'
   | 'hosting'
   | 'agents'
-  | 'commerce';
+  | 'commerce'
+  | 'usage';
+
+export interface UsageQuotaRow {
+  metric_id: string;
+  used: number;
+  limit?: number | null;
+  unit?: string;
+  pct?: number | null;
+  deep_link?: string | null;
+  source?: string;
+}
+
+export interface UsageScopeMeta {
+  plane?: 'project';
+  personal_builder_energy_excluded?: boolean;
+}
+
+export interface ProjectBuilderEnergySlice {
+  current?: number;
+  purchased?: number;
+  owner_kind?: string;
+  llm_payer?: string | null;
+  source?: string;
+}
+
+export interface UsageSlice {
+  quotas?: UsageQuotaRow[];
+  limits_as_of?: string;
+  scope_meta?: UsageScopeMeta;
+  project_builder_energy?: ProjectBuilderEnergySlice | null;
+  sandbox_generation?: Record<string, any>;
+  bot_messages_month?: number;
+  agent_runs_30d?: number;
+  llm_tokens?: { tokens_in?: number; tokens_out?: number; source?: string };
+  filtered?: boolean;
+}
 
 export interface ProjectAnalyticsSnapshot {
   project_id: number;
@@ -89,6 +125,7 @@ export interface ProjectAnalyticsSnapshot {
   hosting?: Record<string, any>;
   agents?: Record<string, any>;
   commerce?: Record<string, any>;
+  usage?: UsageSlice | Record<string, any>;
   links?: Record<string, string | null | undefined>;
   warnings?: Array<{ code: string; slice: string; message: string }>;
   include?: string[];
@@ -234,7 +271,10 @@ export class AgentAnalytics {
     return response.data;
   }
 
-  /** Thin wrapper over getProjectSnapshot activity slice. */
+  /**
+   * Thin wrapper over getProjectSnapshot activity slice.
+   * @deprecated Prefer `getProjectSnapshot` with `include: ['usage']` for quotas.
+   */
   async getUsageStats(params?: {
     project_id?: number;
     period?: AnalyticsPeriod;

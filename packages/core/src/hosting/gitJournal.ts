@@ -24,6 +24,16 @@ export type HostingDevBuildRow = {
   at?: string;
 };
 
+export type HostingLastHookResult = {
+  ok?: boolean;
+  code?: string;
+  detail?: string;
+  bucket_id?: string;
+  build_target?: string;
+  pushed_sha?: string;
+  at?: string;
+};
+
 export type HostingGitStatus = {
   ok?: boolean;
   dirty?: boolean;
@@ -31,6 +41,10 @@ export type HostingGitStatus = {
   last_build_status?: string;
   recent_dev_builds?: HostingDevBuildRow[];
   next_actions?: Record<string, unknown>[];
+  journal_root?: string;
+  last_hook?: HostingLastHookResult;
+  hook_failed?: boolean;
+  recovery_hint?: string;
 };
 
 export async function getHostingGitStatus(

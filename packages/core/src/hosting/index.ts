@@ -74,6 +74,7 @@ export {
   getHostingBuildJobStatus,
   promoteHostingGitBranch,
   type HostingGitStatus,
+  type HostingLastHookResult,
 } from './gitJournal';
 export {
   routeDeploySurface,
