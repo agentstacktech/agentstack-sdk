@@ -1,6 +1,6 @@
 {
   "name": "@agentstack/hooks",
-  "version": "0.4.27",
+  "version": "0.5.0",
   "description": "Shared data hooks for AgentStack SDK - AI-First design",
   "readme": "README.en.md",
   "main": "dist/index.js",

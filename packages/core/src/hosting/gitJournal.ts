@@ -3,19 +3,42 @@
  */
 import type { HTTPClient } from '../client/http-client';
 
+import { mcpExecute, type McpStep } from '../mcp/execute';
+import { resolveMcpUrl } from '../mcp/urls';
+
 import { parseJournalBuildReceipt, type JournalBuildReceipt } from './journalBuildReceipt';
 
-async function mcpExecute<T>(
+async function mcpHostingStep<T>(
   client: HTTPClient,
+  projectId: number,
   action: string,
   params: Record<string, unknown>,
 ): Promise<T> {
-  const res = await client.post<{ ok?: boolean; result?: T; data?: T } & T>(
-    '/mcp/execute',
-    { action, params },
-  );
-  const body = res.data as Record<string, unknown>;
-  return (body?.result ?? body?.data ?? body) as T;
+  const token = client.getAuthToken();
+  if (!token) {
+    throw new Error('hosting.gitJournal: auth token required');
+  }
+  const apiBase = client.getConfig().apiBase ?? '';
+  const steps: McpStep[] = [{ action, params }];
+  const mcpTool =
+    action.startsWith('hosting.git.') && action.includes('promote')
+      ? 'agentstack.execute'
+      : 'agentstack.read';
+  const envelope = await mcpExecute(steps, {
+    token,
+    projectId,
+    mcpUrl: resolveMcpUrl(apiBase),
+    executionIntent: 'direct',
+    stopOnError: true,
+    mcpTool,
+  });
+  const step = envelope.steps?.[0];
+  const result = step?.result as Record<string, unknown> | undefined;
+  const data =
+    (result?.data as T | undefined) ??
+    (result?.ok === true && result?.data !== undefined ? (result.data as T) : undefined) ??
+    (result as T | undefined);
+  return data as T;
 }
 
 export type HostingDevBuildRow = {
@@ -51,16 +74,20 @@ export async function getHostingGitStatus(
   client: HTTPClient,
   params: { project_id: number; bucket_id?: string; bucket_name?: string },
 ): Promise<HostingGitStatus> {
-  return mcpExecute<HostingGitStatus>(client, 'hosting.git.status', params);
+  return mcpHostingStep<HostingGitStatus>(client, params.project_id, 'hosting.git.status', params);
 }
 
 export async function getHostingBuildJobStatus(
   client: HTTPClient,
   jobId: string,
 ): Promise<{ receipt: JournalBuildReceipt; raw: Record<string, unknown> }> {
-  const raw = await mcpExecute<Record<string, unknown>>(client, 'hosting.site.build_status', {
-    job_id: jobId,
-  });
+  const projectId = Number(client.getConfig().projectId ?? 1);
+  const raw = await mcpHostingStep<Record<string, unknown>>(
+    client,
+    projectId,
+    'hosting.site.build_status',
+    { job_id: jobId },
+  );
   return { receipt: parseJournalBuildReceipt(raw), raw };
 }
 
@@ -74,7 +101,7 @@ export async function promoteHostingGitBranch(
     target?: 'dev' | 'prod';
   },
 ): Promise<Record<string, unknown>> {
-  return mcpExecute<Record<string, unknown>>(client, 'hosting.git.promote_branch', {
+  return mcpHostingStep<Record<string, unknown>>(client, params.project_id, 'hosting.git.promote_branch', {
     ref: 'dev',
     target: 'prod',
     ...params,

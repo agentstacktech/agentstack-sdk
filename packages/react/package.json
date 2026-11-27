@@ -1,6 +1,6 @@
 {
   "name": "@agentstack/react",
-  "version": "0.4.27",
+  "version": "0.5.0",
   "description": "React integration for AgentStack SDK",
   "readme": "README.en.md",
   "main": "dist/index.js",

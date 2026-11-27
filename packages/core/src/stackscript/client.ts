@@ -75,6 +75,7 @@ export interface ScriptDryRunReceipt {
   next_actions?: StackscriptMcpNextActionRow[];
   fuel_used?: number;
   dry_run?: boolean;
+  ephemeral_compile?: boolean;
   write_set?: Array<{ path?: string[]; value?: unknown }>;
   events?: Array<Record<string, unknown>>;
   data?: { value?: unknown };
@@ -442,6 +443,25 @@ export function createStackScriptClient(
     return env ? { headers: { 'X-AgentStack-Env': env } } : undefined;
   };
 
+  const needsExecutionIntent = (action: string, params: object): boolean => {
+    if (action === 'script.put') {
+      const p = params as ScriptPutParams;
+      if (p.validate_only && String(p.publish ?? 'none') === 'none') {
+        return false;
+      }
+    }
+    return (
+      action === 'script.put' ||
+      action === 'script.publish' ||
+      action === 'script.rollback' ||
+      action === 'script.run' ||
+      action === 'script.test' ||
+      action === 'script.recompile_version' ||
+      action === 'script.archive' ||
+      action === 'script.delete'
+    );
+  };
+
   const postStep = async <T>(
     action: string,
     params: object,
@@ -481,9 +501,17 @@ export function createStackScriptClient(
         ok: hostedStepPayload.ok !== false,
       };
     } else {
+      const batchBody: Record<string, unknown> = {
+        action,
+        params,
+        context: batchContext,
+      };
+      if (needsExecutionIntent(action, params)) {
+        batchBody.options = { execution_intent: 'direct' };
+      }
       res = await http.post(
         mcpPath,
-        { action, params, context: batchContext },
+        batchBody,
         prodCommit ? extraConfig : { ...mcpRequestConfig(), ...extraConfig },
       );
     }
@@ -585,6 +613,7 @@ export function createStackScriptClient(
       version: number;
       alias: string;
       approve_caps?: boolean;
+      approve_public_run?: boolean;
     }) => postStep('script.publish', params),
     rollback: (params: {
       script_id: string;

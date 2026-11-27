@@ -1,6 +1,6 @@
 {
   "name": "@agentstack/sdk",
-  "version": "0.4.27",
+  "version": "0.5.0",
   "description": "AgentStack-SDK - Universal API client with modular architecture and Neural integration",
   "readme": "README.en.md",
   "type": "module",
